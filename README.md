@@ -44,6 +44,18 @@ npx playwright install ffmpeg      # for showcase videos (screenshots work witho
   node arena.mjs import qwen3-32b-q4 ~/arena-runs/qwen3-32b-q4
   ```
 
+- *Local models over an API:* point the arena at any OpenAI-compatible server (llama.cpp's
+  `llama-server`, Ollama, LM Studio, vLLM). It sends each prompt, saves the page and records
+  how long it took and how many tokens it used:
+
+  ```sh
+  node arena.mjs run qwen3.8-27b-q4 --base-url http://homeserver:8080/v1 --grade
+  node arena.mjs run qwen3.8-27b-q8 --base-url http://homeserver:11434/v1 \
+    --api-model qwen3.8:27b-q8_0 --temperature 0.6 --top-p 0.95 --max-tokens 32768
+  ```
+
+  See [Local models](#local-models) for what is measured and how to compare quantizations.
+
 **2. Grade.**
 
 ```sh
@@ -65,6 +77,45 @@ npm run serve                          # http://localhost:4173
   of the page when it failed. "Open live" runs the app.
 - **Judge:** two anonymous submissions of the same task run live side by side (keys `1` A,
   `2` B, `3` tie, `4` both bad, `N` next). Names are revealed after you vote.
+
+## Local models
+
+`node arena.mjs run <model>` streams each task from an OpenAI-compatible
+`/v1/chat/completions` endpoint and writes, per task:
+
+```
+submissions/<model>/<task>/index.html   the page, taken from the reply's ```html block
+submissions/<model>/<task>/run.json     time and token measurements
+submissions/<model>/<task>/reply.md     the raw reply (and thinking.md for reasoning models)
+```
+
+- **Options:** `--base-url` (default `$ARENA_BASE_URL` or `http://localhost:8080/v1`),
+  `--api-model` (optional when the server serves exactly one model, as `llama-server` does),
+  `--task`, `--force` to re-run tasks that already have a page, `--grade` to grade afterwards,
+  and sampling settings `--temperature`, `--top-p`, `--seed`, `--max-tokens`. `--extra '<json>'`
+  merges anything else into the request, e.g. `'{"chat_template_kwargs":{"enable_thinking":false}}'`
+  to turn off Qwen's thinking on llama-server. A server that needs a key reads `$ARENA_API_KEY`.
+- **The request:** the task's `PROMPT.md` as the user message, plus one short system message
+  asking for the whole file in a single ```` ```html ```` block. It is identical for every model.
+- **Measured:** wall time, time to first token (mostly prompt processing), output tokens
+  including thinking tokens, generation speed in tokens/s, and prompt speed when the server
+  reports it. Numbers come from the server's `usage` (and llama-server's `timings`); a server
+  that reports nothing gets counts estimated from the stream, shown with `~`.
+- **Shown:** a Generation column in the standings and `npm run board` (totals over the tasks
+  that have a `run.json`), and per-task figures on each submission card, with links to the
+  raw reply and the thinking.
+- **Truncation:** a reply cut off by the token limit is flagged. Its page is still graded and
+  usually scores low, so give reasoning models a large `--max-tokens` and context (`-c` on
+  llama-server); a full app plus thinking can need 20–40k tokens.
+- **Chat models:** for a page you pasted in by hand, you can write a `run.json` yourself with any
+  of `wallMs`, `completionTokens`, `reasoningTokens` and `genTokensPerSec` to show it too.
+
+**Comparing models and quantizations.** Give each configuration its own name, e.g.
+`qwen3.8-27b-q4_k_m` and `qwen3.8-27b-q8_0`. Speed differences are measured precisely, but a
+single reply per task is a noisy measure of quality: two runs of the *same* model can differ by
+more than q4 and q8 do. Before concluding that one quantization is better, run each
+configuration two or three times under separate names (`…-q4_k_m-r2`) and compare the spread,
+and grade everything on the same machine.
 
 ## Scoring
 
@@ -116,15 +167,16 @@ the next `npm run grade`.
 ## Layout
 
 ```
-arena.mjs            CLI: tasks, prompt, new, import, grade, board, serve
+arena.mjs            CLI: tasks, prompt, new, import, run, grade, board, serve
 lib/grader.mjs       per-check browser contexts, network isolation, health checks, video
 lib/harness.mjs      the `t` helper object
 lib/probe.js         init script: canvas + Web Audio instrumentation
+lib/runner.mjs       `run`: OpenAI-compatible streaming client, token/time metrics, HTML extraction
 lib/scoring.mjs      leaderboard and Bradley–Terry
 lib/server.mjs       dashboard API; each submission is served from its own *.localhost origin
 dashboard/           standings, task results, blind judging
 tasks/<id>/          PROMPT.md + task.mjs
-submissions/<model>/<task>/index.html
+submissions/<model>/<task>/index.html   (+ run.json, reply.md, thinking.md from `run`)
 results/<model>/<task>/   result.json, showcase.webm, shots/, checks/ (failure screenshots)
 results/votes.json   judge votes
 ```

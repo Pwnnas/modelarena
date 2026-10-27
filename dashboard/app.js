@@ -6,6 +6,15 @@ const app = document.getElementById('app');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const fmt = (n, d = 1) => (n == null ? '—' : Number(n).toFixed(d));
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const num = (n) => Math.round(n).toLocaleString('en-US');
+const kTok = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : String(Math.round(n)));
+function dur(ms) {
+  if (ms == null) return '—';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${(ms / 1000).toFixed(1)} s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+  return `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, '0')}m`;
+}
 
 let S = null;
 const J = { filter: 'any', pair: null, revealed: false, busy: false, last: null, guardUntil: 0 };
@@ -39,6 +48,19 @@ function standingsView() {
   const head = S.tasks
     .map((t) => `<th class="num task-col" title="${esc(t.subtitle)}">${esc(t.title)}</th>`)
     .join('');
+  const anyRun = S.models.some((m) => S.runTotals?.[m]);
+  const genHead = anyRun
+    ? `<th class="num" title="Totals over the tasks generated with arena.mjs run: wall time, output tokens (thinking included) and generation speed">Generation</th>`
+    : '';
+  const genCell = (m) => {
+    const g = S.runTotals?.[m];
+    if (!anyRun) return '';
+    if (!g) return `<td class="num"><span class="none">—</span></td>`;
+    const est = g.estimated ? '~' : '';
+    const tip = `${g.tasks} task(s), ${num(g.completionTokens)} output tokens${g.reasoningTokens ? `, ${num(g.reasoningTokens)} thinking` : ''}${g.truncated ? `, ${g.truncated} cut off at the token limit` : ''}`;
+    return `<td class="num" title="${esc(tip)}"><span class="mid">${dur(g.wallMs)}</span>
+      <small class="cell-sub">${est}${kTok(g.completionTokens)} tok${g.genTokensPerSec ? ` · ${g.genTokensPerSec} tok/s` : ''}</small></td>`;
+  };
   const rows = S.board
     .map((r) => {
       const cells = S.tasks
@@ -61,6 +83,7 @@ function standingsView() {
         <td class="num"><span class="mid">${fmt(r.auto)}</span></td>
         <td class="num">${pref}</td>
         ${cells}
+        ${genCell(r.model)}
       </tr>`;
     })
     .join('');
@@ -68,7 +91,7 @@ function standingsView() {
   return `<h1>Standings</h1>
     <p class="lede">Each model builds the same six browser apps from identical prompts. Click a score to see what passed, what failed and a recording of the app.</p>
     <div class="standings-wrap"><table class="standings">
-      <thead><tr><th>#</th><th>Model</th><th class="num">Arena</th><th class="num">Auto</th><th class="num">Preference</th>${head}</tr></thead>
+      <thead><tr><th>#</th><th>Model</th><th class="num">Arena</th><th class="num">Auto</th><th class="num">Preference</th>${head}${genHead}</tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
     <section class="explain" aria-label="How scoring works">
@@ -117,13 +140,39 @@ function tasksView(id, focusModel) {
   </div>`;
 }
 
+// How the page was generated, when it came from `arena.mjs run` (or a
+// hand-written run.json).
+function runStats(m, tid) {
+  const r = S.runs?.[m]?.[tid];
+  if (!r) return '';
+  const est = r.tokensEstimated ? '~' : '';
+  const items = [
+    ['Time', dur(r.wallMs)],
+    ['Tokens', est + num(r.completionTokens ?? 0)],
+    r.reasoningTokens ? ['Thinking', est + num(r.reasoningTokens)] : null,
+    r.genTokensPerSec ? ['Speed', `${r.genTokensPerSec} tok/s`] : null,
+    r.ttftMs != null ? ['First token', dur(r.ttftMs)] : null,
+    r.promptTokensPerSec ? ['Prompt', `${r.promptTokensPerSec} tok/s`] : null,
+  ].filter(Boolean);
+  const params = Object.entries(r.params ?? {}).map(([k, v]) => `${k} ${typeof v === 'object' ? JSON.stringify(v) : v}`);
+  const src = [r.servedModel ?? r.apiModel, r.endpoint, ...params].filter(Boolean).join(' · ');
+  const live = S.urls[m]?.[tid] ?? '';
+  const file = (name) => esc(live.replace(/index\.html$/, name));
+  const links = [r.replyChars ? `<a href="${file('reply.md')}" target="_blank" rel="noopener">reply</a>` : '', r.reasoningChars ? `<a href="${file('thinking.md')}" target="_blank" rel="noopener">thinking</a>` : '']
+    .filter(Boolean)
+    .join(' · ');
+  const warn = r.finishReason === 'length' ? `<p class="run-warn">Cut off at the token limit, so the page is incomplete. Raise --max-tokens or the server's context size.</p>` : '';
+  return `<dl class="run">${items.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+    <p class="run-src">${esc(src)}${links && live ? ` · ${links}` : ''}</p>${warn}`;
+}
+
 function submissionCard(t, m, focused) {
   const r = result(m, t.id);
   const live = S.urls[m]?.[t.id];
   if (!r) {
     return `<article class="sub" id="sub-${esc(m)}"><div class="sub-media"></div><div class="sub-body">
       <div class="sub-top"><span class="model">${esc(m)}</span></div>
-      <p class="muted">Submitted but not graded yet. Run <code>npm run grade</code>.</p>
+      <p class="muted">Submitted but not graded yet. Run <code>npm run grade</code>.</p>${runStats(m, t.id)}
       <div class="sub-links"><a class="btn" href="${esc(live)}" target="_blank" rel="noopener">Open live</a></div></div></article>`;
   }
   const shots = r.media?.shots ?? [];
@@ -154,6 +203,7 @@ function submissionCard(t, m, focused) {
     <div class="sub-body">
       <div class="sub-top"><span class="model">${esc(m)}</span><span class="big">${fmt(r.score)}</span><span class="of">/ 100</span></div>
       <div class="sub-meta">Graded ${esc(when)} in ${Math.round(r.durationMs / 1000)} s, ${(r.submission.bytes / 1024).toFixed(0)} KB page, Chrome ${esc(r.browser)}</div>
+      ${runStats(m, t.id)}
       <div class="sub-links">
         <a class="btn" href="${esc(live)}" target="_blank" rel="noopener">Open live</a>
       </div>
