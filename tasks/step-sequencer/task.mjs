@@ -17,9 +17,13 @@ const STEP_120 = 60 / 120 / 4;
 
 async function clearPattern(t) {
   for (let round = 0; round < 3; round++) {
-    const pressed = await t.page.locator('button[data-track][data-step][aria-pressed="true"]').all();
+    // Resolve to stable track/step selectors first: an nth() locator over
+    // [aria-pressed="true"] shifts as each click un-presses a step.
+    const pressed = await t.page
+      .locator('button[data-track][data-step][aria-pressed="true"]')
+      .evaluateAll((els) => els.map((el) => [el.dataset.track, el.dataset.step]));
     if (!pressed.length) return;
-    for (const b of pressed) await b.click();
+    for (const [tr, st] of pressed) await t.page.click(step(tr, st));
   }
 }
 

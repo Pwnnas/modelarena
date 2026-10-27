@@ -48,7 +48,15 @@ async function cut(t, y) {
   const vw = t.page.viewportSize().width;
   const s = await stats(t);
   const cx = s.centroid.x;
-  const release = await walk(t, { x: Math.max(4, cx - 450), y }, { x: Math.min(vw - 4, cx + 450), y }, { steps: 45, pause: 10, button: 'right' });
+  // Start and end on bare canvas, as a person would, not on a control panel
+  // floating over it: step each end inward until the press lands on a canvas.
+  const [x0, x1] = await t.eval(({ from, to, y, cx }) => {
+    const onCanvas = (x) => document.elementFromPoint(x, y)?.tagName === 'CANVAS';
+    while (from < cx && !onCanvas(from)) from += 8;
+    while (to > cx && !onCanvas(to)) to -= 8;
+    return [from, to];
+  }, { from: Math.max(4, cx - 450), to: Math.min(vw - 4, cx + 450), y, cx });
+  const release = await walk(t, { x: x0, y }, { x: x1, y }, { steps: 45, pause: 10, button: 'right' });
   await release();
 }
 
