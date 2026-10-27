@@ -8,7 +8,7 @@ const fmt = (n, d = 1) => (n == null ? '—' : Number(n).toFixed(d));
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
 let S = null;
-const J = { filter: 'any', pair: null, revealed: false, busy: false, last: null };
+const J = { filter: 'any', pair: null, revealed: false, busy: false, last: null, guardUntil: 0 };
 
 async function refresh() {
   const res = await fetch('/api/state');
@@ -193,7 +193,9 @@ function nextPair() {
 function judgeView(filter) {
   J.filter = filter && task(filter) ? filter : 'any';
   const valid = J.pair && S.urls[J.pair.a]?.[J.pair.task] && S.urls[J.pair.b]?.[J.pair.task] && (J.filter === 'any' || J.pair.task === J.filter);
-  if (!valid) {
+  // A re-render after voting (e.g. leaving and coming back) would show a
+  // disabled ballot without the reveal overlay, so deal a fresh pair instead.
+  if (!valid || J.revealed) {
     J.pair = nextPair();
     J.revealed = false;
   }
@@ -215,7 +217,7 @@ function judgeView(filter) {
       <div class="screen"><iframe title="Contender ${side.toUpperCase()}" src="${esc(S.urls[J.pair[side]][J.pair.task])}" allow="autoplay; clipboard-read; clipboard-write"></iframe>
         <div class="reveal" data-reveal="${side}"></div></div>
     </div>`;
-  return `<div class="judge">${top}
+  return `<div class="judge" tabindex="-1">${top}
     <p class="brief"><strong>${esc(t.title)}, ${esc(t.subtitle.toLowerCase())}.</strong> ${esc(t.judging.join(' '))}
       Use both apps for a while before voting; each runs live at 1280×800.</p>
     <div class="duel">${pane('a')}${pane('b')}</div>
@@ -291,7 +293,10 @@ function render() {
   }
   document.querySelector('.meta').textContent = `${plural(S.models.length, 'model')}, ${plural(S.tasks.length, 'task')}, ${plural(S.votes.length, 'vote')}`;
   app.innerHTML = view === 'tasks' ? tasksView(a, b) : view === 'judge' ? judgeView(a) : standingsView();
-  if (view === 'judge') fitScreens();
+  if (view === 'judge') {
+    fitScreens();
+    guardFocus();
+  }
   const focus = document.querySelector('[data-focus="1"]');
   if (focus) focus.scrollIntoView({ block: 'start', behavior: 'instant' });
   else window.scrollTo(0, 0);
@@ -337,7 +342,7 @@ app.addEventListener('click', async (e) => {
     J.revealed = false;
     render();
   } else if (action === 'undo') {
-    S = await (await fetch('/api/vote/undo', { method: 'POST' })).json();
+    S = await (await fetch('/api/vote/undo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json();
     toast('Last vote removed');
     J.revealed = false;
     render();
@@ -345,7 +350,10 @@ app.addEventListener('click', async (e) => {
     const f = document.querySelector(`.pane.${el.dataset.side} iframe`);
     const src = f.src;
     f.src = 'about:blank';
-    requestAnimationFrame(() => (f.src = src));
+    requestAnimationFrame(() => {
+      f.src = src;
+      guardFocus([f]);
+    });
   } else if (action === 'expand') {
     const pane = el.closest('.pane');
     const on = !pane.classList.contains('expanded');
@@ -363,6 +371,27 @@ document.addEventListener('keydown', (e) => {
   if (map[e.key]) vote(map[e.key]);
   else if (e.key === 'n' || e.key === 'N') document.querySelector('[data-action="next"]')?.click();
   else if (e.key === 'Escape') document.querySelector('.pane.expanded [data-action="expand"]')?.click();
+});
+
+// Apps that focus themselves on load (a spreadsheet's grid, an editor's canvas)
+// would pull the keyboard into their iframe and silently disable the vote keys.
+// Until the frames have loaded, hand any such focus back to the dashboard;
+// after that, clicking into an app works as usual.
+function guardFocus(frames = [...document.querySelectorAll('.duel iframe')]) {
+  if (!frames.length) return;
+  J.guardUntil = performance.now() + 10000;
+  let pending = frames.length;
+  for (const f of frames)
+    f.addEventListener('load', () => {
+      if (--pending === 0) J.guardUntil = performance.now() + 1000;
+    }, { once: true });
+}
+
+window.addEventListener('blur', () => {
+  if (performance.now() > J.guardUntil) return;
+  setTimeout(() => {
+    if (document.activeElement?.matches?.('.duel iframe')) document.querySelector('.judge')?.focus({ preventScroll: true });
+  });
 });
 
 window.addEventListener('hashchange', render);

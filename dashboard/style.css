@@ -166,6 +166,7 @@ tr:first-child .rank { color: var(--ink); }
 .sub {
   display: grid; grid-template-columns: minmax(0, 46%) minmax(0, 1fr); gap: 0;
   background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden;
+  scroll-margin-top: 76px; /* clear the sticky bar when jumping to a model */
 }
 .sub-media { background: var(--stage); display: flex; flex-direction: column; }
 .sub-media video, .sub-media img.hero { width: 100%; aspect-ratio: 16 / 10; display: block; object-fit: contain; background: var(--stage); }
@@ -202,6 +203,7 @@ tr:first-child .rank { color: var(--ink); }
 
 /* ── Judge ───────────────────────────────────────────────── */
 .judge { background: var(--stage); color: var(--stage-ink); margin: -32px -28px -80px; padding: 24px 28px 40px; min-height: calc(100vh - 60px); }
+.judge:focus { outline: none; }
 .judge-top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
 .judge-top h2 { margin-right: 6px; }
 .seg { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -210,6 +212,7 @@ tr:first-child .rank { color: var(--ink); }
   padding: 5px 11px; border-radius: 99px; cursor: pointer; font-size: 13px;
 }
 .seg button[aria-pressed='true'] { background: var(--stage-ink); color: var(--stage); }
+.seg button:disabled { opacity: 0.35; cursor: default; }
 .judge-top .count { margin-left: auto; font-size: 13px; opacity: 0.7; }
 .judge .brief { font-size: 14px; opacity: 0.85; margin: 0 0 16px; max-width: 110ch; }
 .judge .brief strong { font-weight: 600; }
