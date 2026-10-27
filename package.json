@@ -1,0 +1,20 @@
+{
+  "name": "model-arena",
+  "version": "0.1.0",
+  "description": "Visual model-evaluation arena: tasks, automated grader, blind pairwise judging",
+  "scripts": {
+    "grade": "node arena.mjs grade",
+    "serve": "node arena.mjs serve",
+    "board": "node arena.mjs board",
+    "tasks": "node arena.mjs tasks",
+    "arena": "node arena.mjs"
+  },
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.64.1",
+    "pngjs": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gridcalc</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M8 12h16M8 20h16M14 8v16M20 8v16' stroke='white' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<style>
+:root{
+  --accent:#2563eb; --accent-d:#1d4ed8; --accent-soft:#e6eefc;
+  --ink:#1b2230; --ink-2:#475467; --ink-3:#8791a3;
+  --line:#e5e8ee; --line-strong:#d3d8e0; --chrome:#f6f7f9;
+  --hdr-bg:#f6f7f9; --hdr-line:#dde1e8;
+  --err:#c2272d; --err-bg:#fdf1f1;
+  --rowh:24px; --hdrh:26px; --rhw:50px;
+  --font:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:var(--font);font-size:13px;color:var(--ink);background:var(--chrome);overflow:hidden;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
+#app{display:flex;flex-direction:column;height:100%;min-width:480px}
+
+/* ---------- top bar ---------- */
+#topbar{display:flex;align-items:center;gap:12px;height:48px;padding:0 16px;background:#fff;border-bottom:1px solid var(--line);flex:none}
+.logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#4f8cff,#1d4ed8);display:grid;place-items:center;box-shadow:0 1px 3px rgba(29,78,216,.4),inset 0 0 0 1px rgba(255,255,255,.18)}
+.brand{font-weight:650;font-size:15px;letter-spacing:-.015em}
+.vsep{width:1px;height:20px;background:var(--line)}
+.doc{color:var(--ink-2);font-size:13px}
+.spacer{flex:1}
+.saved{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3)}
+.saved i{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.16)}
+
+/* ---------- toolbar ---------- */
+#toolbar{display:flex;align-items:center;gap:2px;height:40px;padding:0 12px;background:#fff;border-bottom:1px solid var(--line);flex:none}
+.tb{height:28px;min-width:28px;padding:0 8px;border:0;background:transparent;border-radius:6px;color:var(--ink-2);display:inline-flex;align-items:center;justify-content:center;gap:6px;font:500 12.5px var(--font);cursor:pointer;transition:background .12s}
+.tb:hover{background:#eff1f5;color:var(--ink)}
+.tb:active{background:#e4e8ee}
+.tb[disabled]{opacity:.35;pointer-events:none}
+.tb svg{flex:none}
+.tsep{width:1px;height:18px;background:var(--line);margin:0 6px}
+.hint{font-size:12px;color:var(--ink-3)}
+.hint kbd{font:500 11px var(--font);background:#f1f3f6;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--ink-2)}
+
+/* ---------- formula row ---------- */
+#fxrow{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--line);flex:none}
+#name-box{width:72px;height:28px;display:grid;place-items:center;border:1px solid var(--line-strong);border-radius:6px;font-weight:600;font-size:12.5px;background:#fff;color:var(--ink);flex:none;letter-spacing:.01em}
+.fx{font:italic 600 15px Georgia,"Times New Roman",serif;color:var(--ink-3);padding:0 2px;flex:none}
+#bar-wrap{position:relative;flex:1;height:28px;border:1px solid var(--line-strong);border-radius:6px;background:#fff;overflow:hidden;transition:border-color .12s,box-shadow .12s}
+#bar-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.16)}
+#bar-hl,#formula-bar{font:13.5px/26px var(--font);padding:0 10px;letter-spacing:0;word-spacing:0}
+#bar-hl{position:absolute;left:0;top:0;white-space:pre;pointer-events:none;color:var(--ink)}
+#formula-bar{position:absolute;inset:0;width:100%;height:100%;border:0;outline:0;margin:0;background:transparent;color:transparent;caret-color:var(--ink);-webkit-user-select:text;user-select:text}
+#formula-bar::selection,#ed::selection{background:rgba(37,99,235,.28);color:transparent}
+#formula-bar::placeholder{color:#a3acbb}
+
+/* ---------- grid ---------- */
+#grid-scroll{flex:1;min-height:0;position:relative;overflow:auto;background:#fff;scrollbar-gutter:auto}
+#grid-scroll::-webkit-scrollbar{width:13px;height:13px}
+#grid-scroll::-webkit-scrollbar-track{background:#f6f7f9}
+#grid-scroll::-webkit-scrollbar-thumb{background:#cdd2db;border-radius:8px;border:3px solid #f6f7f9}
+#grid-scroll::-webkit-scrollbar-thumb:hover{background:#b3bac6}
+#grid-scroll::-webkit-scrollbar-corner{background:#f6f7f9}
+#sheet{position:relative;width:max-content;min-width:100%}
+#grid{border-collapse:separate;border-spacing:0;table-layout:fixed;font-variant-numeric:tabular-nums}
+#grid th,#grid td{margin:0;height:var(--rowh);padding:0 7px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:calc(var(--rowh) - 1px);font-weight:400}
+#grid td{background:transparent;cursor:cell;text-align:left;color:var(--ink)}
+#grid td[data-t=n]{text-align:right;text-overflow:clip}
+#grid td[data-t=t]{text-align:left}
+#grid td[data-t=b]{text-align:center}
+#grid td[data-t=e]{text-align:center;color:var(--err);background:var(--err-bg);font-weight:500;font-size:12px;position:relative;cursor:help;text-overflow:clip}
+#grid td[data-t=e]::after{content:"";position:absolute;top:0;right:0;border-style:solid;border-width:0 7px 7px 0;border-color:transparent #e5484d transparent transparent}
+#grid td.spill{overflow:visible;text-overflow:clip;position:relative;z-index:1}
+#grid td.in-range{background:rgba(37,99,235,.085)}
+#grid td[aria-selected=true]{background:transparent}
+#grid td[data-t=e].in-range{background:#fbe4e4}
+#grid td[data-t=e][aria-selected=true]{background:var(--err-bg)}
+#grid thead th{position:sticky;top:0;z-index:5;height:var(--hdrh);line-height:calc(var(--hdrh) - 1px);background:var(--hdr-bg);color:var(--ink-2);font-size:11.5px;font-weight:500;text-align:center;border-right-color:var(--hdr-line);border-bottom-color:var(--hdr-line);padding:0;overflow:hidden;cursor:default}
+#grid tbody th{position:sticky;left:0;z-index:4;background:var(--hdr-bg);color:var(--ink-2);font-size:11.5px;font-weight:500;text-align:center;border-right-color:var(--hdr-line);border-bottom-color:var(--hdr-line);padding:0;cursor:default}
+#grid thead th.corner{left:0;z-index:7}
+#grid thead th.corner::after{content:"";position:absolute;right:6px;bottom:5px;border-style:solid;border-width:0 0 10px 10px;border-color:transparent transparent #c0c6d1 transparent}
+#grid thead th.ch:hover,#grid tbody th.rh:hover,#grid thead th.corner:hover{background:#eceff3}
+#grid thead th.ch.sel,#grid tbody th.rh.sel{background:#e9eefa;color:var(--accent-d)}
+#grid thead th.ch.act,#grid tbody th.rh.act{background:#d9e5fc;color:var(--accent-d);font-weight:600}
+#grid thead th.ch.act{box-shadow:inset 0 -2px 0 var(--accent)}
+#grid tbody th.rh.act{box-shadow:inset -2px 0 0 var(--accent)}
+#grid thead th.ch{position:sticky}
+.rz{position:absolute;top:0;right:0;bottom:0;width:6px;cursor:col-resize;z-index:2}
+.rz:hover,.rz.on{background:rgba(37,99,235,.55)}
+
+/* overlays */
+.ov{position:absolute;pointer-events:none;display:none}
+#cursor{z-index:3;border:2px solid var(--accent);box-shadow:0 0 0 1px rgba(255,255,255,.7)}
+#range-box{z-index:2;border:1px solid var(--accent)}
+#ants{z-index:2;background-image:linear-gradient(90deg,var(--accent) 50%,transparent 50%),linear-gradient(90deg,var(--accent) 50%,transparent 50%),linear-gradient(0deg,var(--accent) 50%,transparent 50%),linear-gradient(0deg,var(--accent) 50%,transparent 50%);background-size:8px 2px,8px 2px,2px 8px,2px 8px;background-repeat:repeat-x,repeat-x,repeat-y,repeat-y;background-position:0 0,0 100%,0 0,100% 0;animation:ants .5s linear infinite}
+@keyframes ants{to{background-position:8px 0,-8px 100%,0 -8px,100% 8px}}
+.refbox{position:absolute;z-index:2;pointer-events:none;border:2px solid var(--c);background:color-mix(in srgb,var(--c) 10%,transparent);border-radius:1px}
+#editor{position:absolute;z-index:4;display:none;background:#fff;border:2px solid var(--accent);box-shadow:0 4px 14px rgba(20,30,60,.18);pointer-events:none}
+#ed-hl,#ed{font:13px/21px var(--font);padding:0 8px 0 5px;letter-spacing:0;word-spacing:0}
+#ed-hl{white-space:pre;min-height:21px;color:var(--ink);pointer-events:none}
+#ed{position:absolute;inset:0;width:100%;height:100%;border:0;outline:0;margin:0;background:transparent;color:transparent;caret-color:var(--ink);pointer-events:none;-webkit-user-select:text;user-select:text}
+
+/* syntax colouring */
+.k-fn,.k-bool{color:#7c3aed}.k-str{color:#0f766e}.k-num{color:#b45309}.k-op{color:#64748b}.k-ref{color:#2563eb}.k-name,.k-bad{color:#dc2626;text-decoration:underline wavy #dc2626}
+
+/* ---------- status ---------- */
+#status{display:flex;align-items:center;gap:12px;height:28px;padding:0 14px;background:#fff;border-top:1px solid var(--line);font-size:12px;color:var(--ink-2);flex:none;white-space:nowrap;overflow:hidden}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;background:#eef1f5;color:var(--ink-2);font-weight:600;font-size:11px;letter-spacing:.03em;text-transform:uppercase}
+.pill.edit{background:var(--accent-soft);color:var(--accent-d)}
+#msg{overflow:hidden;text-overflow:ellipsis;color:var(--ink-3)}
+#msg.err{color:var(--err)}
+.sp{flex:1}
+.stat{display:inline-flex;gap:5px;padding:2px 9px;border-radius:6px;background:#f3f5f8;color:var(--ink)}
+.stat b{font-weight:500;color:var(--ink-3)}
+#stats{display:flex;gap:6px;font-variant-numeric:tabular-nums}
+#sink{position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;border:0;padding:0;margin:0;outline:0;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="logo" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><rect x="1.8" y="1.8" width="12.4" height="12.4" rx="2.4"/><path d="M1.8 6h12.4M1.8 10h12.4M6 1.8v12.4M10 1.8v12.4"/></svg></div>
+    <div class="brand">Gridcalc</div>
+    <div class="vsep"></div>
+    <div class="doc">Untitled spreadsheet</div>
+    <div class="spacer"></div>
+    <div class="saved"><i></i>Saved in this browser</div>
+  </header>
+  <div id="toolbar">
+    <button class="tb" id="b-undo" title="Undo (Ctrl+Z)" aria-label="Undo"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5h6a3.5 3.5 0 0 1 0 7H6"/><path d="M6 3.5 3 6.5l3 3"/></svg></button>
+    <button class="tb" id="b-redo" title="Redo (Ctrl+Y)" aria-label="Redo"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 6.5h-6a3.5 3.5 0 0 0 0 7H10"/><path d="M10 3.5l3 3-3 3"/></svg></button>
+    <div class="tsep"></div>
+    <button class="tb" id="b-clear" title="Clear selected cells (Delete)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.6-8"/></svg>Clear</button>
+    <button class="tb" id="b-sample" title="Fill the sheet with an example budget"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><path d="M2 6.5h12M6.5 6.5v7"/></svg>Load example</button>
+    <div class="spacer"></div>
+    <div class="hint">Type to edit &middot; <kbd>F2</kbd> edit in place &middot; <kbd>Enter</kbd> / <kbd>Tab</kbd> commit &middot; <kbd>Esc</kbd> cancel</div>
+  </div>
+  <div id="fxrow">
+    <div id="name-box">A1</div>
+    <div class="fx" aria-hidden="true">fx</div>
+    <div id="bar-wrap"><div id="bar-hl" aria-hidden="true"></div><input id="formula-bar" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Enter a value or a formula, e.g. =SUM(A1:A3)" aria-label="Formula bar"></div>
+  </div>
+  <div id="grid-scroll">
+    <div id="sheet">
+      <table id="grid" role="grid" aria-label="Spreadsheet"></table>
+      <div id="refs"></div>
+      <div class="ov" id="ants"></div>
+      <div class="ov" id="range-box"></div>
+      <div class="ov" id="cursor"></div>
+      <div id="editor"><div id="ed-hl" aria-hidden="true"></div><input id="ed" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Cell editor"></div>
+    </div>
+  </div>
+  <footer id="status">
+    <span class="pill" id="mode">Ready</span>
+    <span id="msg"></span>
+    <span class="sp"></span>
+    <span id="stats"></span>
+  </footer>
+</div>
+<input id="sink" type="text" autocomplete="off" spellcheck="false" aria-label="Grid keyboard input">
+<script>
+(() => {
+'use strict';
+
+/* =====================================================================
+ *  Constants
+ * =================================================================== */
+const COLS = 26, ROWS = 100, N = COLS * ROWS;
+const DEF_W = 100, MIN_W = 44, MAX_W = 520, RHW = 50;
+const LS_CELLS = 'gridcalc.cells.v1', LS_COLS = 'gridcalc.cols.v1';
+const PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#ea580c', '#c026d3', '#0891b2', '#ca8a04', '#475569'];
+
+/* =====================================================================
+ *  Errors & value helpers
+ * =================================================================== */
+class Err { constructor(code, msg) { this.code = code; this.msg = msg; } }
+const E = {
+  DIV0:  new Err('#DIV/0!', 'Division by zero.'),
+  VALUE: new Err('#VALUE!', 'Wrong type of value: text cannot be used in arithmetic.'),
+  REF:   new Err('#REF!',   'Invalid reference: the cell lies outside A1:Z100.'),
+  ERROR: new Err('#ERROR!', 'The formula cannot be parsed or uses an unknown function.'),
+  CYCLE: new Err('#CYCLE!', 'Circular reference: this cell is part of, or depends on, a cycle.'),
+  NUM:   new Err('#NUM!',   'The result is not a valid finite number.')
+};
+
+function fmtNum(x) {
+  if (x === 0) return '0';
+  const s = String(Number(x.toPrecision(10)));
+  return s.indexOf('e') >= 0 ? s.replace('e', 'E') : s;
+}
+const round15 = x => Number(x.toPrecision(15));
+const RE_NUMBER = /^\s*[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?\s*$/;
+
+function colLetters(n) { let s = ''; while (n > 0) { n--; s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26); } return s; }
+const addrOf = i => String.fromCharCode(65 + (i % COLS)) + (Math.floor(i / COLS) + 1);
+function idxOfAddr(a) {
+  const m = /^([A-Z])(\d{1,3})$/.exec(a);
+  if (!m) return -1;
+  const r = parseInt(m[2], 10) - 1, c = m[1].charCodeAt(0) - 65;
+  return (r < 0 || r >= ROWS) ? -1 : r * COLS + c;
+}
+
+/* =====================================================================
+ *  Tokenizer
+ * =================================================================== */
+const RE_NUM = /(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/y;
+const RE_REF = /\$?[A-Za-z]+\$?\d+(?![A-Za-z0-9_(])/y;
+const RE_ID = /[A-Za-z_][A-Za-z0-9_.]*/y;
+const RE_REF_PARTS = /^(\$?)([A-Za-z]+)(\$?)(\d+)$/;
+
+function tokenize(src, from) {
+  const toks = [], n = src.length;
+  let i = from || 0;
+  while (i < n) {
+    const ch = src[i];
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') { i++; continue; }
+    const s = i;
+    if ((ch >= '0' && ch <= '9') || (ch === '.' && src[i + 1] >= '0' && src[i + 1] <= '9')) {
+      RE_NUM.lastIndex = i; RE_NUM.exec(src);
+      i = RE_NUM.lastIndex;
+      toks.push({ k: 'num', s, e: i, v: Number(src.slice(s, i)) });
+      continue;
+    }
+    if (ch === '"') {
+      let j = i + 1, out = '', closed = false;
+      while (j < n) {
+        if (src[j] === '"') {
+          if (src[j + 1] === '"') { out += '"'; j += 2; continue; }
+          closed = true; j++; break;
+        }
+        out += src[j++];
+      }
+      i = j;
+      toks.push({ k: closed ? 'str' : 'bad', s, e: i, v: out });
+      continue;
+    }
+    if (ch === '$' || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch === '_') {
+      RE_REF.lastIndex = i;
+      if (RE_REF.exec(src)) {
+        i = RE_REF.lastIndex;
+        const m = RE_REF_PARTS.exec(src.slice(s, i));
+        const letters = m[2].toUpperCase();
+        let col = 0;
+        for (let q = 0; q < letters.length; q++) col = col * 26 + (letters.charCodeAt(q) - 64);
+        if (letters.length > 3) col = 999999;
+        const row = parseInt(m[4], 10);
+        toks.push({ k: 'ref', s, e: i, ac: m[1] === '$', ar: m[3] === '$', c: col, r: row,
+                    bad: col < 1 || col > COLS || row < 1 || row > ROWS });
+        continue;
+      }
+      RE_ID.lastIndex = i;
+      if (RE_ID.exec(src)) {
+        i = RE_ID.lastIndex;
+        const name = src.slice(s, i), up = name.toUpperCase();
+        let j = i; while (j < n && (src[j] === ' ' || src[j] === '\t')) j++;
+        if (src[j] === '(') toks.push({ k: 'fn', s, e: i, v: up });
+        else if (up === 'TRUE' || up === 'FALSE') toks.push({ k: 'bool', s, e: i, v: up === 'TRUE' });
+        else toks.push({ k: 'name', s, e: i, v: name });
+        continue;
+      }
+      i++; toks.push({ k: 'bad', s, e: i }); continue;
+    }
+    const two = src.substr(i, 2);
+    if (two === '<>' || two === '<=' || two === '>=') { i += 2; toks.push({ k: 'op', s, e: i, v: two }); continue; }
+    if ('+-*/^&=<>(),:'.indexOf(ch) >= 0) { i++; toks.push({ k: 'op', s, e: i, v: ch }); continue; }
+    i++; toks.push({ k: 'bad', s, e: i });
+  }
+  return toks;
+}
+
+/* =====================================================================
+ *  Parser (recursive descent, precedence per spec)
+ * =================================================================== */
+const ARITY = { SUM: [1, 99], AVERAGE: [1, 99], MIN: [1, 99], MAX: [1, 99], COUNT: [1, 99], IF: [2, 3], ABS: [1, 1], ROUND: [1, 2] };
+const CMP_OPS = new Set(['=', '<>', '<', '>', '<=', '>=']);
+
+function parse(toks) {
+  let p = 0;
+  const bad = () => { throw new SyntaxError('parse'); };
+  const isOp = s => p < toks.length && toks[p].k === 'op' && toks[p].v === s;
+  function cmp() {
+    let l = cat();
+    while (p < toks.length && toks[p].k === 'op' && CMP_OPS.has(toks[p].v)) { const op = toks[p++].v; l = { t: 'c', op, a: l, b: cat() }; }
+    return l;
+  }
+  function cat() { let l = add(); while (isOp('&')) { p++; l = { t: '&', a: l, b: add() }; } return l; }
+  function add() { let l = mul(); while (isOp('+') || isOp('-')) { const op = toks[p++].v; l = { t: 'a', op, a: l, b: mul() }; } return l; }
+  function mul() { let l = unary(); while (isOp('*') || isOp('/')) { const op = toks[p++].v; l = { t: 'a', op, a: l, b: unary() }; } return l; }
+  function unary() {
+    if (isOp('-') || isOp('+')) { const op = toks[p++].v; return { t: 'u', op, a: unary() }; }
+    return pow();
+  }
+  function pow() {
+    const base = primary();
+    if (isOp('^')) { p++; return { t: 'a', op: '^', a: base, b: unary() }; }
+    return base;
+  }
+  function primary() {
+    const t = toks[p];
+    if (!t) bad();
+    switch (t.k) {
+      case 'num': p++; return { t: 'n', v: t.v };
+      case 'str': p++; return { t: 's', v: t.v };
+      case 'bool': p++; return { t: 'b', v: t.v };
+      case 'ref': {
+        p++;
+        if (isOp(':')) {
+          p++;
+          const u = toks[p];
+          if (!u || u.k !== 'ref') bad();
+          p++;
+          return { t: 'g', r1: Math.min(t.r, u.r) - 1, r2: Math.max(t.r, u.r) - 1, c1: Math.min(t.c, u.c) - 1, c2: Math.max(t.c, u.c) - 1, bad: t.bad || u.bad };
+        }
+        return { t: 'r', i: t.bad ? -1 : (t.r - 1) * COLS + (t.c - 1), bad: t.bad };
+      }
+      case 'fn': {
+        p++;
+        const ar = ARITY[t.v];
+        if (!ar || !isOp('(')) bad();
+        p++;
+        const args = [];
+        if (isOp(')')) { p++; } else {
+          for (;;) {
+            args.push(cmp());
+            if (isOp(',')) { p++; continue; }
+            if (isOp(')')) { p++; break; }
+            bad();
+          }
+        }
+        if (args.length < ar[0] || args.length > ar[1]) bad();
+        return { t: 'f', name: t.v, args };
+      }
+      case 'op':
+        if (t.v === '(') { p++; const e = cmp(); if (!isOp(')')) bad(); p++; return e; }
+        bad();
+    }
+    return bad();
+  }
+  const ast = cmp();
+  if (p < toks.length) bad();
+  return ast;
+}
+
+/* =====================================================================
+ *  Cell store, evaluator, dependency graph
+ * =================================================================== */
+const EMPTY = [];
+const raws = new Array(N).fill('');
+const kinds = new Uint8Array(N);              // 0 empty, 1 number, 2 text, 3 formula
+const vals = new Array(N).fill(null);
+const asts = new Array(N).fill(null);
+const precs = new Array(N).fill(EMPTY);       // distinct precedents (cell indexes)
+const deps = new Array(N).fill(null);         // Set of dependents
+const stampArr = new Int32Array(N);
+const indeg = new Int32Array(N);
+let stamp = 0;
+
+function toNum(v) {
+  if (typeof v === 'number') return v;
+  if (v === null) return 0;
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  if (typeof v === 'string') {
+    if (v.trim() !== '' && RE_NUMBER.test(v)) return Number(v);
+    return E.VALUE;
+  }
+  return v; // Err
+}
+function toText(v) {
+  if (v === null) return '';
+  if (typeof v === 'number') return fmtNum(v);
+  if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+  return v;
+}
+function toBool(v) {
+  if (typeof v === 'boolean') return v;
+  if (v === null) return false;
+  if (typeof v === 'number') return v !== 0;
+  if (typeof v === 'string') {
+    const u = v.toUpperCase();
+    if (u === 'TRUE') return true;
+    if (u === 'FALSE') return false;
+    return E.VALUE;
+  }
+  return v;
+}
+function rank(v) { return typeof v === 'number' ? 0 : typeof v === 'string' ? 1 : 2; }
+function compareVals(a, b) {
+  if (a === null && b === null) return 0;
+  if (a === null) a = typeof b === 'string' ? '' : typeof b === 'boolean' ? false : 0;
+  if (b === null) b = typeof a === 'string' ? '' : typeof a === 'boolean' ? false : 0;
+  const ra = rank(a), rb = rank(b);
+  if (ra !== rb) return ra < rb ? -1 : 1;
+  if (ra === 0) { a = round15(a); b = round15(b); return a < b ? -1 : a > b ? 1 : 0; }
+  if (ra === 1) { const x = a.toLowerCase(), y = b.toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; }
+  return a === b ? 0 : a ? 1 : -1;
+}
+function shift10(x, n) {
+  const [m, e] = x.toExponential().split('e');
+  return Number(m + 'e' + (Number(e) + n));
+}
+function roundHalfUp(x, d) {
+  const sign = x < 0 ? -1 : 1;
+  const a = Number(Math.abs(x).toPrecision(15));
+  const r = shift10(Math.round(shift10(a, d)), -d);
+  return sign * r;
+}
+
+function gather(args, lenient) {
+  const out = [];
+  for (const a of args) {
+    if (a.t === 'g') {
+      if (a.bad) return E.REF;
+      for (let r = a.r1; r <= a.r2; r++) for (let c = a.c1; c <= a.c2; c++) {
+        const v = vals[r * COLS + c];
+        if (v instanceof Err) return v;
+        if (typeof v === 'number') out.push(v);
+      }
+    } else if (a.t === 'r') {
+      if (a.bad) return E.REF;
+      const v = vals[a.i];
+      if (v instanceof Err) return v;
+      if (typeof v === 'number') out.push(v);
+    } else {
+      const v = ev(a);
+      if (v instanceof Err) return v;
+      const x = toNum(v);
+      if (x instanceof Err) { if (lenient) continue; return x; }
+      out.push(x);
+    }
+  }
+  return out;
+}
+
+function ev(n) {
+  switch (n.t) {
+    case 'n': case 's': case 'b': return n.v;
+    case 'r': { if (n.bad) return E.REF; const v = vals[n.i]; return v === undefined ? null : v; }
+    case 'g': {
+      if (n.bad) return E.REF;
+      if (n.r1 === n.r2 && n.c1 === n.c2) { const v = vals[n.r1 * COLS + n.c1]; return v === undefined ? null : v; }
+      return E.VALUE;
+    }
+    case 'u': {
+      const v = ev(n.a); if (v instanceof Err) return v;
+      const x = toNum(v); if (x instanceof Err) return x;
+      return n.op === '-' ? -x : x;
+    }
+    case 'a': {
+      const l = ev(n.a); if (l instanceof Err) return l;
+      const r = ev(n.b); if (r instanceof Err) return r;
+      const x = toNum(l); if (x instanceof Err) return x;
+      const y = toNum(r); if (y instanceof Err) return y;
+      let res;
+      switch (n.op) {
+        case '+': res = x + y; break;
+        case '-': res = x - y; break;
+        case '*': res = x * y; break;
+        case '/': if (y === 0) return E.DIV0; res = x / y; break;
+        default:
+          if (x === 0 && y < 0) return E.DIV0;
+          res = Math.pow(x, y);
+      }
+      return Number.isFinite(res) ? res : E.NUM;
+    }
+    case '&': {
+      const l = ev(n.a); if (l instanceof Err) return l;
+      const r = ev(n.b); if (r instanceof Err) return r;
+      return toText(l) + toText(r);
+    }
+    case 'c': {
+      const l = ev(n.a); if (l instanceof Err) return l;
+      const r = ev(n.b); if (r instanceof Err) return r;
+      const c = compareVals(l, r);
+      switch (n.op) {
+        case '=': return c === 0;
+        case '<>': return c !== 0;
+        case '<': return c < 0;
+        case '>': return c > 0;
+        case '<=': return c <= 0;
+        default: return c >= 0;
+      }
+    }
+    case 'f': return callFn(n);
+  }
+  return E.ERROR;
+}
+
+function callFn(n) {
+  const a = n.args;
+  switch (n.name) {
+    case 'SUM': { const g = gather(a); if (g instanceof Err) return g; let s = 0; for (let i = 0; i < g.length; i++) s += g[i]; return s; }
+    case 'AVERAGE': { const g = gather(a); if (g instanceof Err) return g; if (!g.length) return E.DIV0; let s = 0; for (let i = 0; i < g.length; i++) s += g[i]; return s / g.length; }
+    case 'MIN': { const g = gather(a); if (g instanceof Err) return g; if (!g.length) return 0; let m = g[0]; for (let i = 1; i < g.length; i++) if (g[i] < m) m = g[i]; return m; }
+    case 'MAX': { const g = gather(a); if (g instanceof Err) return g; if (!g.length) return 0; let m = g[0]; for (let i = 1; i < g.length; i++) if (g[i] > m) m = g[i]; return m; }
+    case 'COUNT': { const g = gather(a, true); if (g instanceof Err) return g; return g.length; }
+    case 'IF': {
+      const c = ev(a[0]); if (c instanceof Err) return c;
+      const b = toBool(c); if (b instanceof Err) return b;
+      if (b) return ev(a[1]);
+      return a.length > 2 ? ev(a[2]) : false;
+    }
+    case 'ABS': {
+      const v = ev(a[0]); if (v instanceof Err) return v;
+      const x = toNum(v); if (x instanceof Err) return x;
+      return Math.abs(x);
+    }
+    case 'ROUND': {
+      const v = ev(a[0]); if (v instanceof Err) return v;
+      const x = toNum(v); if (x instanceof Err) return x;
+      let d = 0;
+      if (a.length > 1) {
+        const dv = ev(a[1]); if (dv instanceof Err) return dv;
+        d = toNum(dv); if (d instanceof Err) return d;
+        d = Math.trunc(d);
+      }
+      if (!Number.isFinite(x)) return E.NUM;
+      if (d > 300) return x;
+      if (d < -300) return 0;
+      return roundHalfUp(x, d);
+    }
+  }
+  return E.ERROR;
+}
+
+function collectPrecs(ast, self) {
+  const st = ++stamp, out = [], stack = [ast];
+  const add = i => { if (stampArr[i] !== st) { stampArr[i] = st; out.push(i); } };
+  while (stack.length) {
+    const n = stack.pop();
+    switch (n.t) {
+      case 'r': if (!n.bad) add(n.i); break;
+      case 'g': if (!n.bad) for (let r = n.r1; r <= n.r2; r++) for (let c = n.c1; c <= n.c2; c++) add(r * COLS + c); break;
+      case 'u': stack.push(n.a); break;
+      case 'a': case '&': case 'c': stack.push(n.a, n.b); break;
+      case 'f': for (const x of n.args) stack.push(x); break;
+    }
+  }
+  return out;
+}
+
+function setPrecs(i, np) {
+  const old = precs[i];
+  for (let k = 0; k < old.length; k++) { const s = deps[old[k]]; if (s) s.delete(i); }
+  for (let k = 0; k < np.length; k++) { const p = np[k]; (deps[p] || (deps[p] = new Set())).add(i); }
+  precs[i] = np;
+}
+
+function installCell(i, raw) {
+  raws[i] = raw;
+  asts[i] = null;
+  let np = EMPTY;
+  if (raw === '') { kinds[i] = 0; vals[i] = null; }
+  else if (raw.charCodeAt(0) === 61) {
+    kinds[i] = 3; vals[i] = E.ERROR;
+    try { const ast = parse(tokenize(raw, 1)); asts[i] = ast; np = collectPrecs(ast, i); }
+    catch (_) { asts[i] = null; }
+  } else if (RE_NUMBER.test(raw) && Number.isFinite(Number(raw))) { kinds[i] = 1; vals[i] = Number(raw); }
+  else { kinds[i] = 2; vals[i] = raw; }
+  setPrecs(i, np);
+}
+
+function evalCell(i) {
+  if (kinds[i] !== 3) return;
+  const ast = asts[i];
+  let v;
+  if (!ast) v = E.ERROR;
+  else { try { v = ev(ast); } catch (_) { v = E.ERROR; } }
+  if (v === null) v = 0;
+  if (typeof v === 'number' && !Number.isFinite(v)) v = E.NUM;
+  vals[i] = v;
+}
+
+/* Incremental recalculation: affected = seeds + transitive dependents,
+ * evaluated once each in topological order. Whatever cannot be ordered is cyclic. */
+function recalc(seeds) {
+  const st = ++stamp, aff = [];
+  for (const s of seeds) if (stampArr[s] !== st) { stampArr[s] = st; aff.push(s); }
+  for (let h = 0; h < aff.length; h++) {
+    const d = deps[aff[h]];
+    if (d) for (const x of d) if (stampArr[x] !== st) { stampArr[x] = st; aff.push(x); }
+  }
+  for (let k = 0; k < aff.length; k++) {
+    const i = aff[k], pr = precs[i]; let n = 0;
+    for (let q = 0; q < pr.length; q++) if (stampArr[pr[q]] === st) n++;
+    indeg[i] = n;
+  }
+  const queue = [];
+  for (let k = 0; k < aff.length; k++) if (indeg[aff[k]] === 0) queue.push(aff[k]);
+  for (let h = 0; h < queue.length; h++) {
+    const i = queue[h];
+    evalCell(i);
+    const d = deps[i];
+    if (d) for (const x of d) if (stampArr[x] === st && --indeg[x] === 0) queue.push(x);
+  }
+  if (queue.length < aff.length) for (let k = 0; k < aff.length; k++) if (indeg[aff[k]] > 0) vals[aff[k]] = E.CYCLE;
+  return aff;
+}
+
+/* =====================================================================
+ *  DOM construction
+ * =================================================================== */
+const $ = s => document.querySelector(s);
+const tbl = $('#grid'), scroller = $('#grid-scroll');
+const cursorEl = $('#cursor'), rangeEl = $('#range-box'), antsEl = $('#ants'), refLayer = $('#refs');
+const editorEl = $('#editor'), edHl = $('#ed-hl'), ed = $('#ed');
+const bar = $('#formula-bar'), barHl = $('#bar-hl'), nameBox = $('#name-box');
+const sink = $('#sink'), modeEl = $('#mode'), msgEl = $('#msg'), statsEl = $('#stats');
+const bUndo = $('#b-undo'), bRedo = $('#b-redo');
+
+const colW = new Array(COLS).fill(DEF_W);
+try {
+  const saved = JSON.parse(localStorage.getItem(LS_COLS) || 'null');
+  if (Array.isArray(saved)) for (let c = 0; c < COLS; c++) if (Number.isFinite(saved[c])) colW[c] = Math.min(MAX_W, Math.max(MIN_W, saved[c]));
+} catch (_) {}
+
+(function build() {
+  let h = '<colgroup><col style="width:' + RHW + 'px">';
+  for (let c = 0; c < COLS; c++) h += '<col style="width:' + colW[c] + 'px">';
+  h += '</colgroup><thead><tr role="row"><th class="corner" role="columnheader" aria-label="Select all"></th>';
+  for (let c = 0; c < COLS; c++) h += '<th class="ch" role="columnheader" data-col="' + String.fromCharCode(65 + c) + '">' + String.fromCharCode(65 + c) + '<i class="rz"></i></th>';
+  h += '</tr></thead><tbody>';
+  for (let r = 0; r < ROWS; r++) {
+    h += '<tr role="row"><th class="rh" role="rowheader" data-row="' + (r + 1) + '">' + (r + 1) + '</th>';
+    for (let c = 0; c < COLS; c++) h += '<td role="gridcell" data-cell="' + String.fromCharCode(65 + c) + (r + 1) + '" aria-selected="false"></td>';
+    h += '</tr>';
+  }
+  h += '</tbody>';
+  tbl.innerHTML = h;
+})();
+const tds = Array.from(tbl.querySelectorAll('td'));
+const colHdrs = Array.from(tbl.querySelectorAll('th.ch'));
+const rowHdrs = Array.from(tbl.querySelectorAll('th.rh'));
+const colEls = Array.from(tbl.querySelectorAll('col'));
+const corner = tbl.querySelector('th.corner');
+tds.forEach((td, i) => { td._i = i; });
+colHdrs.forEach((th, c) => { th._c = c; });
+rowHdrs.forEach((th, r) => { th._r = r; });
+function applyTableWidth() { tbl.style.width = (RHW + colW.reduce((a, b) => a + b, 0)) + 'px'; }
+applyTableWidth();
+
+/* text measuring (for overflow of text into empty neighbours) */
+const mctx = document.createElement('canvas').getContext('2d');
+mctx.font = '13px ' + getComputedStyle(document.body).fontFamily;
+const widthCache = new Map();
+function textWidth(s) {
+  let w = widthCache.get(s);
+  if (w === undefined) { w = mctx.measureText(s).width; if (widthCache.size > 4000) widthCache.clear(); widthCache.set(s, w); }
+  return w;
+}
+
+/* =====================================================================
+ *  Rendering of cell values
+ * =================================================================== */
+const shown = new Array(N).fill('');
+const types = new Array(N).fill('');
+const spilled = new Uint8Array(N);
+const dirtyRows = new Set();
+
+function renderCell(i) {
+  const v = vals[i];
+  let text, t;
+  if (kinds[i] === 0) { text = ''; t = ''; }
+  else if (v instanceof Err) { text = v.code; t = 'e'; }
+  else if (typeof v === 'number') { text = fmtNum(v); t = 'n'; }
+  else if (typeof v === 'boolean') { text = v ? 'TRUE' : 'FALSE'; t = 'b'; }
+  else { text = v; t = 't'; }
+  const td = tds[i];
+  if (text !== shown[i]) { td.textContent = text; shown[i] = text; dirtyRows.add(Math.floor(i / COLS)); }
+  if (t !== types[i]) {
+    if (t) td.setAttribute('data-t', t); else td.removeAttribute('data-t');
+    types[i] = t;
+    dirtyRows.add(Math.floor(i / COLS));
+  }
+  if (t === 'e') { const tip = v.code + ' — ' + v.msg; if (td.title !== tip) td.title = tip; }
+  else if (td.hasAttribute('title')) td.removeAttribute('title');
+}
+
+function updateSpillRow(r) {
+  const base = r * COLS;
+  for (let c = 0; c < COLS; c++) {
+    const i = base + c;
+    let want = 0;
+    if (types[i] === 't' && shown[i] !== '' && c < COLS - 1 && shown[i + 1] === '') {
+      let avail = colW[c], k = c + 1;
+      while (k < COLS && shown[base + k] === '') { avail += colW[k]; k++; }
+      const w = textWidth(shown[i]) + 16;
+      want = (w > colW[c] && w <= avail) ? 1 : 0;
+    }
+    if (want !== spilled[i]) { spilled[i] = want; tds[i].classList.toggle('spill', !!want); }
+  }
+}
+function flushSpill() { if (dirtyRows.size) { for (const r of dirtyRows) updateSpillRow(r); dirtyRows.clear(); } }
+
+/* =====================================================================
+ *  Persistence & history
+ * =================================================================== */
+function save() {
+  try {
+    const o = {};
+    for (let i = 0; i < N; i++) if (raws[i] !== '') o[addrOf(i)] = raws[i];
+    localStorage.setItem(LS_CELLS, JSON.stringify(o));
+  } catch (_) {}
+}
+function saveCols() { try { localStorage.setItem(LS_COLS, JSON.stringify(colW)); } catch (_) {} }
+
+const undoStack = [], redoStack = [];
+function syncHistoryButtons() { bUndo.disabled = !undoStack.length; bRedo.disabled = !redoStack.length; }
+
+/* changes: array of [index, rawString] */
+function applyBatch(changes, record) {
+  const seeds = [], rec = [];
+  for (const [i, raw] of changes) {
+    if (raws[i] === raw) continue;
+    rec.push({ i, before: raws[i], after: raw });
+    installCell(i, raw);
+    seeds.push(i);
+  }
+  if (!seeds.length) return false;
+  const aff = recalc(seeds);
+  for (let k = 0; k < aff.length; k++) renderCell(aff[k]);
+  flushSpill();
+  save();
+  if (record !== false) {
+    undoStack.push(rec); if (undoStack.length > 300) undoStack.shift();
+    redoStack.length = 0;
+  }
+  syncHistoryButtons();
+  if (!edit) refreshBar();
+  updateStatus();
+  return rec;
+}
+function undo() {
+  const h = undoStack.pop(); if (!h) return;
+  applyBatch(h.map(x => [x.i, x.before]), false);
+  redoStack.push(h); syncHistoryButtons();
+  focusChanged(h);
+}
+function redo() {
+  const h = redoStack.pop(); if (!h) return;
+  applyBatch(h.map(x => [x.i, x.after]), false);
+  undoStack.push(h); syncHistoryButtons();
+  focusChanged(h);
+}
+function focusChanged(h) {
+  const i = h[0].i;
+  moveTo(Math.floor(i / COLS), i % COLS, false);
+}
+
+/* =====================================================================
+ *  Selection
+ * =================================================================== */
+let sel = { r: 0, c: 0 }, ext = { r: 0, c: 0 };
+let prevActive = -1, prevRect = null, prevColHdrs = [], prevRowHdrs = [];
+const selIdx = () => sel.r * COLS + sel.c;
+function rectOf() {
+  return { r1: Math.min(sel.r, ext.r), r2: Math.max(sel.r, ext.r), c1: Math.min(sel.c, ext.c), c2: Math.max(sel.c, ext.c) };
+}
+const clampR = r => Math.max(0, Math.min(ROWS - 1, r));
+const clampC = c => Math.max(0, Math.min(COLS - 1, c));
+
+function place(el, r1, c1, r2, c2) {
+  const a = tds[r1 * COLS + c1], b = tds[r2 * COLS + c2];
+  el.style.left = (a.offsetLeft - 1) + 'px';
+  el.style.top = (a.offsetTop - 1) + 'px';
+  el.style.width = (b.offsetLeft + b.offsetWidth - a.offsetLeft + 1) + 'px';
+  el.style.height = (b.offsetTop + b.offsetHeight - a.offsetTop + 1) + 'px';
+}
+
+function renderSelection() {
+  const si = selIdx();
+  if (prevActive !== si) {
+    if (prevActive >= 0) tds[prevActive].setAttribute('aria-selected', 'false');
+    tds[si].setAttribute('aria-selected', 'true');
+    prevActive = si;
+  }
+  const b = rectOf();
+  if (prevRect) for (let r = prevRect.r1; r <= prevRect.r2; r++) for (let c = prevRect.c1; c <= prevRect.c2; c++) tds[r * COLS + c].classList.remove('in-range');
+  const multi = b.r1 !== b.r2 || b.c1 !== b.c2;
+  if (multi) for (let r = b.r1; r <= b.r2; r++) for (let c = b.c1; c <= b.c2; c++) tds[r * COLS + c].classList.add('in-range');
+  prevRect = multi ? b : null;
+  for (const h of prevColHdrs) h.classList.remove('sel', 'act');
+  for (const h of prevRowHdrs) h.classList.remove('sel', 'act');
+  prevColHdrs = []; prevRowHdrs = [];
+  for (let c = b.c1; c <= b.c2; c++) { const h = colHdrs[c]; h.classList.add(c === sel.c ? 'act' : 'sel'); prevColHdrs.push(h); }
+  for (let r = b.r1; r <= b.r2; r++) { const h = rowHdrs[r]; h.classList.add(r === sel.r ? 'act' : 'sel'); prevRowHdrs.push(h); }
+  if (multi && !(b.r1 === b.r2 && b.c1 === b.c2)) { place(rangeEl, b.r1, b.c1, b.r2, b.c2); rangeEl.style.display = 'block'; }
+  else rangeEl.style.display = 'none';
+  place(cursorEl, sel.r, sel.c, sel.r, sel.c);
+  cursorEl.style.display = edit ? 'none' : 'block';
+  nameBox.textContent = addrOf(si);
+  if (!edit) refreshBar();
+  updateStatus();
+}
+
+function ensureVisible(r, c) {
+  const td = tds[r * COLS + c];
+  const L = td.offsetLeft, T = td.offsetTop, W = td.offsetWidth, H = td.offsetHeight;
+  const vw = scroller.clientWidth, vh = scroller.clientHeight;
+  const hw = corner.offsetWidth, hh = corner.offsetHeight;
+  let sl = scroller.scrollLeft, st = scroller.scrollTop;
+  if (L - hw < sl) sl = L - hw; else if (L + W > sl + vw) sl = L + W - vw;
+  if (T - hh < st) st = T - hh; else if (T + H > st + vh) st = T + H - vh;
+  if (sl !== scroller.scrollLeft) scroller.scrollLeft = Math.max(0, sl);
+  if (st !== scroller.scrollTop) scroller.scrollTop = Math.max(0, st);
+}
+
+function moveTo(r, c, extend) {
+  r = clampR(r); c = clampC(c);
+  if (extend) { ext = { r, c }; }
+  else { sel = { r, c }; ext = { r, c }; }
+  ensureVisible(r, c);
+  renderSelection();
+}
+
+function selectAll() { ext = { r: ROWS - 1, c: COLS - 1 }; renderSelection(); }
+
+function layoutOverlays() {
+  renderSelection();
+  if (clip && antsEl.style.display === 'block') place(antsEl, clip.r0, clip.c0, clip.r0 + clip.rows.length - 1, clip.c0 + clip.rows[0].length - 1);
+  if (edit) { positionEditor(); refreshEdit(); }
+}
+
+/* =====================================================================
+ *  Formula bar, status bar
+ * =================================================================== */
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+function analyze(text) {
+  const res = { toks: [], colors: new Map(), boxes: [] };
+  if (text.charCodeAt(0) !== 61) return res;
+  const toks = res.toks = tokenize(text, 1);
+  const keyColor = new Map(); let n = 0;
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i]; if (t.k !== 'ref') continue;
+    const o = toks[i + 2];
+    const range = (toks[i + 1] && toks[i + 1].k === 'op' && toks[i + 1].v === ':' && o && o.k === 'ref') ? o : null;
+    const key = range ? t.c + ',' + t.r + ':' + o.c + ',' + o.r : t.c + ',' + t.r;
+    let col = keyColor.get(key); const fresh = col === undefined;
+    if (fresh) { col = PALETTE[n++ % PALETTE.length]; keyColor.set(key, col); }
+    res.colors.set(i, col);
+    if (range) { res.colors.set(i + 1, col); res.colors.set(i + 2, col); }
+    if (fresh && !t.bad && (!range || !range.bad)) {
+      const q = range || t;
+      res.boxes.push({ color: col, r1: Math.min(t.r, q.r) - 1, r2: Math.max(t.r, q.r) - 1, c1: Math.min(t.c, q.c) - 1, c2: Math.max(t.c, q.c) - 1 });
+    }
+    if (range) i += 2;
+  }
+  return res;
+}
+function renderHL(text, info, useColors) {
+  if (text.charCodeAt(0) !== 61) return esc(text);
+  let out = '<span class="k-op">=</span>', last = 1;
+  for (let i = 0; i < info.toks.length; i++) {
+    const t = info.toks[i];
+    if (t.s > last) out += esc(text.slice(last, t.s));
+    const style = (useColors && info.colors.has(i)) ? ' style="color:' + info.colors.get(i) + '"' : '';
+    out += '<span class="k-' + t.k + '"' + style + '>' + esc(text.slice(t.s, t.e)) + '</span>';
+    last = t.e;
+  }
+  if (last < text.length) out += esc(text.slice(last));
+  return out;
+}
+
+function refreshBar() {
+  const raw = raws[selIdx()];
+  if (bar.value !== raw) bar.value = raw;
+  barHl.innerHTML = renderHL(raw, analyze(raw), false);
+  barHl.style.transform = '';
+}
+
+function updateStatus() {
+  modeEl.textContent = edit ? 'Edit' : 'Ready';
+  modeEl.classList.toggle('edit', !!edit);
+  const v = vals[selIdx()];
+  if (!edit && v instanceof Err) { msgEl.textContent = v.code + ' — ' + v.msg; msgEl.className = 'err'; }
+  else if (edit) { msgEl.textContent = 'Enter to commit · Esc to cancel'; msgEl.className = ''; }
+  else { msgEl.textContent = ''; msgEl.className = ''; }
+  const b = rectOf();
+  let sum = 0, cnt = 0, mn = Infinity, mx = -Infinity;
+  for (let r = b.r1; r <= b.r2; r++) for (let c = b.c1; c <= b.c2; c++) {
+    const x = vals[r * COLS + c];
+    if (typeof x === 'number') { sum += x; cnt++; if (x < mn) mn = x; if (x > mx) mx = x; }
+  }
+  if (cnt > 0) {
+    let h = '<span class="stat"><b>Sum</b>' + fmtNum(sum) + '</span><span class="stat"><b>Count</b>' + cnt + '</span>';
+    if (cnt > 1) h += '<span class="stat"><b>Avg</b>' + fmtNum(sum / cnt) + '</span><span class="stat"><b>Min</b>' + fmtNum(mn) + '</span><span class="stat"><b>Max</b>' + fmtNum(mx) + '</span>';
+    statsEl.innerHTML = h;
+  } else statsEl.innerHTML = '';
+}
+
+/* =====================================================================
+ *  Editing
+ * =================================================================== */
+let edit = null; // { idx, mode: 'type' | 'edit' | 'bar' }
+let loopOn = false;
+
+function positionEditor() {
+  const td = tds[edit.idx];
+  editorEl.style.left = (td.offsetLeft - 1) + 'px';
+  editorEl.style.top = (td.offsetTop - 1) + 'px';
+  editorEl.style.minWidth = (td.offsetWidth + 1) + 'px';
+  editorEl.style.height = (td.offsetHeight + 1) + 'px';
+}
+
+const refPool = [];
+function renderRefBoxes(boxes) {
+  for (let i = 0; i < boxes.length; i++) {
+    let el = refPool[i];
+    if (!el) { el = document.createElement('div'); el.className = 'refbox'; refLayer.appendChild(el); refPool[i] = el; }
+    const b = boxes[i];
+    el.style.setProperty('--c', b.color);
+    place(el, b.r1, b.c1, b.r2, b.c2);
+    el.style.display = 'block';
+  }
+  for (let i = boxes.length; i < refPool.length; i++) refPool[i].style.display = 'none';
+}
+
+function refreshEdit() {
+  if (!edit) return;
+  const text = edit.mode === 'bar' ? bar.value : ed.value;
+  const info = analyze(text);
+  const html = renderHL(text, info, true);
+  edHl.innerHTML = html;
+  barHl.innerHTML = html;
+  renderRefBoxes(info.boxes);
+}
+
+function startEdit(mode, text) {
+  if (edit) return;
+  edit = { idx: selIdx(), mode };
+  ensureVisible(sel.r, sel.c);
+  positionEditor();
+  ed.value = text; bar.value = text;
+  editorEl.style.display = 'block';
+  cursorEl.style.display = 'none';
+  antsEl.style.display = 'none';
+  refreshEdit();
+  if (mode !== 'bar') { ed.focus({ preventScroll: true }); ed.setSelectionRange(text.length, text.length); }
+  updateStatus();
+}
+
+function endEditUI() {
+  edit = null;
+  editorEl.style.display = 'none';
+  renderRefBoxes([]);
+  cursorEl.style.display = 'block';
+  bar.scrollLeft = 0;
+}
+
+function commitEdit(dr, dc) {
+  if (!edit) return;
+  const e = edit;
+  const text = e.mode === 'bar' ? bar.value : ed.value;
+  endEditUI();
+  sink.focus({ preventScroll: true });
+  applyBatch([[e.idx, text]]);
+  if (dr || dc) moveTo(sel.r + dr, sel.c + dc, false); else renderSelection();
+}
+
+function cancelEdit() {
+  if (!edit) return;
+  endEditUI();
+  sink.focus({ preventScroll: true });
+  renderSelection();
+}
+
+ed.addEventListener('input', () => {
+  if (!edit) return;
+  bar.value = ed.value;
+  refreshEdit();
+});
+bar.addEventListener('input', () => {
+  if (!edit) startEdit('bar', bar.value);
+  ed.value = bar.value;
+  refreshEdit();
+});
+bar.addEventListener('focus', () => {
+  if (!edit) startEdit('bar', bar.value);
+  else edit.mode = 'bar';
+  if (!loopOn) { loopOn = true; requestAnimationFrame(syncBarLoop); }
+});
+function syncBarLoop() {
+  if (document.activeElement !== bar) { loopOn = false; barHl.style.transform = ''; return; }
+  barHl.style.transform = 'translateX(' + (-bar.scrollLeft) + 'px)';
+  requestAnimationFrame(syncBarLoop);
+}
+ed.addEventListener('blur', e => {
+  if (!edit || edit.mode === 'bar' || !document.hasFocus()) return;
+  if (e.relatedTarget === bar) return;
+  commitEdit(0, 0);
+});
+bar.addEventListener('blur', e => {
+  if (!edit || edit.mode !== 'bar' || !document.hasFocus()) return;
+  if (e.relatedTarget === ed) return;
+  commitEdit(0, 0);
+});
+
+/* =====================================================================
+ *  Clipboard (internal, with relative reference shifting)
+ * =================================================================== */
+let clip = null; // { rows: string[][], r0, c0 }
+
+function refText(t, dr, dc) {
+  let c = t.c, r = t.r;
+  if (!t.ac) c += dc;
+  if (!t.ar) r += dr;
+  if (c < 1 || r < 1) return (t.ac ? '$' : '') + 'A' + (t.ar ? '$' : '') + '0';
+  return (t.ac ? '$' : '') + colLetters(c) + (t.ar ? '$' : '') + r;
+}
+function shiftFormula(raw, dr, dc) {
+  const toks = tokenize(raw, 1);
+  let out = '', last = 0;
+  for (const t of toks) {
+    if (t.k !== 'ref' || t.c > 18278) continue;
+    out += raw.slice(last, t.s) + refText(t, dr, dc);
+    last = t.e;
+  }
+  return out + raw.slice(last);
+}
+
+function clipText() { return clip.rows.map(r => r.join('\t')).join('\n'); }
+function doCopy() {
+  const b = rectOf(), rows = [];
+  for (let r = b.r1; r <= b.r2; r++) { const row = []; for (let c = b.c1; c <= b.c2; c++) row.push(raws[r * COLS + c]); rows.push(row); }
+  clip = { rows, r0: b.r1, c0: b.c1 };
+  place(antsEl, b.r1, b.c1, b.r2, b.c2);
+  antsEl.style.display = 'block';
+  try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(clipText()).catch(() => {}); } catch (_) {}
+}
+function clearRange() {
+  const b = rectOf(), ch = [];
+  for (let r = b.r1; r <= b.r2; r++) for (let c = b.c1; c <= b.c2; c++) ch.push([r * COLS + c, '']);
+  applyBatch(ch);
+}
+function doPaste() {
+  if (!clip) return;
+  const b = rectOf(), h = clip.rows.length, w = clip.rows[0].length;
+  const fill = h === 1 && w === 1 && (b.r2 > b.r1 || b.c2 > b.c1);
+  const rr = fill ? b.r2 - b.r1 + 1 : h, cc = fill ? b.c2 - b.c1 + 1 : w;
+  const ch = [];
+  let lastR = b.r1, lastC = b.c1;
+  for (let dr = 0; dr < rr; dr++) for (let dc = 0; dc < cc; dc++) {
+    const r = b.r1 + dr, c = b.c1 + dc;
+    if (r >= ROWS || c >= COLS) continue;
+    const sr = fill ? 0 : dr, sc = fill ? 0 : dc;
+    const src = clip.rows[sr][sc];
+    const raw = src.charCodeAt(0) === 61 ? shiftFormula(src, r - (clip.r0 + sr), c - (clip.c0 + sc)) : src;
+    ch.push([r * COLS + c, raw]);
+    lastR = r; lastC = c;
+  }
+  applyBatch(ch);
+  sel = { r: b.r1, c: b.c1 }; ext = { r: lastR, c: lastC };
+  ensureVisible(lastR, lastC); ensureVisible(b.r1, b.c1);
+  renderSelection();
+}
+function pasteExternal(text) {
+  text = text.replace(/\r\n?/g, '\n').replace(/\n$/, '');
+  if (!text) return;
+  const rows = text.split('\n').map(l => l.split('\t'));
+  const b = rectOf(), ch = [];
+  let lastR = b.r1, lastC = b.c1;
+  rows.forEach((row, dr) => row.forEach((val, dc) => {
+    const r = b.r1 + dr, c = b.c1 + dc;
+    if (r >= ROWS || c >= COLS) return;
+    ch.push([r * COLS + c, val]); lastR = r; lastC = c;
+  }));
+  applyBatch(ch);
+  sel = { r: b.r1, c: b.c1 }; ext = { r: lastR, c: lastC };
+  renderSelection();
+}
+document.addEventListener('copy', e => {
+  if (edit || document.activeElement !== sink) return;
+  doCopy();
+  e.clipboardData.setData('text/plain', clipText());
+  e.preventDefault();
+});
+document.addEventListener('paste', e => {
+  if (edit || document.activeElement !== sink) return;
+  e.preventDefault();
+  const t = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+  if (clip && t === clipText()) doPaste(); else if (t) pasteExternal(t); else if (clip) doPaste();
+});
+
+/* =====================================================================
+ *  Keyboard
+ * =================================================================== */
+function jumpTarget(r, c, dr, dc) {
+  const ne = (rr, cc) => kinds[rr * COLS + cc] !== 0;
+  const inb = (rr, cc) => rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS;
+  let nr = r + dr, nc = c + dc;
+  if (!inb(nr, nc)) return [r, c];
+  if (ne(r, c) && ne(nr, nc)) {
+    while (inb(nr + dr, nc + dc) && ne(nr + dr, nc + dc)) { nr += dr; nc += dc; }
+    return [nr, nc];
+  }
+  while (inb(nr, nc) && !ne(nr, nc)) { nr += dr; nc += dc; }
+  if (!inb(nr, nc)) { nr = clampR(nr); nc = clampC(nc); }
+  return [nr, nc];
+}
+
+const ARROWS = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+
+function onGridKey(e) {
+  const mod = e.ctrlKey || e.metaKey, k = e.key;
+  if (mod && !e.altKey) {
+    const lk = k.toLowerCase();
+    if (lk === 'c') { doCopy(); return; }
+    if (lk === 'x') { e.preventDefault(); doCopy(); clearRange(); return; }
+    if (lk === 'v') { if (clip) { e.preventDefault(); doPaste(); } return; }
+    if (lk === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+    if (lk === 'y') { e.preventDefault(); redo(); return; }
+    if (lk === 'a') { e.preventDefault(); selectAll(); return; }
+    if (ARROWS[k]) {
+      e.preventDefault();
+      const d = ARROWS[k], from = e.shiftKey ? ext : sel;
+      const [r, c] = jumpTarget(from.r, from.c, d[0], d[1]);
+      moveTo(r, c, e.shiftKey);
+      return;
+    }
+    if (k === 'Home') { e.preventDefault(); moveTo(0, 0, e.shiftKey); return; }
+    if (k === 'End') { e.preventDefault(); moveTo(ROWS - 1, COLS - 1, e.shiftKey); return; }
+    return;
+  }
+  if (ARROWS[k]) {
+    e.preventDefault();
+    const d = ARROWS[k];
+    if (e.shiftKey) moveTo(ext.r + d[0], ext.c + d[1], true);
+    else moveTo(sel.r + d[0], sel.c + d[1], false);
+    return;
+  }
+  switch (k) {
+    case 'Enter': e.preventDefault(); moveTo(sel.r + (e.shiftKey ? -1 : 1), sel.c, false); return;
+    case 'Tab': e.preventDefault(); moveTo(sel.r, sel.c + (e.shiftKey ? -1 : 1), false); return;
+    case 'Home': e.preventDefault(); moveTo(sel.r, 0, e.shiftKey); return;
+    case 'End': e.preventDefault(); moveTo(sel.r, COLS - 1, e.shiftKey); return;
+    case 'PageDown': case 'PageUp': {
+      e.preventDefault();
+      const n = Math.max(1, Math.floor((scroller.clientHeight - corner.offsetHeight) / tds[0].offsetHeight) - 1) * (k === 'PageUp' ? -1 : 1);
+      moveTo((e.shiftKey ? ext.r : sel.r) + n, e.shiftKey ? ext.c : sel.c, e.shiftKey);
+      return;
+    }
+    case 'Delete': case 'Backspace': e.preventDefault(); clearRange(); return;
+    case 'F2': e.preventDefault(); startEdit('edit', raws[selIdx()]); return;
+    case 'Escape': antsEl.style.display = 'none'; return;
+  }
+  if (k.length === 1 && !e.metaKey && !(e.ctrlKey && !e.altKey)) {
+    e.preventDefault();
+    startEdit('type', k);
+  }
+}
+
+function onEditKey(e) {
+  if (e.isComposing || !edit) return;
+  const k = e.key;
+  if (k === 'Enter') { e.preventDefault(); commitEdit(e.shiftKey ? -1 : 1, 0); }
+  else if (k === 'Tab') { e.preventDefault(); commitEdit(0, e.shiftKey ? -1 : 1); }
+  else if (k === 'Escape') { e.preventDefault(); cancelEdit(); }
+  else if (k === 'F2') { e.preventDefault(); edit.mode = 'edit'; }
+  else if ((k === 'ArrowUp' || k === 'ArrowDown') && edit.mode === 'type') { e.preventDefault(); commitEdit(k === 'ArrowUp' ? -1 : 1, 0); }
+}
+function onBarKey(e) {
+  if (e.isComposing) return;
+  const k = e.key;
+  if (!edit) startEdit('bar', bar.value);
+  if (k === 'Enter') { e.preventDefault(); commitEdit(0, 0); }
+  else if (k === 'Tab') { e.preventDefault(); commitEdit(0, e.shiftKey ? -1 : 1); }
+  else if (k === 'Escape') { e.preventDefault(); cancelEdit(); }
+}
+
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if (t === ed) return onEditKey(e);
+  if (t === bar) return onBarKey(e);
+  if (t !== sink && t !== document.body && t !== document.documentElement && t.tagName === 'INPUT') return;
+  if (e.isComposing || e.key === 'Process') return;
+  onGridKey(e);
+});
+
+sink.addEventListener('input', () => {
+  const v = sink.value; sink.value = '';
+  if (v && !edit) startEdit('type', v);
+});
+sink.addEventListener('compositionend', e => {
+  const v = e.data || sink.value; sink.value = '';
+  if (v && !edit) startEdit('type', v);
+});
+
+/* =====================================================================
+ *  Mouse
+ * =================================================================== */
+let drag = null, textDrag = null, resizing = null, lastMouse = null, scrollTimer = null;
+
+function charIndexAt(x, y) {
+  const len = ed.value.length;
+  const hr = edHl.getBoundingClientRect();
+  if (x <= hr.left + 5) return 0;
+  edHl.style.pointerEvents = 'auto';
+  let r = null;
+  try { r = document.caretRangeFromPoint(x, Math.min(Math.max(y, hr.top + 3), hr.bottom - 3)); } catch (_) {}
+  edHl.style.pointerEvents = '';
+  if (!r || !edHl.contains(r.startContainer)) return x > hr.left + hr.width / 2 ? len : 0;
+  if (r.startContainer.nodeType !== 3) return r.startOffset > 0 ? len : 0;
+  let idx = 0;
+  const w = document.createTreeWalker(edHl, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) {
+    if (n === r.startContainer) return Math.min(len, idx + r.startOffset);
+    idx += n.nodeValue.length;
+  }
+  return len;
+}
+
+function extendTo(el) {
+  if (!el || !drag || !el.closest) return;
+  let r = ext.r, c = ext.c;
+  const td = el.closest('td[data-cell]');
+  if (td && drag.type === 'cell') { r = Math.floor(td._i / COLS); c = td._i % COLS; }
+  else {
+    const th = el.closest('th');
+    if (th && drag.type === 'col' && th.classList.contains('ch')) { c = th._c; r = ROWS - 1; }
+    else if (th && drag.type === 'row' && th.classList.contains('rh')) { r = th._r; c = COLS - 1; }
+    else if (td && drag.type === 'col') { c = td._i % COLS; r = ROWS - 1; }
+    else if (td && drag.type === 'row') { r = Math.floor(td._i / COLS); c = COLS - 1; }
+  }
+  if (r !== ext.r || c !== ext.c) { ext = { r, c }; renderSelection(); }
+}
+
+scroller.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  const t = e.target;
+  const rz = t.closest('.rz');
+  if (rz) {
+    const c = rz.parentNode._c;
+    resizing = { c, x: e.clientX, w: colW[c], el: rz };
+    rz.classList.add('on');
+    e.preventDefault();
+    return;
+  }
+  const td = t.closest('td[data-cell]');
+  const th = td ? null : t.closest('th');
+  if (!td && !th) return;
+  if (edit && edit.mode !== 'bar' && td && td._i === edit.idx) {
+    e.preventDefault();
+    const i = charIndexAt(e.clientX, e.clientY);
+    if (e.shiftKey) ed.setSelectionRange(Math.min(ed.selectionStart, i), Math.max(ed.selectionEnd, i)); else ed.setSelectionRange(i, i);
+    textDrag = { a: i };
+    ed.focus({ preventScroll: true });
+    return;
+  }
+  if (edit) commitEdit(0, 0);
+  e.preventDefault();
+  if (td) {
+    const r = Math.floor(td._i / COLS), c = td._i % COLS;
+    drag = { type: 'cell' };
+    if (e.shiftKey) { ext = { r, c }; renderSelection(); }
+    else { sel = { r, c }; ext = { r, c }; renderSelection(); }
+  } else if (th.classList.contains('ch')) {
+    drag = { type: 'col' };
+    if (e.shiftKey) { sel = { r: 0, c: sel.c }; ext = { r: ROWS - 1, c: th._c }; }
+    else { sel = { r: 0, c: th._c }; ext = { r: ROWS - 1, c: th._c }; }
+    renderSelection();
+  } else if (th.classList.contains('rh')) {
+    drag = { type: 'row' };
+    if (e.shiftKey) { sel = { r: sel.r, c: 0 }; ext = { r: th._r, c: COLS - 1 }; }
+    else { sel = { r: th._r, c: 0 }; ext = { r: th._r, c: COLS - 1 }; }
+    renderSelection();
+  } else {
+    sel = { r: 0, c: 0 }; ext = { r: ROWS - 1, c: COLS - 1 }; renderSelection();
+  }
+  sink.focus({ preventScroll: true });
+  if (drag && !scrollTimer) scrollTimer = setInterval(autoScroll, 35);
+});
+
+function autoScroll() {
+  if (!drag || !lastMouse) return;
+  const rc = scroller.getBoundingClientRect();
+  const hw = corner.offsetWidth, hh = corner.offsetHeight;
+  let dx = 0, dy = 0;
+  if (lastMouse.clientX > rc.right - 18) dx = Math.min(40, (lastMouse.clientX - rc.right + 18) + 8);
+  else if (lastMouse.clientX < rc.left + hw) dx = -Math.min(40, (rc.left + hw - lastMouse.clientX) + 8);
+  if (lastMouse.clientY > rc.bottom - 18) dy = Math.min(40, (lastMouse.clientY - rc.bottom + 18) + 8);
+  else if (lastMouse.clientY < rc.top + hh) dy = -Math.min(40, (rc.top + hh - lastMouse.clientY) + 8);
+  if (!dx && !dy) return;
+  scroller.scrollLeft += dx; scroller.scrollTop += dy;
+  const x = Math.min(Math.max(lastMouse.clientX, rc.left + hw + 2), rc.right - 20);
+  const y = Math.min(Math.max(lastMouse.clientY, rc.top + hh + 2), rc.bottom - 20);
+  extendTo(document.elementFromPoint(x, y));
+}
+
+document.addEventListener('mousemove', e => {
+  lastMouse = e;
+  if (resizing) {
+    const w = Math.min(MAX_W, Math.max(MIN_W, resizing.w + e.clientX - resizing.x));
+    setColW(resizing.c, w);
+    return;
+  }
+  if (textDrag && edit) {
+    const i = charIndexAt(e.clientX, e.clientY);
+    ed.setSelectionRange(Math.min(textDrag.a, i), Math.max(textDrag.a, i));
+    return;
+  }
+  if (drag) extendTo(document.elementFromPoint(e.clientX, e.clientY));
+});
+document.addEventListener('mouseup', () => {
+  if (resizing) { resizing.el.classList.remove('on'); resizing = null; saveCols(); for (let r = 0; r < ROWS; r++) dirtyRows.add(r); flushSpill(); }
+  drag = null; textDrag = null;
+  if (scrollTimer) { clearInterval(scrollTimer); scrollTimer = null; }
+});
+
+function setColW(c, w) {
+  colW[c] = w;
+  colEls[c + 1].style.width = w + 'px';
+  applyTableWidth();
+  layoutOverlays();
+}
+
+scroller.addEventListener('dblclick', e => {
+  const rz = e.target.closest('.rz');
+  if (rz) { autoFit(rz.parentNode._c); return; }
+  const td = e.target.closest('td[data-cell]');
+  if (!td) return;
+  if (edit && edit.mode !== 'bar') {
+    if (td._i !== edit.idx) return;
+    const s = ed.value, i = charIndexAt(e.clientX, e.clientY);
+    let a = i, b = i;
+    const isW = ch => /[A-Za-z0-9_$.]/.test(ch);
+    while (a > 0 && isW(s[a - 1])) a--;
+    while (b < s.length && isW(s[b])) b++;
+    ed.setSelectionRange(a, b);
+    return;
+  }
+  if (edit) return;
+  sel = { r: Math.floor(td._i / COLS), c: td._i % COLS }; ext = { r: sel.r, c: sel.c };
+  renderSelection();
+  startEdit('edit', raws[selIdx()]);
+});
+
+function autoFit(c) {
+  let w = 0;
+  for (let r = 0; r < ROWS; r++) { const s = shown[r * COLS + c]; if (s) w = Math.max(w, textWidth(s)); }
+  setColW(c, Math.min(MAX_W, Math.max(MIN_W, Math.ceil(w) + 22)));
+  saveCols();
+  for (let r = 0; r < ROWS; r++) dirtyRows.add(r);
+  flushSpill();
+}
+
+/* clicks on chrome never steal keyboard focus from the grid */
+document.addEventListener('mousedown', e => {
+  const t = e.target;
+  if (t.closest && (t.closest('.tb') || t.closest('#toolbar') || t.closest('#topbar') || t.closest('#status') || t.closest('#fxrow') && t.id !== 'formula-bar' && !t.closest('#bar-wrap'))) {
+    e.preventDefault();
+  }
+});
+function chromeAction(fn) { return () => { if (edit) commitEdit(0, 0); fn(); sink.focus({ preventScroll: true }); }; }
+bUndo.addEventListener('click', chromeAction(undo));
+bRedo.addEventListener('click', chromeAction(redo));
+$('#b-clear').addEventListener('click', chromeAction(clearRange));
+$('#b-sample').addEventListener('click', chromeAction(loadSample));
+
+window.addEventListener('resize', () => layoutOverlays());
+window.addEventListener('focus', () => { if (!edit) sink.focus({ preventScroll: true }); });
+
+/* =====================================================================
+ *  Example data
+ * =================================================================== */
+function loadSample() {
+  const d = [
+    ['A1', 'Quarterly budget'],
+    ['A2', 'Every number below is live: edit a cell and its dependents recalculate.'],
+    ['A3', 'Category'], ['B3', 'Q1'], ['C3', 'Q2'], ['D3', 'Q3'], ['E3', 'Q4'], ['F3', 'Total'], ['G3', 'Share %'], ['H3', 'Status'],
+    ['A4', 'Software'], ['B4', '12400'], ['C4', '13150'], ['D4', '14200'], ['E4', '15800'],
+    ['A5', 'Hardware'], ['B5', '8200'], ['C5', '7900'], ['D5', '9100'], ['E5', '8800'],
+    ['A6', 'Services'], ['B6', '15600'], ['C6', '16200'], ['D6', '15900'], ['E6', '17400'],
+    ['A7', 'Marketing'], ['B7', '5400'], ['C7', '6100'], ['D7', '5800'], ['E7', '7200'],
+    ['A8', 'Support'], ['B8', '3900'], ['C8', '4100'], ['D8', '4400'], ['E8', '4300'],
+    ['A9', 'Total'], ['B9', '=SUM(B4:B8)'], ['C9', '=SUM(C4:C8)'], ['D9', '=SUM(D4:D8)'], ['E9', '=SUM(E4:E8)'], ['F9', '=SUM(F4:F8)'], ['G9', '=SUM(G4:G8)'],
+    ['A11', 'Average quarter'], ['B11', '=AVERAGE(B9:E9)'],
+    ['A12', 'Best quarter'], ['B12', '=MAX(B9:E9)'],
+    ['A13', 'Worst quarter'], ['B13', '=MIN(B9:E9)'],
+    ['A14', 'Growth Q1 to Q4 %'], ['B14', '=ROUND((E9-B9)/B9*100,1)'],
+    ['A15', 'Tax rate'], ['B15', '0.2'],
+    ['A16', 'Tax due'], ['B16', '=ROUND(F9*B15,2)'],
+    ['A17', 'Summary'], ['B17', '="Total of "&F9&" with tax "&B16']
+  ];
+  for (let r = 4; r <= 8; r++) {
+    d.push(['F' + r, '=SUM(B' + r + ':E' + r + ')']);
+    d.push(['G' + r, '=ROUND(F' + r + '/F$9*100,1)']);
+    d.push(['H' + r, '=IF(F' + r + '>50000,"Strong","Watch")']);
+  }
+  applyBatch(d.map(([a, v]) => [idxOfAddr(a), v]));
+  moveTo(0, 0, false);
+}
+
+/* =====================================================================
+ *  Boot
+ * =================================================================== */
+(function boot() {
+  const seeds = [];
+  try {
+    const o = JSON.parse(localStorage.getItem(LS_CELLS) || '{}');
+    if (o && typeof o === 'object') for (const a of Object.keys(o)) {
+      const i = idxOfAddr(a), raw = o[a];
+      if (i >= 0 && typeof raw === 'string' && raw !== '') { installCell(i, raw); seeds.push(i); }
+    }
+  } catch (_) {}
+  const aff = recalc(seeds);
+  for (let k = 0; k < aff.length; k++) renderCell(aff[k]);
+  flushSpill();
+  syncHistoryButtons();
+  renderSelection();
+  sink.focus({ preventScroll: true });
+})();
+})();
+</script>
+</body>
+</html>
