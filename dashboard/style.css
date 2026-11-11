@@ -294,6 +294,28 @@ tr:first-child .rank { color: var(--ink); }
   z-index: 60;
 }
 
+/* ── Run (web-triggered generation) ────────────────────────── */
+.run-layout { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.run-form .field { margin-bottom: 14px; }
+.run-form label { display: block; font-size: 12px; color: var(--graphite); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+.run-form input, .run-form select { width: 100%; background: var(--sheet); color: var(--ink); border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; font: inherit; }
+.run-form .field-row { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 12px; }
+.run-form .model-row { display: flex; gap: 8px; }
+.run-form .model-row input { flex: 1; }
+.run-form .model-row .btn { flex: 0 0 auto; }
+.hint { font-size: 12px; color: var(--graphite); margin-top: 5px; min-height: 15px; overflow-wrap: anywhere; }
+.hint.error { color: var(--fail); }
+.run-status-panel h2 { margin-bottom: 12px; }
+.run-item { border: 1px solid var(--rule-soft); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+.run-item-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.run-item-head .btn { margin-left: auto; padding: 4px 10px; font-size: 12px; }
+.run-meta { font-size: 12px; }
+.run-badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--rule); color: var(--graphite); }
+.run-badge.running { color: var(--corner-a); border-color: var(--corner-a); }
+.run-badge.done { color: var(--pass); border-color: var(--pass); }
+.run-badge.error, .run-badge.stopped { color: var(--fail); border-color: var(--fail); }
+.run-log { margin-top: 8px; font: 11px/1.5 var(--mono); color: var(--graphite); background: var(--paper); border-radius: 6px; padding: 8px 10px; max-height: 160px; overflow: auto; overflow-wrap: anywhere; }
+
 @media (max-width: 960px) {
   .bar { gap: 14px; padding: 0 16px; }
   .bar .meta { display: none; }
@@ -308,6 +330,8 @@ tr:first-child .rank { color: var(--ink); }
   .task-head { flex-direction: column; }
   .standings-wrap { overflow-x: auto; }
   .ballot { grid-template-columns: 1fr 1fr; }
+  .run-layout { grid-template-columns: 1fr; }
+  .run-form .field-row { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

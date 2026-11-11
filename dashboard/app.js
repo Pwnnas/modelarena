@@ -18,6 +18,8 @@ function dur(ms) {
 
 let S = null;
 const J = { filter: 'any', pair: null, revealed: false, busy: false, last: null, guardUntil: 0 };
+// Run-view state (kept separate from S so polling doesn't reset the form).
+const R = { providers: [], thinkingLevels: [], tasks: [], models: [], modelsLoading: false, modelsError: null, runs: [], pollTimer: null, loaded: false };
 
 async function refresh() {
   const res = await fetch('/api/state');
@@ -339,6 +341,118 @@ async function vote(winner) {
   document.querySelector('[data-action="undo"]').disabled = false;
 }
 
+// ── Run (web-triggered generation) ─────────────────────────────────────────
+const runById = (id) => document.getElementById(id);
+const RUN_FIELDS = { 'run-name': 'name', 'run-model': 'model', 'run-baseurl': 'baseurl', 'run-thinking': 'thinking', 'run-task': 'task', 'run-maxtokens': 'maxtokens', 'run-provider': 'provider' };
+R.form = { name: '', model: '', baseurl: '', thinking: 'off', task: '', maxtokens: '', provider: '' };
+
+function runView() {
+  const provOptions = R.providers.map((p) => `<option value="${p.id}">${esc(p.label)}</option>`).join('');
+  const thinkOptions = R.thinkingLevels.map((l) => `<option value="${l}">${l}</option>`).join('');
+  const taskOptions = `<option value="">All tasks</option>` + R.tasks.map((t) => `<option value="${t.id}">${esc(t.title)} (${t.id})</option>`).join('');
+  const modelOpts = R.models.map((m) => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+  return `<h1>Run a model</h1>
+    <p class="lede">Generate the tasks from a provider and grade them. Put <code>OPENROUTER_API_KEY</code> in a <code>.env</code> file to pick OpenRouter models, or point at any OpenAI-compatible server by URL.</p>
+    <div class="run-layout">
+      <section class="panel run-form">
+        <div class="field"><label for="run-name">Run name (folder)</label><input id="run-name" placeholder="e.g. qwen3.8-27b-q4-or" autocomplete="off"></div>
+        <div class="field"><label for="run-provider">Provider</label><select id="run-provider">${provOptions}</select></div>
+        <div class="field" id="run-baseurl-row"><label for="run-baseurl">Server base URL</label><input id="run-baseurl" placeholder="http://localhost:8080/v1" autocomplete="off"></div>
+        <div class="field"><label for="run-model">Model</label>
+          <div class="model-row"><input id="run-model" list="run-models-list" placeholder="pick or type a model id" autocomplete="off"><button class="btn" id="run-load-models" data-action="run-load-models" type="button">Load models</button></div>
+          <datalist id="run-models-list">${modelOpts}</datalist>
+          <div class="hint" id="run-models-hint"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label for="run-thinking">Thinking</label><select id="run-thinking">${thinkOptions}</select></div>
+          <div class="field"><label for="run-task">Task</label><select id="run-task">${taskOptions}</select></div>
+          <div class="field"><label for="run-maxtokens">Max tokens</label><input id="run-maxtokens" type="number" min="1" placeholder="e.g. 32768"></div>
+        </div>
+        <button class="btn primary" id="run-start" data-action="run-start" type="button">Start run</button>
+        <div class="hint" id="run-start-hint"></div>
+      </section>
+      <section class="panel run-status-panel"><h2>Runs</h2><div id="run-status"><span class="muted">No runs yet.</span></div></section>
+    </div>`;
+}
+
+function restoreRunForm() {
+  for (const [id, key] of Object.entries(RUN_FIELDS)) { const el = runById(id); if (el) el.value = R.form[key] ?? ''; }
+}
+function applyProviderVisibility() {
+  const row = runById('run-baseurl-row');
+  if (row) row.style.display = R.form.provider === 'openrouter' ? 'none' : '';
+}
+function updateModelsHint() {
+  const h = runById('run-models-hint'); if (!h) return;
+  h.textContent = R.modelsLoading ? 'Loading models…' : R.modelsError ? R.modelsError : R.models.length ? `${R.models.length} models available` : '';
+  h.classList.toggle('error', !!R.modelsError);
+}
+async function loadRunModels() {
+  R.modelsLoading = true; R.modelsError = null; updateModelsHint();
+  try {
+    const q = new URLSearchParams({ provider: R.form.provider || 'custom' });
+    if (R.form.provider !== 'openrouter') q.set('baseUrl', R.form.baseurl || '');
+    const res = await fetch('/api/run/models?' + q.toString());
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error || 'could not list models');
+    R.models = j.models ?? [];
+  } catch (e) { R.models = []; R.modelsError = String(e.message ?? e); }
+  R.modelsLoading = false;
+  const dl = runById('run-models-list');
+  if (dl) dl.innerHTML = R.models.map((m) => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+  updateModelsHint();
+}
+async function initRunView() {
+  if (!R.loaded) {
+    try {
+      const r = await (await fetch('/api/run/providers')).json();
+      R.providers = r.providers ?? []; R.thinkingLevels = r.thinkingLevels ?? []; R.tasks = r.tasks ?? []; R.loaded = true;
+      if (!R.form.provider) R.form.provider = R.providers[0]?.id ?? 'custom';
+      if (!R.form.baseurl) R.form.baseurl = R.providers.find((p) => p.id === 'custom')?.baseUrl ?? '';
+      if (!R.form.thinking) R.form.thinking = 'off';
+      app.innerHTML = runView(); restoreRunForm(); applyProviderVisibility();
+    } catch (e) {
+      const h = runById('run-start-hint'); if (h) h.textContent = 'Could not load providers: ' + (e.message ?? e);
+    }
+  }
+  loadRunModels();
+  startRunPolling();
+}
+function runStatusHTML(runs) {
+  if (!runs.length) return '<span class="muted">No runs yet.</span>';
+  return runs.map((r) => {
+    const stop = r.status === 'running' ? `<button class="btn" data-action="run-stop" data-model="${esc(r.model)}" type="button">Stop</button>` : '';
+    const meta = [r.opts.apiModel, r.opts.thinking ? `thinking ${r.opts.thinking}` : null, r.opts.task || 'all tasks'].filter(Boolean).join(' · ');
+    const log = (r.lines ?? []).slice(-8).map((l) => `<div>${esc(l)}</div>`).join('');
+    return `<div class="run-item"><div class="run-item-head"><strong>${esc(r.model)}</strong><span class="run-badge ${r.status}">${r.status}</span><span class="muted run-meta">${esc(meta)}</span>${stop}</div><div class="run-log">${log}</div></div>`;
+  }).join('');
+}
+async function updateRunStatus() {
+  const el = runById('run-status'); if (!el) return;
+  try { const r = await (await fetch('/api/run/status')).json(); R.runs = r.runs ?? []; el.innerHTML = runStatusHTML(R.runs); } catch { /* keep last */ }
+}
+function startRunPolling() { stopRunPolling(); updateRunStatus(); R.pollTimer = setInterval(updateRunStatus, 2500); }
+function stopRunPolling() { if (R.pollTimer) { clearInterval(R.pollTimer); R.pollTimer = null; } }
+async function startRunFromForm() {
+  const hint = runById('run-start-hint');
+  const body = {
+    model: (R.form.name || '').trim(), provider: R.form.provider || 'custom',
+    apiModel: (R.form.model || '').trim(), baseUrl: (R.form.baseurl || '').trim(),
+    thinking: R.form.thinking || undefined, task: R.form.task || undefined,
+    maxTokens: R.form.maxtokens ? Number(R.form.maxtokens) : undefined,
+  };
+  if (!body.model) { if (hint) hint.textContent = 'Enter a run name.'; return; }
+  if (!body.apiModel) { if (hint) hint.textContent = 'Pick a model (Load models, or type an id).'; return; }
+  if (hint) hint.textContent = 'Starting…';
+  try {
+    const res = await fetch('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await res.json();
+    if (!res.ok) { if (hint) hint.textContent = j.error || 'Failed to start'; return; }
+    if (hint) hint.textContent = `Started ${j.model}. Progress shows on the right.`;
+    startRunPolling();
+  } catch (e) { if (hint) hint.textContent = String(e.message ?? e); }
+}
+
 // ── Router & events ──────────────────────────────────────────────────────
 function render() {
   const [view = 'standings', a, b] = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
@@ -348,7 +462,12 @@ function render() {
   }
   document.querySelector('.meta').textContent = `${S.suite === 'v2' ? 'Suite v2 · ' : ''}${plural(S.models.length, 'model')}, ${plural(S.tasks.length, 'task')}, ${plural(S.votes.length, 'vote')}`;
   document.title = S.suite === 'v2' ? 'Model Arena v2' : 'Model Arena';
-  app.innerHTML = view === 'tasks' ? tasksView(a, b) : view === 'judge' ? judgeView(a) : standingsView();
+  if (view === 'run') {
+    app.innerHTML = runView(); restoreRunForm(); applyProviderVisibility(); initRunView();
+  } else {
+    stopRunPolling();
+    app.innerHTML = view === 'tasks' ? tasksView(a, b) : view === 'judge' ? judgeView(a) : standingsView();
+  }
   if (view === 'judge') {
     fitScreens();
     guardFocus();
@@ -417,7 +536,25 @@ app.addEventListener('click', async (e) => {
     el.setAttribute('aria-pressed', String(on));
     el.textContent = on ? 'Back to split view' : 'Full screen';
     fitScreens();
+  } else if (action === 'run-start') {
+    startRunFromForm();
+  } else if (action === 'run-load-models') {
+    loadRunModels();
+  } else if (action === 'run-stop') {
+    fetch('/api/run/stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: el.dataset.model }) }).then(updateRunStatus);
   }
+});
+
+// Run-form fields: keep R.form in sync; provider change reloads the model list.
+app.addEventListener('input', (e) => {
+  const key = RUN_FIELDS[e.target.id];
+  if (key) R.form[key] = e.target.value;
+});
+app.addEventListener('change', (e) => {
+  const key = RUN_FIELDS[e.target.id];
+  if (!key) return;
+  R.form[key] = e.target.value;
+  if (e.target.id === 'run-provider') { applyProviderVisibility(); loadRunModels(); }
 });
 
 document.addEventListener('keydown', (e) => {

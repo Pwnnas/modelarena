@@ -2,3 +2,4 @@ node_modules/
 results/
 .DS_Store
 v2/results/
+.env

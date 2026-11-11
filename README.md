@@ -160,6 +160,20 @@ node arena.mjs run qwen3.8-27b-bf16-or --base-url https://openrouter.ai/api/v1 \
 The provider that answered is saved in `run.json` and shown on the submission card. Its time and
 speed measure that provider's hardware, so compare quality, not speed, against a local run.
 
+## Run from the dashboard
+
+The **Run** view starts a generation + grading job without the terminal. Pick a provider,
+a model, a thinking level and (optionally) a single task, give the run a folder name, and
+press **Start run**; progress and the latest log lines stream into the panel, and each run
+can be stopped. It spawns the same `arena.mjs run … --grade` pipeline, so retries, HTML
+extraction, `run.json` metrics and grading all behave exactly as on the CLI.
+
+- **OpenRouter:** put `OPENROUTER_API_KEY=sk-or-…` in a `.env` file at the repo root and
+  OpenRouter appears as a provider with its full model catalogue. `.env` is gitignored.
+- **Local / custom server:** choose the *Local / custom server* provider and set the base
+  URL (e.g. `http://192.168.1.20:8080/v1`); **Load models** queries its `/models` endpoint.
+  `ARENA_BASE_URL` and `ARENA_API_KEY` in `.env` set the defaults.
+
 ## Legacy experimental suite (`--v2`)
 
 > Superseded by the integrated v2 tasks above (Tally, Relay, Enigma), which are counted in
