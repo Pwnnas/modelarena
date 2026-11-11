@@ -343,8 +343,8 @@ async function vote(winner) {
 
 // ── Run (web-triggered generation) ─────────────────────────────────────────
 const runById = (id) => document.getElementById(id);
-const RUN_FIELDS = { 'run-name': 'name', 'run-model': 'model', 'run-baseurl': 'baseurl', 'run-thinking': 'thinking', 'run-task': 'task', 'run-maxtokens': 'maxtokens', 'run-provider': 'provider' };
-R.form = { name: '', model: '', baseurl: '', thinking: 'off', task: '', maxtokens: '', provider: '' };
+const RUN_FIELDS = { 'run-name': 'name', 'run-model': 'model', 'run-baseurl': 'baseurl', 'run-apikey': 'apikey', 'run-thinking': 'thinking', 'run-task': 'task', 'run-maxtokens': 'maxtokens', 'run-provider': 'provider' };
+R.form = { name: '', model: '', baseurl: '', apikey: '', thinking: 'off', task: '', maxtokens: '', provider: '' };
 
 function runView() {
   const provOptions = R.providers.map((p) => `<option value="${p.id}">${esc(p.label)}</option>`).join('');
@@ -358,6 +358,7 @@ function runView() {
         <div class="field"><label for="run-name">Run name (folder)</label><input id="run-name" placeholder="e.g. qwen3.8-27b-q4-or" autocomplete="off"></div>
         <div class="field"><label for="run-provider">Provider</label><select id="run-provider">${provOptions}</select></div>
         <div class="field" id="run-baseurl-row"><label for="run-baseurl">Server base URL</label><input id="run-baseurl" placeholder="http://localhost:8080/v1" autocomplete="off"></div>
+        <div class="field" id="run-apikey-row"><label for="run-apikey">API key (optional)</label><input id="run-apikey" type="password" placeholder="leave empty if the server needs no key" autocomplete="off"></div>
         <div class="field"><label for="run-model">Model</label>
           <div class="model-row"><input id="run-model" list="run-models-list" placeholder="pick or type a model id" autocomplete="off"><button class="btn" id="run-load-models" data-action="run-load-models" type="button">Load models</button></div>
           <datalist id="run-models-list">${modelOpts}</datalist>
@@ -379,8 +380,9 @@ function restoreRunForm() {
   for (const [id, key] of Object.entries(RUN_FIELDS)) { const el = runById(id); if (el) el.value = R.form[key] ?? ''; }
 }
 function applyProviderVisibility() {
-  const row = runById('run-baseurl-row');
-  if (row) row.style.display = R.form.provider === 'openrouter' ? 'none' : '';
+  const custom = R.form.provider !== 'openrouter';
+  const base = runById('run-baseurl-row'); if (base) base.style.display = custom ? '' : 'none';
+  const key = runById('run-apikey-row'); if (key) key.style.display = custom ? '' : 'none';
 }
 function updateModelsHint() {
   const h = runById('run-models-hint'); if (!h) return;
@@ -391,7 +393,7 @@ async function loadRunModels() {
   R.modelsLoading = true; R.modelsError = null; updateModelsHint();
   try {
     const q = new URLSearchParams({ provider: R.form.provider || 'custom' });
-    if (R.form.provider !== 'openrouter') q.set('baseUrl', R.form.baseurl || '');
+    if (R.form.provider !== 'openrouter') { q.set('baseUrl', R.form.baseurl || ''); if (R.form.apikey) q.set('apiKey', R.form.apikey); }
     const res = await fetch('/api/run/models?' + q.toString());
     const j = await res.json();
     if (!res.ok) throw new Error(j.error || 'could not list models');
@@ -438,6 +440,7 @@ async function startRunFromForm() {
   const body = {
     model: (R.form.name || '').trim(), provider: R.form.provider || 'custom',
     apiModel: (R.form.model || '').trim(), baseUrl: (R.form.baseurl || '').trim(),
+    apiKey: (R.form.apikey || '').trim() || undefined,
     thinking: R.form.thinking || undefined, task: R.form.task || undefined,
     maxTokens: R.form.maxtokens ? Number(R.form.maxtokens) : undefined,
   };

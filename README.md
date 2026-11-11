@@ -168,11 +168,12 @@ press **Start run**; progress and the latest log lines stream into the panel, an
 can be stopped. It spawns the same `arena.mjs run … --grade` pipeline, so retries, HTML
 extraction, `run.json` metrics and grading all behave exactly as on the CLI.
 
-- **OpenRouter:** put `OPENROUTER_API_KEY=sk-or-…` in a `.env` file at the repo root and
-  OpenRouter appears as a provider with its full model catalogue. `.env` is gitignored.
+- **OpenRouter:** copy `.env.example` to `.env` and set `OPENROUTER_API_KEY=sk-or-…`;
+  OpenRouter then appears as a provider with its full model catalogue. `.env` is gitignored.
 - **Local / custom server:** choose the *Local / custom server* provider and set the base
   URL (e.g. `http://192.168.1.20:8080/v1`); **Load models** queries its `/models` endpoint.
-  `ARENA_BASE_URL` and `ARENA_API_KEY` in `.env` set the defaults.
+  The API key is optional — leave it empty and the arena still tries to connect, list models
+  and run without auth. `ARENA_BASE_URL` and `ARENA_API_KEY` in `.env` set the defaults.
 
 ## Legacy experimental suite (`--v2`)
 
