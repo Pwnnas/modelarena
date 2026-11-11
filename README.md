@@ -1,8 +1,9 @@
 # Model Arena
 
 A local benchmark for comparing AI models on **visual, interactive web apps**. Every model gets
-the same six demanding prompts and builds a single-file `index.html` for each. The arena then scores
-each app two ways:
+the same six demanding core prompts and builds a single-file `index.html` for each. The **v2
+suite** adds three more tasks: two that lean hard on tool calling (with data shipped in the
+agent's workspace) and one hard-but-fast simulation task. The arena scores each app two ways:
 
 1. **Auto score (0–100 per task).** A headless Chrome drives every page with real mouse and
    keyboard input. It measures correctness, frame rate and audio timing, and awards partial
@@ -18,6 +19,20 @@ each app two ways:
 | `cloth-sim`, Silk | tearable Verlet cloth | stability, grab/cut physics, wind, 60 FPS, shaded fabric |
 | `terrain-flyover`, Horizon | infinite terrain in raw WebGL | determinism, chunk streaming, day/night lighting, atmosphere |
 | `command-palette`, Commander | ⌘K palette in a notes app | fuzzy ranking, ARIA combobox, focus trap, motion and reduced motion |
+
+**v2 suite** (counted in the v2 scores only):
+
+| Task | What the model builds | What separates good from great |
+|---|---|---|
+| `expense-ledger`, Tally | finance ledger from a workspace CSV + budgets JSON | tool use: reading and embedding the exact data; totals, budgets, filter/search/sort |
+| `packet-decoder`, Relay | binary protocol decoder + capture explorer | tool use: recovering a gzipped capture split into base64 parts; varints, zigzag, CRC-16 |
+| `enigma`, Enigma | faithful Enigma M3 simulator | the double-stepping anomaly, ring settings, plugboard — letter-exact against a reference |
+
+The two tool-heavy tasks are graded so that **weak tool callers still earn partial credit**:
+roughly half the points come from spec-only checks (UI, decoder logic) that need no workspace
+files, and the rest from data fidelity that requires actually reading/decoding the files.
+Tally needs simple file reads; Relay needs a multi-step decode-and-verify workflow — different
+difficulty, same partial-credit ladder.
 
 ## Setup
 
@@ -44,14 +59,23 @@ npx playwright install ffmpeg      # for showcase videos (screenshots work witho
   node arena.mjs import qwen3-32b-q4 ~/arena-runs/qwen3-32b-q4
   ```
 
+  Tool-use tasks (Tally, Relay) also copy their `workspace/` data files into each task folder,
+  so the agent can read/decode them with its tools. The submitted `index.html` must embed the
+  data — the graded page has no access to the workspace or the network.
+
 **2. Grade.**
 
 ```sh
 npm run grade                          # grades only new or changed submissions
 npm run grade -- --model qwen3-32b-q4 --task cloth-sim --force
+npm run grade -- --concurrency 4       # grade 4 jobs at once (short: -c 4)
 ```
 
 Each task takes 1–2 minutes. Progress prints per check, followed by the standings.
+`--concurrency N` runs N grading jobs in parallel (default 1) when your machine can handle
+it; each line is then prefixed with `[model/task]`. The v2 tasks are correctness-only and
+parallelise cleanly; the core tasks' frame-rate checks are load-sensitive, so use
+`--concurrency 1` when you need comparable timing numbers.
 
 **3. Look and judge.**
 
@@ -59,7 +83,7 @@ Each task takes 1–2 minutes. Progress prints per check, followed by the standi
 npm run serve                          # http://localhost:4173
 ```
 
-- **Standings:** Arena, Auto and Preference scores, with a score per task.
+- **Standings:** Arena, Auto and Preference scores plus Arena v2 / Auto v2 (full suite), with a score per task.
 - **Tasks:** the prompt, then every submission with its video, screenshots and every check.
   Expand a check to see its sub-assertions, what the grader actually observed, and a screenshot
   of the page when it failed. "Open live" runs the app.
@@ -73,11 +97,16 @@ npm run serve                          # http://localhost:4173
 - A **task score** is points earned / points possible × 100. Every task also has three health
   checks: no uncaught exceptions, no console errors, no network requests. These only count in
   full once a page earns 25% of the core points, so a blank page scores ~0.
-- **Auto** is the mean over all tasks anyone attempted. A task a model skipped counts as 0.
+- **Auto** is the mean over the **original six** tasks anyone attempted. A task a model skipped
+  counts as 0. This is the historical score: it does not change when v2 tasks are added.
+- **Auto v2** is the mean over **all tasks (original + v2)** anyone attempted, but it is only
+  reported once a model has been graded on **every active v2 task**. Until then it shows `—`,
+  so a model that never ran the new tasks is not penalised and its v1 numbers stay comparable.
 - **Preference** is the expected win rate against an average (Elo 1500) model, fitted from
   votes with Bradley–Terry plus a one-win/one-loss prior. It's shown after 5 votes.
-- **Arena** is `0.7 × Auto + 0.3 × Preference` once Preference exists, otherwise Auto. The
-  weights live in `lib/scoring.mjs`.
+- **Arena** is `0.7 × Auto + 0.3 × Preference` once Preference exists, otherwise Auto.
+  **Arena v2** is the same blend using Auto v2 (and is `—` whenever Auto v2 is). The weights
+  live in `lib/scoring.mjs`.
 
 Frame-rate checks depend on the machine, so grade all models on the same computer.
 `--force` re-grades everything after you change hardware or a task.
@@ -105,13 +134,18 @@ export const checks = [
 export async function showcase(t) { /* scripted demo; t.shot('name') saves a screenshot */ }
 ```
 
+Set `suite: 'v2'` in `meta` to add the task to the v2 scores only (it then counts toward
+Auto v2 / Arena v2, never the historical Auto / Arena). To ship data files the agent must
+read with its tools, put them under `tasks/<id>/workspace/`; `arena.mjs new` copies them into
+the task folder and their contents are hashed into the task, so editing them re-grades.
+
 Helpers on `t`: `part`, `ok`, `poll`, `sleep`, `eval`, `setInput`, `drag`, `shortcut`, `box`,
 `count`, `visible`, `screenshot` / `stableShot` with `t.image.diff | stats | coverage | pixel`,
 `fps`, `reload`, and `probe()`. `probe()` reports the canvas contexts created and every Web
 Audio `start(when)` call, captured by `lib/probe.js` before the page's own scripts run.
 
-Changing a task's `task.mjs` or `PROMPT.md` marks its results stale, so they are re-graded on
-the next `npm run grade`.
+Changing a task's `task.mjs`, `PROMPT.md` or any `workspace/` file marks its results stale, so
+they are re-graded on the next `npm run grade`.
 
 ## Layout
 
@@ -123,7 +157,7 @@ lib/probe.js         init script: canvas + Web Audio instrumentation
 lib/scoring.mjs      leaderboard and Bradley–Terry
 lib/server.mjs       dashboard API; each submission is served from its own *.localhost origin
 dashboard/           standings, task results, blind judging
-tasks/<id>/          PROMPT.md + task.mjs
+tasks/<id>/          PROMPT.md + task.mjs (+ workspace/ data files for tool-use tasks)
 submissions/<model>/<task>/index.html
 results/<model>/<task>/   result.json, showcase.webm, shots/, checks/ (failure screenshots)
 results/votes.json   judge votes

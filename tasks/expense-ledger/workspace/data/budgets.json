@@ -1,0 +1,14 @@
+{
+  "period": "2026-Q1",
+  "currency": "USD",
+  "limits": {
+    "Groceries": 900,
+    "Rent": 4500,
+    "Transport": 360,
+    "Dining": 480,
+    "Utilities": 420,
+    "Entertainment": 270,
+    "Health": 240,
+    "Shopping": 650
+  }
+}

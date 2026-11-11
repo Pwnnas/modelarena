@@ -1,0 +1,22 @@
+{
+  "parts": [
+    {
+      "file": "part-01.b64",
+      "sha256": "da6d0a411fd258a3a973dd7df7b303848b4651c188901d454c02bc165e4e302f",
+      "bytes": 127
+    },
+    {
+      "file": "part-02.b64",
+      "sha256": "1019b312fb4284f98f46976fd52678b1e5ed13ba012b6d3ac97e0a399a926c87",
+      "bytes": 127
+    },
+    {
+      "file": "part-03.b64",
+      "sha256": "825010a6f01e37b07531b1e2dcd6326e3d0348d63bdbfcd9d43142baad4889e2",
+      "bytes": 127
+    }
+  ],
+  "gzipSha256": "6fec0535b6f100519fc2912c66ad48006c21392853f520b2d743d03b46ea2b2a",
+  "records": 26,
+  "encoding": "Each part is base64 of one chunk of a single gzip stream. Decode parts to bytes, concatenate in part order, gunzip, parse as JSONL."
+}

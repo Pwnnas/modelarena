@@ -1,0 +1,165 @@
+[
+  {
+    "name": "minimal",
+    "hex": "a702000101611b7c",
+    "expect": {
+      "ok": true,
+      "seq": 1,
+      "device": "a"
+    }
+  },
+  {
+    "name": "all-fields",
+    "hex": "a7020fc80e73656e736f722d6e6f64652d3135f50157e820849ed40598c8dc019262",
+    "expect": {
+      "ok": true,
+      "seq": 200,
+      "device": "sensor-node-15",
+      "temperature": -12.3,
+      "humidity": 87,
+      "battery": 4200,
+      "gps": {
+        "lat": 59.3293,
+        "lon": 18.0686
+      }
+    }
+  },
+  {
+    "name": "negative-temp",
+    "hex": "a702010707626574612d303209089e",
+    "expect": {
+      "ok": true,
+      "seq": 7,
+      "device": "beta-02",
+      "temperature": -0.5
+    }
+  },
+  {
+    "name": "multibyte-battery",
+    "hex": "a70204580867616d6d612d3033b960d275",
+    "expect": {
+      "ok": true,
+      "seq": 88,
+      "device": "gamma-03",
+      "battery": 12345
+    }
+  },
+  {
+    "name": "gps-southern",
+    "hex": "a702090908616c7068612d3031b203ffb79d03e3d4de064e0a",
+    "expect": {
+      "ok": true,
+      "seq": 9,
+      "device": "alpha-01",
+      "temperature": 21.7,
+      "gps": {
+        "lat": -33.8688,
+        "lon": -70.6693
+      }
+    }
+  },
+  {
+    "name": "humidity-max",
+    "hex": "a702030a07626574612d3032f00464e934",
+    "expect": {
+      "ok": true,
+      "seq": 10,
+      "device": "beta-02",
+      "temperature": 31.2,
+      "humidity": 100
+    }
+  },
+  {
+    "name": "seq-max",
+    "hex": "a70204ff017ae4197a31",
+    "expect": {
+      "ok": true,
+      "seq": 255,
+      "device": "z",
+      "battery": 3300
+    }
+  },
+  {
+    "name": "zero-temp",
+    "hex": "a702030c08616c7068612d303100006611",
+    "expect": {
+      "ok": true,
+      "seq": 12,
+      "device": "alpha-01",
+      "temperature": 0,
+      "humidity": 0
+    }
+  },
+  {
+    "name": "bad-magic",
+    "hex": "a602072a0a72656c61792d6e6f6465f00237bc1ee336",
+    "expect": {
+      "ok": false,
+      "error": "magic"
+    }
+  },
+  {
+    "name": "bad-version",
+    "hex": "a703072a0a72656c61792d6e6f6465f00237bc1ee336",
+    "expect": {
+      "ok": false,
+      "error": "version"
+    }
+  },
+  {
+    "name": "bad-crc",
+    "hex": "a702072a0a72656c61792d6e6f6465f00237bc1ee363",
+    "expect": {
+      "ok": false,
+      "error": "crc"
+    }
+  },
+  {
+    "name": "truncated",
+    "hex": "a702072a0a72656c61792d6e6f6465f00237bc",
+    "expect": {
+      "ok": false,
+      "error": "truncated"
+    }
+  },
+  {
+    "name": "odd-hex",
+    "hex": "a702072a0a72656c61792d6e6f6465f00237bc1ee336a",
+    "expect": {
+      "ok": false,
+      "error": "format"
+    }
+  },
+  {
+    "name": "non-hex",
+    "hex": "zz02072a0a72656c61792d6e6f6465f00237bc1ee336",
+    "expect": {
+      "ok": false,
+      "error": "format"
+    }
+  },
+  {
+    "name": "empty",
+    "hex": "",
+    "expect": {
+      "ok": false,
+      "error": "format"
+    }
+  },
+  {
+    "name": "unknown-flag",
+    "hex": "a702172a0a72656c61792d6e6f6465f00237bc1ee336",
+    "expect": {
+      "ok": false,
+      "error": "flags"
+    }
+  },
+  {
+    "name": "trailing-byte",
+    "hex": "a702072a0a72656c61792d6e6f6465f00237bc1e00fb4d",
+    "expect": {
+      "ok": false,
+      "error": "trailing"
+    }
+  }
+]

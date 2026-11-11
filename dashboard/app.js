@@ -37,8 +37,9 @@ function standingsView() {
       <span class="path">submissions/&lt;model&gt;/&lt;task&gt;/index.html</span>, then run <code>npm run grade</code>.</div>`;
   }
   const head = S.tasks
-    .map((t) => `<th class="num task-col" title="${esc(t.subtitle)}">${esc(t.title)}</th>`)
+    .map((t) => `<th class="num task-col" title="${esc(t.subtitle)}">${esc(t.title)}${t.suite === 'v2' ? ' <span class="v2-badge">v2</span>' : ''}</th>`)
     .join('');
+  const v2cell = (n) => (n == null ? '<span class="none">—</span>' : `<span class="mid v2-num">${fmt(n)}</span>`);
   const rows = S.board
     .map((r) => {
       const cells = S.tasks
@@ -54,11 +55,14 @@ function standingsView() {
         r.preference == null
           ? `<span class="none">—</span><small class="muted" style="display:block;font-size:12px">${r.record.games}/${S.minVotes} votes</small>`
           : `<span class="mid">${fmt(r.preference)}</span><small class="muted" style="display:block;font-size:12px">Elo ${r.elo}, ${r.record.wins}–${r.record.losses}–${r.record.ties}</small>`;
+      const v2progress = r.v2Of ? ` · v2 ${r.v2Attempted}/${r.v2Of}` : '';
       return `<tr>
         <td class="rank">${r.rank}</td>
-        <td class="model">${esc(r.model)}<small>${r.attempted} of ${r.of} tasks</small></td>
+        <td class="model">${esc(r.model)}<small>${r.attempted} of ${r.of} tasks${v2progress}</small></td>
         <td class="num"><span class="big">${fmt(r.arena)}</span></td>
         <td class="num"><span class="mid">${fmt(r.auto)}</span></td>
+        <td class="num" title="Full suite incl. v2 tasks; — until every v2 task is graded">${v2cell(r.arena2)}</td>
+        <td class="num" title="Mean over all tasks incl. v2">${v2cell(r.auto2)}</td>
         <td class="num">${pref}</td>
         ${cells}
       </tr>`;
@@ -66,15 +70,16 @@ function standingsView() {
     .join('');
   const w = S.weights;
   return `<h1>Standings</h1>
-    <p class="lede">Each model builds the same six browser apps from identical prompts. Click a score to see what passed, what failed and a recording of the app.</p>
+    <p class="lede">Each model builds the same six core browser apps from identical prompts; the v2 suite adds three more (two tool-heavy, one hard simulation). Click a score to see what passed, what failed and a recording of the app.</p>
     <div class="standings-wrap"><table class="standings">
-      <thead><tr><th>#</th><th>Model</th><th class="num">Arena</th><th class="num">Auto</th><th class="num">Preference</th>${head}</tr></thead>
+      <thead><tr><th>#</th><th>Model</th><th class="num">Arena</th><th class="num">Auto</th><th class="num">Arena v2</th><th class="num">Auto v2</th><th class="num">Preference</th>${head}</tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
     <section class="explain" aria-label="How scoring works">
-      <div><h3>Auto</h3><p>The mean task score from the automated grader. A headless Chrome drives every page with real mouse, keyboard and audio instrumentation, and awards partial credit per check. Tasks a model skipped count as 0.</p></div>
+      <div><h3>Auto</h3><p>The mean task score from the automated grader over the original six tasks. A headless Chrome drives every page with real mouse, keyboard and audio instrumentation, and awards partial credit per check. Tasks a model skipped count as 0.</p></div>
       <div><h3>Preference</h3><p>From blind side-by-side votes on the Judge page, fitted with Bradley–Terry (order-independent Elo). Shown as the expected win rate against an average model, after ${S.minVotes} votes.</p></div>
       <div><h3>Arena</h3><p>${Math.round(w.auto * 100)}% Auto plus ${Math.round(w.preference * 100)}% Preference once a model has enough votes, otherwise Auto alone. Automated checks are objective; human votes judge what they can't measure: beauty and feel.</p></div>
+      <div><h3>Arena v2 / Auto v2</h3><p>The full suite: the original six tasks plus the three v2 tasks. Auto v2 is the mean over all nine; Arena v2 blends in Preference with the same weights. Shown only once a model has been graded on every v2 task — older runs keep their original scores untouched.</p></div>
     </section>`;
 }
 
@@ -85,7 +90,7 @@ function tasksView(id, focusModel) {
     .map((x) => {
       const best = Math.max(...S.models.map((m) => result(m, x.id)?.score ?? -1));
       return `<a href="#/tasks/${x.id}" ${x.id === t.id ? 'aria-current="page"' : ''}>
-        <span class="t">${esc(x.title)}</span><span class="best">${best >= 0 ? fmt(best, 0) : ''}</span><span class="s">${esc(x.subtitle)}</span></a>`;
+        <span class="t">${esc(x.title)}${x.suite === 'v2' ? ' <span class="v2-badge">v2</span>' : ''}</span><span class="best">${best >= 0 ? fmt(best, 0) : ''}</span><span class="s">${esc(x.subtitle)}</span></a>`;
     })
     .join('');
   const models = S.models
@@ -102,7 +107,7 @@ function tasksView(id, focusModel) {
       <div class="task-head">
         <div>
           <h1>${esc(t.title)}</h1>
-          <p class="muted" style="margin:0 0 8px;font-weight:500">${esc(t.subtitle)}, ${t.checks.length} checks, ${pts} points</p>
+          <p class="muted" style="margin:0 0 8px;font-weight:500">${esc(t.subtitle)}, ${t.checks.length} checks, ${pts} points${t.suite === 'v2' ? ' · v2 suite' : ''}</p>
           <p style="margin:0;max-width:72ch">${esc(t.summary)}</p>
           <ul class="skills">${(t.skills ?? []).map((s) => `<li>${esc(s)}</li>`).join('')}</ul>
         </div>

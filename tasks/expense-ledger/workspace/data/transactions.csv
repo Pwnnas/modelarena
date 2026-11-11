@@ -1,0 +1,97 @@
+id,date,description,category,amount
+tx-001,2026-01-01,Parking — Arlanda,Transport,-68.36
+tx-002,2026-01-01,Rent — apartment 4B,Rent,-1450.00
+tx-003,2026-01-02,Water bill,Utilities,-155.59
+tx-004,2026-01-02,Parking — Arlanda,Transport,-48.33
+tx-005,2026-01-04,Espresso House,Dining,-51.42
+tx-006,2026-01-05,ICA Kvantum,Groceries,-108.37
+tx-007,2026-01-06,Parking — Arlanda,Transport,-28.18
+tx-008,2026-01-06,"Book ""Deep Work""",Shopping,-27.70
+tx-009,2026-01-08,SJ train ticket,Transport,-87.94
+tx-010,2026-01-11,ICA Kvantum,Groceries,-93.43
+tx-011,2026-01-12,Bio Capitol,Entertainment,-14.26
+tx-012,2026-01-14,"Book ""Deep Work""",Shopping,-190.44
+tx-013,2026-01-14,Invoice #1042 — logo design,Freelance,850.00
+tx-014,2026-01-16,Bio Capitol,Entertainment,-13.92
+tx-015,2026-01-16,Parking — Arlanda,Transport,-20.17
+tx-016,2026-01-16,Telia broadband,Utilities,-196.26
+tx-017,2026-01-17,H&M,Shopping,-87.72
+tx-018,2026-01-18,Café Latté & bulle,Dining,-19.82
+tx-019,2026-01-18,Café Latté & bulle,Dining,-87.65
+tx-020,2026-01-18,Sushi Yama,Dining,-16.22
+tx-021,2026-01-18,Willys,Groceries,-62.25
+tx-022,2026-01-20,Steam game,Entertainment,-103.06
+tx-023,2026-01-21,Coop Konsum,Groceries,-101.27
+tx-024,2026-01-22,Vattenfall electricity,Utilities,-196.98
+tx-025,2026-01-22,Vattenfall electricity,Utilities,-93.23
+tx-026,2026-01-23,Circle K fuel,Transport,-54.00
+tx-027,2026-01-23,Lunch — Vasastan,Dining,-46.96
+tx-028,2026-01-25,SL metro card,Transport,-93.17
+tx-029,2026-01-25,Monthly salary — Nordwind AB,Salary,3200.00
+tx-030,2026-01-26,Comhem internet,Utilities,-142.19
+tx-031,2026-01-27,Pizza Hut,Dining,-10.39
+tx-032,2026-01-28,"Coffee, beans & filters",Groceries,-45.26
+tx-033,2026-01-28,Willys,Groceries,-25.35
+tx-034,2026-02-01,Rent — apartment 4B,Rent,-1450.00
+tx-035,2026-02-03,Hemköp,Groceries,-95.50
+tx-036,2026-02-03,Espresso House,Dining,-54.75
+tx-037,2026-02-03,Invoice #1047 — web audit,Freelance,1200.00
+tx-038,2026-02-08,Hemköp,Groceries,-102.22
+tx-039,2026-02-09,Parking — Arlanda,Transport,-17.75
+tx-040,2026-02-10,Dentist visit,Health,-155.04
+tx-041,2026-02-10,Netflix,Entertainment,-39.83
+tx-042,2026-02-11,Hemköp,Groceries,-25.69
+tx-043,2026-02-11,Coop Konsum,Groceries,-86.10
+tx-044,2026-02-12,Vattenfall electricity,Utilities,-182.69
+tx-045,2026-02-13,"Coffee, beans & filters",Groceries,-27.18
+tx-046,2026-02-15,SJ train ticket,Transport,-14.27
+tx-047,2026-02-16,ICA Kvantum,Groceries,-32.54
+tx-048,2026-02-16,IKEA,Shopping,-101.52
+tx-049,2026-02-17,IKEA,Shopping,-102.09
+tx-050,2026-02-17,Lunch — Vasastan,Dining,-43.48
+tx-051,2026-02-17,Hemköp,Groceries,-77.76
+tx-052,2026-02-20,Gym membership,Health,-97.96
+tx-053,2026-02-20,Espresso House,Dining,-19.18
+tx-054,2026-02-21,Invoice #1051 — icon set,Freelance,475.50
+tx-055,2026-02-22,"Coffee, beans & filters",Groceries,-35.20
+tx-056,2026-02-22,Coop Konsum,Groceries,-78.01
+tx-057,2026-02-24,H&M,Shopping,-229.84
+tx-058,2026-02-24,Water bill,Utilities,-180.46
+tx-059,2026-02-25,Lunch — Vasastan,Dining,-80.27
+tx-060,2026-02-25,IKEA,Shopping,-34.76
+tx-061,2026-02-25,Monthly salary — Nordwind AB,Salary,3200.00
+tx-062,2026-02-26,Circle K fuel,Transport,-63.46
+tx-063,2026-02-27,SJ train ticket,Transport,-19.67
+tx-064,2026-03-01,Zalando,Shopping,-250.32
+tx-065,2026-03-01,Rent — apartment 4B,Rent,-1450.00
+tx-066,2026-03-02,"Coffee, beans & filters",Groceries,-71.89
+tx-067,2026-03-04,Parking — Arlanda,Transport,-20.33
+tx-068,2026-03-06,Vårdcentral copay,Health,-37.76
+tx-069,2026-03-06,"Coffee, beans & filters",Groceries,-60.57
+tx-070,2026-03-08,Espresso House,Dining,-36.82
+tx-071,2026-03-09,Water bill,Utilities,-123.54
+tx-072,2026-03-10,Spotify Premium,Entertainment,-30.38
+tx-073,2026-03-10,Hemköp,Groceries,-73.85
+tx-074,2026-03-11,Circle K fuel,Transport,-53.49
+tx-075,2026-03-12,Telia broadband,Utilities,-105.81
+tx-076,2026-03-12,Invoice #1058 — landing page,Freelance,990.00
+tx-077,2026-03-13,Concert — Annas,Entertainment,-32.66
+tx-078,2026-03-14,Hemköp,Groceries,-68.44
+tx-079,2026-03-14,ICA Kvantum,Groceries,-118.42
+tx-080,2026-03-15,"Coffee, beans & filters",Groceries,-106.63
+tx-081,2026-03-15,Concert — Annas,Entertainment,-97.62
+tx-082,2026-03-16,SL metro card,Transport,-43.60
+tx-083,2026-03-18,Steam game,Entertainment,-24.22
+tx-084,2026-03-20,Zalando,Shopping,-220.44
+tx-085,2026-03-20,Water bill,Utilities,-198.92
+tx-086,2026-03-21,Steam game,Entertainment,-110.96
+tx-087,2026-03-22,Gym membership,Health,-34.17
+tx-088,2026-03-22,Sushi Yama,Dining,-27.60
+tx-089,2026-03-24,Espresso House,Dining,-58.22
+tx-090,2026-03-25,SL metro card,Transport,-43.11
+tx-091,2026-03-25,Steam game,Entertainment,-78.93
+tx-092,2026-03-25,Monthly salary — Nordwind AB,Salary,3200.00
+tx-093,2026-03-26,Coop Konsum,Groceries,-34.42
+tx-094,2026-03-27,ICA Kvantum,Groceries,-71.74
+tx-095,2026-03-27,Concert — Annas,Entertainment,-94.08
+tx-096,2026-03-28,SJ train ticket,Transport,-32.48

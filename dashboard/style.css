@@ -124,9 +124,15 @@ tr:first-child .rank { color: var(--ink); }
 .meter { height: 4px; background: var(--rule-soft); border-radius: 2px; margin-top: 7px; overflow: hidden; min-width: 54px; }
 .meter > i { display: block; height: 100%; background: var(--ink); }
 .none { color: var(--rule); }
+.v2-badge {
+  font: 600 10px/1 var(--text); letter-spacing: 0.04em; vertical-align: 2px;
+  padding: 2px 5px; border-radius: 99px; border: 1px solid var(--rule);
+  color: var(--graphite); background: var(--sheet);
+}
+.v2-num { color: var(--graphite); }
 
 .explain {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 28px;
   margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--rule);
 }
 .explain h3 { font: 600 20px/1.1 var(--display); margin: 0 0 6px; }
