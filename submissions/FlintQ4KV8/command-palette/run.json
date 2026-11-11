@@ -1,0 +1,25 @@
+{
+  "source": "arena run",
+  "endpoint": "192.168.1.172:8080",
+  "apiModel": "D:\\models\\flint-UD-Q4_K_XL.gguf",
+  "servedModel": "D:\\models\\flint-UD-Q4_K_XL.gguf",
+  "params": {
+    "thinking": "low"
+  },
+  "startedAt": "2026-10-28T13:03:59.845Z",
+  "wallMs": 522766,
+  "ttftMs": 1166,
+  "thinkingMs": 401423,
+  "promptTokens": 2803,
+  "completionTokens": 52406,
+  "reasoningTokens": 41066,
+  "tokensEstimated": false,
+  "genTokensPerSec": 100.5,
+  "promptTokensPerSec": 2885.1,
+  "finishReason": "stop",
+  "replyChars": 38089,
+  "reasoningChars": 160824,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 38114
+}

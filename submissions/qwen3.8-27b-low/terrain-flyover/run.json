@@ -1,0 +1,26 @@
+{
+  "source": "arena run",
+  "endpoint": "openrouter.ai",
+  "apiModel": "qwen/qwen3.8-27b",
+  "servedModel": "qwen/qwen3.8-27b",
+  "provider": "Parasail",
+  "params": {
+    "thinking": "low"
+  },
+  "startedAt": "2026-10-28T13:13:58.733Z",
+  "wallMs": 633088,
+  "ttftMs": 756,
+  "thinkingMs": 473327,
+  "promptTokens": 1426,
+  "completionTokens": 38267,
+  "reasoningTokens": 27676,
+  "tokensEstimated": false,
+  "genTokensPerSec": 60.5,
+  "promptTokensPerSec": null,
+  "finishReason": "stop",
+  "replyChars": 26556,
+  "reasoningChars": 77808,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 26543
+}

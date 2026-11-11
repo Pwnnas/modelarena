@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commander — Notes</title>
+<style>
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --accent: #5b5bd6;
+  --accent-soft: rgba(91, 91, 214, 0.12);
+  --accent-text: #5b5bd6;
+  --bg: #f5f6f8;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #ebedf0;
+  --text: #1a1a2e;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --border: #e5e7eb;
+  --shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 12px 48px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06);
+  --palette-bg: #ffffff;
+  --palette-shadow: 0 16px 64px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.08);
+  --highlight-bg: #f0f0f5;
+  --highlight-active: rgba(91, 91, 214, 0.08);
+  --overlay: rgba(0,0,0,0.3);
+  --toast-bg: #1a1a2e;
+  --toast-text: #ffffff;
+  --keycap-bg: #f0f1f3;
+  --keycap-border: #d1d5db;
+  --keycap-text: #4b5563;
+  --input-bg: #f9fafb;
+  --mark-bg: rgba(91, 91, 214, 0.15);
+  --mark-color: #4338ca;
+  --sidebar-width: 280px;
+  --transition-theme: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+[data-theme="dark"] {
+  --bg: #0f1117;
+  --bg-secondary: #1a1d27;
+  --bg-tertiary: #252832;
+  --text: #e8eaf0;
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6b7280;
+  --border: #2d3140;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.2);
+  --shadow-lg: 0 12px 48px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.2);
+  --palette-bg: #1e2130;
+  --palette-shadow: 0 16px 64px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3);
+  --highlight-bg: #2a2d3a;
+  --highlight-active: rgba(91, 91, 214, 0.15);
+  --overlay: rgba(0,0,0,0.5);
+  --toast-bg: #e8eaf0;
+  --toast-text: #1a1a2e;
+  --keycap-bg: #2d3140;
+  --keycap-border: #3d4256;
+  --keycap-text: #9ca3af;
+  --input-bg: #252832;
+  --mark-bg: rgba(91, 91, 214, 0.25);
+  --mark-color: #a5b4fc;
+}
+
+html {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  transition: var(--transition-theme);
+}
+
+/* App Layout */
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: var(--transition-theme);
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  padding: 20px 16px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  transition: var(--transition-theme);
+}
+
+.sidebar-count {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
+  padding: 2px 8px;
+  border-radius: 10px;
+  transition: var(--transition-theme);
+}
+
+.note-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+}
+
+.note-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 2px;
+  transition: background 0.15s ease;
+  position: relative;
+}
+
+.note-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.note-item.active {
+  background: var(--accent-soft);
+}
+
+.note-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.note-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: var(--transition-theme);
+}
+
+.note-item-preview {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: var(--transition-theme);
+}
+
+.note-item-date {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+/* Editor */
+.editor-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  transition: var(--transition-theme);
+}
+
+.editor-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-secondary);
+  transition: var(--transition-theme);
+}
+
+.editor-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  transition: var(--transition-theme);
+}
+
+.editor-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.open-palette-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-theme), transform 0.1s ease;
+  font-family: inherit;
+}
+
+.open-palette-btn:hover {
+  background: var(--bg);
+  border-color: var(--text-tertiary);
+}
+
+.open-palette-btn:active {
+  transform: scale(0.97);
+}
+
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  background: var(--keycap-bg);
+  border: 1px solid var(--keycap-border);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--keycap-text);
+  font-family: inherit;
+  line-height: 1;
+  transition: var(--transition-theme);
+}
+
+#editor {
+  flex: 1;
+  padding: 24px 32px;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.7;
+  font-family: inherit;
+  transition: var(--transition-theme);
+}
+
+/* Palette Overlay */
+#palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  backdrop-filter: blur(4px);
+}
+
+#palette-overlay.open {
+  opacity: 1;
+}
+
+#palette-overlay.closing {
+  opacity: 0;
+}
+
+#palette {
+  width: 640px;
+  max-width: 90vw;
+  background: var(--palette-bg);
+  border-radius: 12px;
+  box-shadow: var(--palette-shadow);
+  overflow: hidden;
+  transform: scale(0.95) translateY(-8px);
+  opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--border);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.35s ease, border-color 0.35s ease;
+}
+
+#palette-overlay.open #palette {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+#palette-overlay.closing #palette {
+  transform: scale(0.97) translateY(-4px);
+  opacity: 0;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.palette-input-wrapper {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: var(--transition-theme);
+}
+
+.palette-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+#palette-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 16px;
+  color: var(--text);
+  font-family: inherit;
+  line-height: 1.4;
+  transition: color 0.35s ease;
+}
+
+#palette-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.palette-breadcrumb {
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  transition: var(--transition-theme);
+}
+
+.breadcrumb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.breadcrumb-back {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Palette List */
+#palette-list {
+  position: relative;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 8px;
+  transition: height 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  list-style: none;
+}
+
+#palette-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+#palette-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#palette-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+#active-highlight {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--highlight-active);
+  border: 1px solid var(--accent-soft);
+  pointer-events: none;
+  transition: top 0.15s cubic-bezier(0.4, 0, 0.2, 1), height 0.15s ease, opacity 0.15s ease;
+  opacity: 0;
+}
+
+#active-highlight.visible {
+  opacity: 1;
+}
+
+.group-heading {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  user-select: none;
+  transition: var(--transition-theme);
+}
+
+.palette-option {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+  transition: background 0.1s ease;
+}
+
+.palette-option:hover {
+  background: var(--highlight-bg);
+}
+
+.option-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 13px;
+  transition: var(--transition-theme);
+}
+
+.option-text {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text);
+  transition: var(--transition-theme);
+}
+
+.option-text mark {
+  background: var(--mark-bg);
+  color: var(--mark-color);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.option-shortcut {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.option-accent-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Empty state */
+#palette-empty {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  display: none;
+}
+
+#palette-empty.visible {
+  display: block;
+}
+
+#palette-empty .empty-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+/* Palette footer */
+.palette-footer {
+  padding: 8px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  transition: var(--transition-theme);
+}
+
+.palette-footer .footer-key {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.palette-footer .footer-key .keycap {
+  min-width: 18px;
+  height: 18px;
+  font-size: 10px;
+}
+
+/* Toast */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 10px 16px;
+  background: var(--toast-bg);
+  color: var(--toast-text);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateX(100%);
+  opacity: 0;
+  animation: toast-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  transition: var(--transition-theme);
+  pointer-events: auto;
+}
+
+.toast.exiting {
+  animation: toast-out 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.toast-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+  }
+  
+  #palette {
+    transform: none !important;
+    transition: opacity 0.15s ease, background-color 0.35s ease, border-color 0.35s ease !important;
+  }
+  
+  #palette-overlay.open #palette {
+    transform: none !important;
+  }
+  
+  #palette-overlay.closing #palette {
+    transform: none !important;
+  }
+  
+  #active-highlight {
+    transition: opacity 0.1s ease !important;
+  }
+  
+  .toast {
+    transform: none !important;
+    animation: none !important;
+    opacity: 1 !important;
+  }
+  
+  .toast.exiting {
+    animation: none !important;
+    opacity: 0 !important;
+    transition: opacity 0.1s ease !important;
+  }
+  
+  #palette-list {
+    transition: none !important;
+  }
+  
+  body, .sidebar, .editor-area, .editor-header, .note-item {
+    transition: opacity 0.15s ease !important;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 220px;
+  }
+  #palette {
+    width: 95vw;
+    margin: 0 8px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">Notes</span>
+      <span class="sidebar-count" id="note-count">5</span>
+    </div>
+    <div class="note-list" id="note-list"></div>
+  </aside>
+  <main class="editor-area">
+    <div class="editor-header">
+      <span class="editor-title" id="editor-title">Project Roadmap</span>
+      <div class="editor-actions">
+        <button id="open-palette" class="open-palette-btn" title="Open Command Palette">
+          <span>Commands</span>
+          <span class="keycap" id="mod-keycap">⌘</span><span class="keycap">K</span>
+        </button>
+      </div>
+    </div>
+    <textarea id="editor" spellcheck="false">Project Roadmap — Q1 2025
+
+Overview
+--------
+This document outlines the key initiatives for the upcoming quarter. We're focused on shipping the new collaboration features and improving performance across the board.
+
+Key Milestones
+--------------
+[ ] Complete real-time editing engine
+[ ] Ship offline mode for notes
+[ ] Launch shared workspaces beta
+[x] Migrate search to vector embeddings
+[x] Reduce cold start time by 40%
+
+Notes
+-----
+The collaboration engine is on track for mid-February. We need to finalize the conflict resolution strategy before the next design review.
+
+Performance targets:
+- P95 load time: < 800ms
+- Editor latency: < 50ms for typing
+- Search: < 200ms for 10k documents
+
+Action Items
+------------
+1. Review PR #2847 (conflict resolution)
+2. Update API docs for v2 endpoints
+3. Schedule load testing for next sprint
+4. Draft migration guide for enterprise customers
+
+---
+Last edited: Today at 2:34 PM</textarea>
+  </main>
+</div>
+
+<div id="toast-container" role="status" aria-live="polite"></div>
+
+<script>
+// Data
+const COMMANDS = [
+  { id: "go-inbox", title: "Go to Inbox", group: "Navigation", keywords: ["home"] },
+  { id: "go-today", title: "Go to Today", group: "Navigation" },
+  { id: "go-archive", title: "Go to Archive", group: "Navigation" },
+  { id: "go-settings", title: "Go to Settings", group: "Navigation", keywords: ["preferences", "options"], shortcut: "Mod+," },
+  { id: "go-line", title: "Go to Line…", group: "Navigation", keywords: ["jump"], shortcut: "Mod+G" },
+  { id: "go-symbol", title: "Go to Symbol…", group: "Navigation", shortcut: "Mod+Shift+O" },
+  { id: "search-notes", title: "Search Notes…", group: "Navigation", keywords: ["find"], shortcut: "Mod+Shift+F" },
+  { id: "new-note", title: "New Note", group: "Notes", keywords: ["create", "add"], shortcut: "Mod+N" },
+  { id: "new-note-template", title: "New Note from Template…", group: "Notes" },
+  { id: "duplicate-note", title: "Duplicate Note", group: "Notes", keywords: ["copy", "clone"] },
+  { id: "rename-note", title: "Rename Note…", group: "Notes", shortcut: "F2" },
+  { id: "delete-note", title: "Delete Note", group: "Notes", keywords: ["remove", "trash"] },
+  { id: "pin-note", title: "Pin Note", group: "Notes", keywords: ["favorite", "star"] },
+  { id: "move-note", title: "Move Note to Folder…", group: "Notes" },
+  { id: "export-pdf", title: "Export Note as PDF", group: "Notes" },
+  { id: "export-md", title: "Export Note as Markdown", group: "Notes" },
+  { id: "share-note", title: "Share Note Link", group: "Notes", keywords: ["copy", "url"] },
+  { id: "bold", title: "Bold", group: "Editor", shortcut: "Mod+B" },
+  { id: "italic", title: "Italic", group: "Editor", shortcut: "Mod+I" },
+  { id: "insert-link", title: "Insert Link…", group: "Editor", keywords: ["url"] },
+  { id: "insert-table", title: "Insert Table", group: "Editor" },
+  { id: "insert-code", title: "Insert Code Block", group: "Editor", keywords: ["snippet"] },
+  { id: "insert-checklist", title: "Insert Checklist", group: "Editor", keywords: ["todo", "task"] },
+  { id: "word-wrap", title: "Toggle Word Wrap", group: "Editor", shortcut: "Alt+Z" },
+  { id: "format-doc", title: "Format Document", group: "Editor", keywords: ["prettify", "beautify"], shortcut: "Shift+Alt+F" },
+  { id: "sort-asc", title: "Sort Lines Ascending", group: "Editor" },
+  { id: "sort-desc", title: "Sort Lines Descending", group: "Editor" },
+  { id: "toggle-dark-mode", title: "Toggle Dark Mode", group: "View", keywords: ["theme", "night", "appearance"], shortcut: "Mod+Shift+L" },
+  { id: "change-accent", title: "Change Accent Color…", group: "View", keywords: ["theme", "color"], page: "accent" },
+  { id: "toggle-sidebar", title: "Toggle Sidebar", group: "View", shortcut: "Mod+\\" },
+  { id: "toggle-focus-mode", title: "Toggle Focus Mode", group: "View", keywords: ["zen", "distraction free"] },
+  { id: "zoom-in", title: "Zoom In", group: "View", shortcut: "Mod+=" },
+  { id: "zoom-out", title: "Zoom Out", group: "View", shortcut: "Mod+-" },
+  { id: "zoom-reset", title: "Reset Zoom", group: "View", shortcut: "Mod+0" },
+  { id: "shortcuts", title: "Keyboard Shortcuts", group: "Help", keywords: ["keys", "hotkeys"], shortcut: "Mod+/" },
+  { id: "release-notes", title: "Release Notes", group: "Help", keywords: ["changelog", "what's new"] },
+  { id: "feedback", title: "Send Feedback", group: "Help" },
+  { id: "about", title: "About Commander", group: "Help" },
+];
+
+const ACCENTS = [
+  { id: "accent-indigo", title: "Indigo", value: "#5b5bd6" },
+  { id: "accent-emerald", title: "Emerald", value: "#10b981" },
+  { id: "accent-rose", title: "Rose", value: "#e11d48" },
+  { id: "accent-amber", title: "Amber", value: "#f59e0b" },
+  { id: "accent-sky", title: "Sky", value: "#0ea5e9" },
+];
+
+// Notes data
+const NOTES = [
+  { id: "note-1", title: "Project Roadmap", preview: "This document outlines the key initiatives...", date: "Today" },
+  { id: "note-2", title: "Meeting Notes — Design Sync", preview: "Discussed the new onboarding flow...", date: "Yesterday" },
+  { id: "note-3", title: "Reading List", preview: "Books and articles to read this month...", date: "3 days ago" },
+  { id: "note-4", title: "API Architecture Notes", preview: "REST vs GraphQL tradeoffs for the new...", date: "Last week" },
+  { id: "note-5", title: "Personal — Trip Planning", preview: "Itinerary draft for the spring break...", date: "2 weeks ago" },
+];
+
+// State
+let paletteOpen = false;
+let previousFocus = null;
+let activeIndex = 0;
+let currentQuery = "";
+let subPage = null; // null or "accent"
+let currentResults = [];
+let noteCounter = 5;
+
+// Detect platform
+const isMac = /Mac|iP(hone|ad|od)/.test(navigator.platform);
+const modKey = isMac ? '⌘' : 'Ctrl';
+
+// Set mod keycap
+document.getElementById('mod-keycap').textContent = modKey;
+
+// Recents
+function getRecents() {
+  try {
+    const raw = localStorage.getItem('commander-recents');
+    return raw ? JSON.parse(raw) : [];
+  } catch(e) { return []; }
+}
+
+function saveRecents(recents) {
+  try {
+    localStorage.setItem('commander-recents', JSON.stringify(recents.slice(0, 5)));
+  } catch(e) {}
+}
+
+function addRecent(commandId) {
+  let recents = getRecents();
+  recents = recents.filter(r => r !== commandId);
+  recents.unshift(commandId);
+  saveRecents(recents.slice(0, 5));
+}
+
+// Fuzzy matching
+function fuzzyMatch(query, target) {
+  if (!query) return { score: 0, matches: [] };
+  const q = query.toLowerCase();
+  const t = target.toLowerCase();
+  
+  // Check if q is a subsequence of t (greedy left-to-right with word boundary preference)
+  const matches = [];
+  let qi = 0;
+  
+  for (let ti = 0; ti < t.length && qi < q.length; ti++) {
+    if (t[ti] === q[qi]) {
+      matches.push(ti);
+      qi++;
+    }
+  }
+  
+  if (qi < q.length) return null; // Not a subsequence
+  
+  // Calculate score
+  let score = 0;
+  
+  // Exact match (highest)
+  if (t === q) score += 10000;
+  else if (t.startsWith(q)) score += 5000;
+  
+  // Word start bonus for each matched char
+  for (let i = 0; i < matches.length; i++) {
+    const idx = matches[i];
+    if (idx === 0 || t[idx-1] === ' ' || t[idx-1] === '-' || t[idx-1] === '_' || t[idx-1] === '\t') {
+      score += 200;
+    }
+  }
+  
+  // Contiguous run bonus
+  let runLength = 1;
+  let maxRun = 1;
+  for (let i = 1; i < matches.length; i++) {
+    if (matches[i] === matches[i-1] + 1) {
+      runLength++;
+      maxRun = Math.max(maxRun, runLength);
+    } else {
+      runLength = 1;
+    }
+  }
+  score += maxRun * 50;
+  
+  // All contiguous bonus
+  if (matches.length > 1 && maxRun === matches.length) {
+    score += 300;
+  }
+  
+  // Penalize longer titles
+  score -= t.length * 3;
+  
+  // Penalize gaps
+  if (matches.length > 1) {
+    const totalSpan = matches[matches.length - 1] - matches[0] + 1;
+    score -= (totalSpan - matches.length) * 5;
+  }
+  
+  return { score, matches };
+}
+
+function searchCommands(query) {
+  if (!query) return null;
+  
+  const results = [];
+  for (let i = 0; i < COMMANDS.length; i++) {
+    const cmd = COMMANDS[i];
+    const titleMatch = fuzzyMatch(query, cmd.title);
+    
+    if (titleMatch) {
+      results.push({ command: cmd, score: titleMatch.score + 1000, matches: titleMatch.matches, matchedTarget: 'title' });
+      continue;
+    }
+    
+    // Check keywords
+    if (cmd.keywords) {
+      for (const kw of cmd.keywords) {
+        const kwMatch = fuzzyMatch(query, kw);
+        if (kwMatch) {
+          results.push({ command: cmd, score: kwMatch.score, matches: kwMatch.matches, matchedTarget: 'keyword' });
+          break;
+        }
+      }
+    }
+  }
+  
+  // Sort by score descending, then by original index for ties
+  results.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return COMMANDS.indexOf(a.command) - COMMANDS.indexOf(b.command);
+  });
+  
+  return results.slice(0, 50);
+}
+
+function searchAccents(query) {
+  if (!query) return ACCENTS.map((a, i) => ({ command: a, score: 0, matches: [], matchedTarget: 'title', index: i }));
+  
+  const results = [];
+  for (let i = 0; i < ACCENTS.length; i++) {
+    const acc = ACCENTS[i];
+    const match = fuzzyMatch(query, acc.title);
+    if (match) {
+      results.push({ command: acc, score: match.score, matches: match.matches, matchedTarget: 'title', index: i });
+    }
+  }
+  
+  results.sort((a, b) => b.score - a.score);
+  return results;
+}
+
+// Highlight title with marks
+function highlightTitle(title, matches) {
+  if (!matches || matches.length === 0) return title;
+  const chars = title.split('');
+  const matchSet = new Set(matches);
+  let result = '';
+  let inMark = false;
+  
+  for (let i = 0; i < chars.length; i++) {
+    if (matchSet.has(i)) {
+      if (!inMark) {
+        result += '<mark>';
+        inMark = true;
+      }
+      result += escapeHtml(chars[i]);
+    } else {
+      if (inMark) {
+        result += '</mark>';
+        inMark = false;
+      }
+      result += escapeHtml(chars[i]);
+    }
+  }
+  
+  if (inMark) result += '</mark>';
+  return result;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Shortcut display
+function formatShortcut(shortcut) {
+  if (!shortcut) return '';
+  return shortcut.replace('Mod', modKey);
+}
+
+function getShortcutKeys(shortcut) {
+  if (!shortcut) return [];
+  const parts = shortcut.split('+');
+  return parts.map(p => p.replace('Mod', modKey));
+}
+
+// Render notes in sidebar
+function renderNotes() {
+  const list = document.getElementById('note-list');
+  const notes = JSON.parse(localStorage.getItem('commander-notes') || 'null') || NOTES;
+  list.innerHTML = '';
+  notes.forEach((note, i) => {
+    const el = document.createElement('div');
+    el.className = 'note-item' + (i === 0 ? ' active' : '');
+    el.setAttribute('data-note', note.id);
+    el.innerHTML = `
+      <div class="note-item-title">${escapeHtml(note.title)}</div>
+      <div class="note-item-preview">${escapeHtml(note.preview)}</div>
+      <div class="note-item-date">${note.date}</div>
+    `;
+    list.appendChild(el);
+  });
+  document.getElementById('note-count').textContent = notes.length;
+}
+
+// Add a new note
+function addNote() {
+  const stored = JSON.parse(localStorage.getItem('commander-notes') || 'null');
+  const notes = stored || [...NOTES];
+  noteCounter++;
+  notes.unshift({
+    id: 'note-' + noteCounter,
+    title: 'Untitled Note',
+    preview: 'Start writing...',
+    date: 'Just now'
+  });
+  try {
+    localStorage.setItem('commander-notes', JSON.stringify(notes));
+  } catch(e) {}
+  renderNotes();
+  document.getElementById('editor-title').textContent = 'Untitled Note';
+  document.getElementById('editor').value = '';
+}
+
+// Palette DOM
+let overlay, palette, input, list, emptyState, breadcrumb, highlightEl, footer;
+
+function createPalette() {
+  overlay = document.createElement('div');
+  overlay.id = 'palette-overlay';
+  overlay.innerHTML = `
+    <div id="palette" role="dialog" aria-modal="true" aria-label="Command Palette">
+      <div class="palette-input-wrapper">
+        <svg class="palette-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input id="palette-input" type="text" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-activedescendant="" placeholder="Type a command or search..." autocomplete="off" spellcheck="false">
+      </div>
+      <div class="palette-breadcrumb" id="palette-breadcrumb" style="display:none;"></div>
+      <div id="palette-list" role="listbox" aria-label="Commands">
+        <div id="active-highlight"></div>
+      </div>
+      <div id="palette-empty">
+        <div class="empty-icon">∅</div>
+        <div>No matching commands</div>
+      </div>
+      <div class="palette-footer">
+        <span class="footer-key"><span class="keycap">↑</span><span class="keycap">↓</span> navigate</span>
+        <span class="footer-key"><span class="keycap">↵</span> select</span>
+        <span class="footer-key"><span class="keycap">esc</span> close</span>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(overlay);
+  
+  palette = document.getElementById('palette');
+  input = document.getElementById('palette-input');
+  list = document.getElementById('palette-list');
+  emptyState = document.getElementById('palette-empty');
+  breadcrumb = document.getElementById('palette-breadcrumb');
+  highlightEl = document.getElementById('active-highlight');
+  footer = overlay.querySelector('.palette-footer');
+  
+  // Event listeners
+  input.addEventListener('input', onInput);
+  input.addEventListener('keydown', onInputKeydown);
+  overlay.addEventListener('mousedown', onOverlayMouseDown);
+  
+  // Start hidden
+  overlay.style.display = 'none';
+}
+
+function onOverlayMouseDown(e) {
+  if (e.target === overlay) {
+    closePalette();
+  }
+}
+
+function onInput() {
+  currentQuery = input.value;
+  updateResults();
+}
+
+function onInputKeydown(e) {
+  switch(e.key) {
+    case 'ArrowDown':
+      e.preventDefault();
+      moveActive(1);
+      break;
+    case 'ArrowUp':
+      e.preventDefault();
+      moveActive(-1);
+      break;
+    case 'Home':
+      e.preventDefault();
+      setActiveIndex(0);
+      break;
+    case 'End':
+      e.preventDefault();
+      setActiveIndex(currentResults.length - 1);
+      break;
+    case 'Enter':
+      e.preventDefault();
+      executeActive();
+      break;
+    case 'Escape':
+      e.preventDefault();
+      if (subPage) {
+        exitSubPage();
+      } else {
+        closePalette();
+      }
+      break;
+    case 'Backspace':
+      if (subPage && currentQuery === '') {
+        e.preventDefault();
+        exitSubPage();
+      }
+      break;
+    case 'Tab':
+      e.preventDefault();
+      break;
+  }
+}
+
+function moveActive(dir) {
+  if (currentResults.length === 0) return;
+  let newIndex = activeIndex + dir;
+  if (newIndex >= currentResults.length) newIndex = 0;
+  if (newIndex < 0) newIndex = currentResults.length - 1;
+  setActiveIndex(newIndex);
+}
+
+function setActiveIndex(index) {
+  if (index < 0 || index >= currentResults.length) return;
+  activeIndex = index;
+  updateActiveHighlight();
+  updateAria();
+}
+
+function updateActiveHighlight() {
+  if (currentResults.length === 0) {
+    highlightEl.classList.remove('visible');
+    return;
+  }
+  
+  const optionEl = list.querySelector(`[data-index="${activeIndex}"]`);
+  if (optionEl) {
+    const listRect = list.getBoundingClientRect();
+    const optRect = optionEl.getBoundingClientRect();
+    const top = optRect.top - listRect.top + list.scrollTop - 4;
+    const height = optRect.height;
+    
+    highlightEl.style.top = top + 'px';
+    highlightEl.style.height = height + 'px';
+    highlightEl.classList.add('visible');
+    
+    // Scroll into view
+    optionEl.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function updateAria() {
+  const activeOpt = list.querySelector(`[data-index="${activeIndex}"]`);
+  if (activeOpt) {
+    input.setAttribute('aria-activedescendant', activeOpt.id);
+  } else {
+    input.setAttribute('aria-activedescendant', '');
+  }
+  
+  // Update aria-selected
+  list.querySelectorAll('[role="option"]').forEach(opt => {
+    opt.setAttribute('aria-selected', 'false');
+  });
+  if (activeOpt) {
+    activeOpt.setAttribute('aria-selected', 'true');
+  }
+}
+
+function updateResults() {
+  let results;
+  
+  if (subPage === 'accent') {
+    results = searchAccents(currentQuery);
+  } else if (currentQuery.trim()) {
+    results = searchCommands(currentQuery.trim());
+    if (results === null) results = [];
+  } else {
+    results = getGroupedResults();
+  }
+  
+  currentResults = results;
+  
+  if (currentResults.length === 0) {
+    activeIndex = -1;
+  } else {
+    activeIndex = 0;
+  }
+  
+  renderResults();
+  updateActiveHighlight();
+  updateAria();
+}
+
+function getGroupedResults() {
+  const recents = getRecents();
+  const results = [];
+  
+  // Recent group
+  const recentCommands = recents.map(id => COMMANDS.find(c => c.id === id)).filter(Boolean);
+  
+  for (const cmd of recentCommands) {
+    results.push({ command: cmd, score: 0, matches: [], matchedTarget: 'title', group: 'Recent', index: results.length });
+  }
+  
+  // All commands by group
+  const groups = [...new Set(COMMANDS.map(c => c.group))];
+  for (const group of groups) {
+    const groupCommands = COMMANDS.filter(c => c.group === group);
+    for (const cmd of groupCommands) {
+      results.push({ command: cmd, score: 0, matches: [], matchedTarget: 'title', group: group, index: results.length });
+    }
+  }
+  
+  return results;
+}
+
+function renderResults() {
+  // Save current list height for animation
+  const oldHeight = list.offsetHeight;
+  
+  // Clear list (keep highlight)
+  list.querySelectorAll('.group-heading, .palette-option').forEach(el => el.remove());
+  
+  const hasResults = currentResults.length > 0;
+  
+  if (!hasResults) {
+    emptyState.classList.add('visible');
+    list.style.display = 'none';
+    return;
+  }
+  
+  emptyState.classList.remove('visible');
+  list.style.display = '';
+  
+  const isGrouped = !currentQuery.trim() && !subPage;
+  const isSubPage = subPage !== null;
+  
+  let lastGroup = null;
+  
+  currentResults.forEach((result, i) => {
+    // Group heading
+    if (isGrouped && result.group !== lastGroup) {
+      lastGroup = result.group;
+      const heading = document.createElement('div');
+      heading.className = 'group-heading';
+      heading.textContent = result.group;
+      list.appendChild(heading);
+    }
+    
+    // Option
+    const opt = document.createElement('div');
+    opt.className = 'palette-option';
+    opt.setAttribute('role', 'option');
+    opt.setAttribute('id', 'opt-' + result.command.id);
+    opt.setAttribute('data-command', result.command.id);
+    opt.setAttribute('data-index', i);
+    opt.setAttribute('aria-selected', i === activeIndex ? 'true' : 'false');
+    
+    let iconContent = getIconForCommand(result.command);
+    let titleHtml;
+    
+    if (isSubPage) {
+      titleHtml = highlightTitle(result.command.title, result.matches);
+      opt.innerHTML = `
+        <div class="option-accent-swatch" style="background: ${result.command.value};"></div>
+        <span class="option-text">${titleHtml}</span>
+      `;
+    } else {
+      titleHtml = highlightTitle(result.command.title, result.matches);
+      const shortcut = result.command.shortcut ? getShortcutKeys(result.command.shortcut) : [];
+      const shortcutHtml = shortcut.length > 0 
+        ? `<span class="option-shortcut">${shortcut.map(k => `<span class="keycap">${escapeHtml(k)}</span>`).join('')}</span>` 
+        : '';
+      
+      opt.innerHTML = `
+        <div class="option-icon">${iconContent}</div>
+        <span class="option-text">${titleHtml}</span>
+        ${shortcutHtml}
+      `;
+    }
+    
+    // Click handler
+    opt.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      executeCommand(result.command);
+    });
+    
+    // Hover handler
+    opt.addEventListener('mouseenter', () => {
+      setActiveIndex(i);
+    });
+    
+    list.appendChild(opt);
+  });
+  
+  // Animate height
+  requestAnimationFrame(() => {
+    const newHeight = Math.min(list.scrollHeight, 340);
+    if (Math.abs(newHeight - oldHeight) > 2) {
+      list.style.height = newHeight + 'px';
+    }
+  });
+  
+  // Update breadcrumb
+  if (isSubPage) {
+    breadcrumb.style.display = 'flex';
+    breadcrumb.innerHTML = `
+      <span class="breadcrumb-chip">Accent Color</span>
+      <span class="breadcrumb-back" onclick="exitSubPage()">← Back</span>
+    `;
+  } else {
+    breadcrumb.style.display = 'none';
+  }
+}
+
+function getIconForCommand(cmd) {
+  const icons = {
+    'Navigation': '🧭',
+    'Notes': '📝',
+    'Editor': '✏️',
+    'View': '👁️',
+    'Help': '❓'
+  };
+  return icons[cmd.group] || '⚡';
+}
+
+// Execute command
+function executeActive() {
+  if (currentResults.length === 0) return;
+  const result = currentResults[activeIndex];
+  if (result) executeCommand(result.command);
+}
+
+function executeCommand(cmd) {
+  // Check if it opens a sub-page
+  if (cmd.page) {
+    openSubPage(cmd.page);
+    return;
+  }
+  
+  addRecent(cmd.id);
+  
+  // Real effects
+  switch(cmd.id) {
+    case 'toggle-dark-mode':
+      const currentTheme = document.documentElement.dataset.theme;
+      document.documentElement.dataset.theme = currentTheme === 'light' ? 'dark' : 'light';
+      break;
+    case 'new-note':
+      addNote();
+      break;
+    case 'toggle-sidebar':
+      const sidebar = document.querySelector('.sidebar');
+      sidebar.style.display = sidebar.style.display === 'none' ? '' : 'none';
+      break;
+  }
+  
+  closePalette();
+  showToast(cmd.title);
+}
+
+function openSubPage(page) {
+  subPage = page;
+  currentQuery = '';
+  input.value = '';
+  updateResults();
+}
+
+function exitSubPage() {
+  subPage = null;
+  currentQuery = '';
+  input.value = '';
+  updateResults();
+}
+
+// Open/Close palette
+function openPalette() {
+  if (paletteOpen) return;
+  
+  previousFocus = document.activeElement;
+  paletteOpen = true;
+  currentQuery = '';
+  subPage = null;
+  
+  input.value = '';
+  overlay.style.display = 'flex';
+  
+  // Force reflow
+  overlay.offsetHeight;
+  
+  overlay.classList.add('open');
+  
+  requestAnimationFrame(() => {
+    input.focus();
+    updateResults();
+  });
+}
+
+function closePalette() {
+  if (!paletteOpen) return;
+  paletteOpen = false;
+  
+  overlay.classList.remove('open');
+  overlay.classList.add('closing');
+  
+  setTimeout(() => {
+    overlay.classList.remove('closing');
+    overlay.style.display = 'none';
+    
+    // Return focus
+    if (previousFocus && previousFocus !== document.body) {
+      previousFocus.focus();
+    }
+  }, 160);
+}
+
+// Toast
+function showToast(title) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.setAttribute('data-toast', title);
+  toast.innerHTML = `
+    <span class="toast-check">✓</span>
+    <span>${escapeHtml(title)}</span>
+  `;
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.classList.add('exiting');
+    setTimeout(() => {
+      toast.remove();
+    }, 250);
+  }, 3000);
+}
+
+// Global keyboard handler
+document.addEventListener('keydown', (e) => {
+  const isCtrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
+  
+  if (isCtrlK) {
+    e.preventDefault();
+    if (paletteOpen) {
+      closePalette();
+    } else {
+      openPalette();
+    }
+    return;
+  }
+  
+  // If palette is open, prevent other keys from reaching the background
+  if (paletteOpen && e.key === 'Escape') {
+    // Already handled in input keydown
+  }
+});
+
+// Open button
+document.getElementById('open-palette').addEventListener('click', () => {
+  openPalette();
+});
+
+// Initialize
+function init() {
+  createPalette();
+  renderNotes();
+}
+
+init();
+</script>
+</body>
+</html>

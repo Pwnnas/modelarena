@@ -141,7 +141,7 @@ const NCX = COLS - 1, NCY = ROWS - 1;  // cells
 const N = COLS * ROWS;
 const NCELL = NCX * NCY;
 const PRESTRETCH = 0.05;
-const GATHER = 0.70;                   // rod width / cloth width (curtain pleats)
+const GATHER = 0.72;                   // rod width / cloth width (curtain pleats)
 const DT = 1 / 120;                    // fixed simulation step
 const MAX_FRAME = 0.05, MAX_STEPS = 5;
 const TEAR = 2.15;                     // tear when stretched beyond this ratio
@@ -150,7 +150,7 @@ const BASE_DAMP = 0.9;                 // 1/s
 const EXTRA_DAMP = 7.0;                // extra viscosity when everything is slow
 const VREF = 320;                      // px/s (x S) below which extra viscosity ramps in
 const VMAX = 4200;                     // px/s (x S) velocity clamp
-const SLEEP_V = 2.2;                   // px/s (x S)
+const SLEEP_V = 12;                   // px/s (x S)
 const AIR_RATE = 1.25;                 // 1/s normal air drag
 const WIND_SPEED = 1150;               // px/s (x S)
 const GRAB_RADIUS = 40, GRAB_LIFT = 46, GRAB_MAXSTEP = 40;
@@ -232,8 +232,8 @@ const baseF = new Float32Array(NCELL * 3), baseB = new Float32Array(NCELL * 3), 
       const c = j * NCX + i, o = c * 3;
       let r = 0.56, g = 0.055, b = 0.13, sh = 0.8;
       const band = (i >> 2) & 1;
-      if (band) { r *= 1.12; g *= 1.30; b *= 1.18; sh = 1.25; }
-      const wv = ((i + j) & 1) ? 1.032 : 0.968;
+      if (band) { r *= 1.06; g *= 1.15; b *= 1.08; sh = 1.25; }
+      const wv = ((i + j) & 1) ? 1.006 : 0.994;
       r *= wv; g *= wv; b *= wv;
       let gm = 0;
       if (i % PIN_EVERY === 0) gm = Math.max(gm, 0.42);                  // pleat rib thread
@@ -255,7 +255,7 @@ const baseF = new Float32Array(NCELL * 3), baseB = new Float32Array(NCELL * 3), 
 
 /* ---------- layout ---------- */
 function computeLayout() {
-  const hW = (vw * 0.80) / (GATHER * NCX);
+  const hW = (vw * 0.74) / (GATHER * NCX);
   const hH = (vh * 0.72) / NCY;
   const h = Math.max(3, Math.min(hW, hH, 22));
   const S = h / 12;
@@ -559,7 +559,7 @@ function step() {
   vmaxPrev = Math.sqrt(vm2) / DT;
 
   if (!wind && grab < 0 && vmaxPrev < SLEEP_V * S) {
-    if (++quiet >= 36) {
+    if (++quiet >= 30) {
       Q.set(P);
       asleep = true; dirty = true;
     }
@@ -620,7 +620,7 @@ function releaseGrab() {
 const bgc = document.createElement('canvas');
 const shc = document.createElement('canvas');
 const sctx = shc.getContext('2d');
-const SH = 6;
+const SH = 8;
 
 function makeBackground() {
   bgc.width = canvas.width; bgc.height = canvas.height;
@@ -695,6 +695,7 @@ const SPEC1 = new Float32Array(256), SPEC2 = new Float32Array(256);
 for (let i = 0; i < 256; i++) { const x = i / 255; SPEC1[i] = Math.pow(x, 34); SPEC2[i] = Math.pow(x, 46); }
 
 const CN = new Float32Array(NCELL * 3);   // unit normals (front oriented)
+const CS = new Float32Array(NCELL * 3), CS2 = new Float32Array(NCELL * 3);   // smoothed normals
 const CTg = new Float32Array(NCELL * 3);  // weft tangent
 const CZ = new Float32Array(NCELL);
 const cMask = new Uint8Array(NCELL);
@@ -771,6 +772,22 @@ function drawCloth() {
     }
   }
   const tq0 = performance.now();
+  // smooth the normal field (two passes, stronger along the folds) so cells blend into each other
+  for (let pass = 0; pass < 2; pass++) {
+    const src = pass === 0 ? CN : CS2, dst = pass === 0 ? CS2 : CS;
+    for (let j = 0; j < NCY; j++) {
+      for (let i = 0; i < NCX; i++) {
+        const o = (j * NCX + i) * 3;
+        const cl = i > 0 ? o - 3 : o, cr = i < NCX - 1 ? o + 3 : o;
+        const cu = j > 0 ? o - NCX * 3 : o, cd = j < NCY - 1 ? o + NCX * 3 : o;
+        const sx = src[o] * 2 + (src[cl] + src[cr]) * 0.6 + (src[cu] + src[cd]) * 1.2;
+        const sy = src[o + 1] * 2 + (src[cl + 1] + src[cr + 1]) * 0.6 + (src[cu + 1] + src[cd + 1]) * 1.2;
+        const sz = src[o + 2] * 2 + (src[cl + 2] + src[cr + 2]) * 0.6 + (src[cu + 2] + src[cd + 2]) * 1.2;
+        const l = Math.sqrt(sx * sx + sy * sy + sz * sz) || 1;
+        dst[o] = sx / l; dst[o + 1] = sy / l; dst[o + 2] = sz / l;
+      }
+    }
+  }
   // pass 2: shading + item list
   binCnt.fill(0);
   let nItems = 0;
@@ -780,8 +797,8 @@ function drawCloth() {
       const c = j * NCX + i, m = cMask[c];
       if (!m) continue;
       const o = c * 3;
-      let nx = CN[o], ny = CN[o + 1], nz = CN[o + 2];
-      const side = nz >= 0 ? 1 : -1;
+      let nx = CS[o], ny = CS[o + 1], nz = CS[o + 2];
+      const side = CN[o + 2] >= 0 ? 1 : -1;
       // curvature (divergence of the normal field) for cheap occlusion: darken valleys
       const cl = i > 0 ? o - 3 : o, cr = i < NCX - 1 ? o + 3 : o;
       const cu = j > 0 ? o - NCX * 3 : o, cd = j < NCY - 1 ? o + NCX * 3 : o;
@@ -795,11 +812,11 @@ function drawCloth() {
       const nf = nx * FX + ny * FY + nz * FZ; const dif2 = nf > 0 ? nf : 0;
       const nh = nx * HX + ny * HY + nz * HZ;
       let s1 = nh > 0 ? SPEC1[(nh * 255) | 0] : 0;
-      const th = (CTg[o] * HX + CTg[o + 1] * HY + CTg[o + 2] * HZ);
+      const tl_ = Math.sqrt(nz * nz + nx * nx) || 1; const th = (nz * HX - nx * HZ) / tl_;
       const sn = Math.sqrt(Math.max(0, 1 - th * th));
       let s2 = SPEC2[(sn * 255) | 0] * (ndl > 0 ? Math.min(1, ndl * 2.5) : 0);
       const sheen = sheenM[c];
-      const spec = (s1 * 0.45 + s2 * 0.42) * sheen;
+      const spec = (s1 * 0.40 + s2 * 0.30) * sheen;
       const fres = 1 - (nz < 0 ? -nz : nz);
       const rim = fres * fres * fres * 0.30;
       // soft pool of light
@@ -872,7 +889,7 @@ function drawCloth() {
 
   const tq2 = performance.now();
   ctx.drawImage(bgc, 0, 0, vw, vh);
-  ctx.globalAlpha = 0.52;
+  ctx.globalAlpha = 0.46;
   ctx.drawImage(shc, 0, 0, vw, vh);
   ctx.globalAlpha = 1;
 

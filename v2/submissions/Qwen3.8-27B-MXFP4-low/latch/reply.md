@@ -1,0 +1,922 @@
+
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Latch — Digital Logic Workbench</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Courier New',monospace;background:#0d1117;color:#c9d1d9}
+#toolbar{position:fixed;top:0;left:0;right:0;height:48px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;padding:0 8px;gap:4px;z-index:100}
+#toolbar button{background:#21262d;border:1px solid #30363d;color:#c9d1d9;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit;white-space:nowrap;transition:background .1s}
+#toolbar button:hover{background:#30363d}
+#toolbar button.active{background:#1f6feb;border-color:#1f6feb;color:#fff}
+#toolbar button[aria-pressed="true"]{background:#238636;border-color:#238636;color:#fff}
+#toolbar .sep{width:1px;height:28px;background:#30363d;margin:0 4px;flex-shrink:0}
+#ticks{font-size:13px;color:#58a6ff;min-width:60px;text-align:center;font-weight:bold}
+#board{position:absolute;top:48px;left:0;right:0;bottom:0;overflow:hidden;background:#0d1117;background-image:radial-gradient(circle,#1c2128 1px,transparent 1px);background-size:24px 24px}
+#wire-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5}
+.gate{position:absolute;cursor:pointer;user-select:none;border:1px solid #30363d;border-radius:6px;background:#161b22;display:flex;align-items:center;justify-content:center;transition:border-color .15s,box-shadow .15s;z-index:10}
+.gate:hover{border-color:#58a6ff}
+.gate.selected{border-color:#f0883e;box-shadow:0 0 12px rgba(240,136,62,0.5)}
+.pin{position:absolute;width:10px;height:10px;border-radius:50%;background:#484f58;cursor:crosshair;z-index:20;transition:background .1s,box-shadow .1s}
+.pin.on{background:#3fb950;box-shadow:0 0 8px rgba(63,185,80,0.7)}
+.pin:hover{background:#58a6ff}
+.pin-label{position:absolute;font-size:9px;color:#8b949e;pointer-events:none;z-index:15}
+.wire-path{fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.wire-path.off{stroke:#484f58}
+.wire-path.on{stroke:#3fb950;filter:drop-shadow(0 0 4px rgba(63,185,80,0.6))}
+.gate-label{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);font-size:9px;color:#8b949e;pointer-events:none;white-space:nowrap}
+#status-bar{position:fixed;bottom:0;left:0;right:0;height:24px;background:#161b22;border-top:1px solid #30363d;display:flex;align-items:center;padding:0 12px;font-size:11px;color:#8b949e;z-index:100}
+#status-text{flex:1}
+#status-stable{margin-left:12px;color:#3fb950}
+#status-stable.unstable{color:#f0883e}
+#temp-wire{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:4}
+#temp-wire path{fill:none;stroke:#58a6ff;stroke-width:2;stroke-dasharray:6 4;opacity:0.7}
+</style>
+</head>
+<body>
+<div id="toolbar">
+<button id="tool-select" class="active" title="Select tool">Select</button>
+<div class="sep"></div>
+<button id="tool-in" title="Place Input">In</button>
+<button id="tool-out" title="Place Output">Out</button>
+<button id="tool-not" title="Place NOT">NOT</button>
+<button id="tool-and" title="Place AND">AND</button>
+<button id="tool-or" title="Place OR">OR</button>
+<button id="tool-xor" title="Place XOR">XOR</button>
+<button id="tool-nand" title="Place NAND">NAND</button>
+<button id="tool-nor" title="Place NOR">NOR</button>
+<button id="tool-dff" title="Place DFF">DFF</button>
+<button id="tool-clk" title="Place Clock">CLK</button>
+<div class="sep"></div>
+<button id="tick" title="Advance one step">Step</button>
+<button id="run" aria-pressed="false" title="Toggle run">Run</button>
+<button id="reset" title="Reset circuit">Reset</button>
+<button id="undo" title="Undo last edit">Undo</button>
+<div class="sep"></div>
+<span id="ticks">t=0</span>
+</div>
+<div id="board">
+<svg id="wire-layer"></svg>
+<svg id="temp-wire"></svg>
+</div>
+<div id="status-bar">
+<span id="status-text">Ready</span>
+<span id="status-stable">stable</span>
+</div>
+<script>
+(function(){
+'use strict';
+
+var components = new Map();
+var wires = [];
+var compOrder = [];
+var time = 0;
+var running = false;
+var stable = true;
+var selectedId = null;
+var currentTool = 'select';
+var undoHistory = [];
+var runInterval = null;
+var nextGridIdx = 0;
+var wireIdCounter = 0;
+
+var board = document.getElementById('board');
+var wireLayer = document.getElementById('wire-layer');
+var tempWireSvg = document.getElementById('temp-wire');
+var ticksEl = document.getElementById('ticks');
+var runBtn = document.getElementById('run');
+var statusText = document.getElementById('status-text');
+var statusStable = document.getElementById('status-stable');
+
+var GATE_DEFS = {
+  in:{inputs:[],outputs:['Y'],w:44,h:44},
+  clk:{inputs:[],outputs:['Y'],w:52,h:52},
+  out:{inputs:['A'],outputs:['Y'],w:44,h:44},
+  not:{inputs:['A'],outputs:['Y'],w:60,h:44},
+  and:{inputs:['A','B'],outputs:['Y'],w:68,h:52},
+  or:{inputs:['A','B'],outputs:['Y'],w:68,h:52},
+  xor:{inputs:['A','B'],outputs:['Y'],w:68,h:52},
+  nand:{inputs:['A','B'],outputs:['Y'],w:68,h:52},
+  nor:{inputs:['A','B'],outputs:['Y'],w:68,h:52},
+  dff:{inputs:['D','CLK','RST'],outputs:['Q'],w:84,h:68}
+};
+
+function getPinPos(compId, pin){
+  var comp = components.get(compId);
+  if(!comp) return {x:0,y:0};
+  var def = GATE_DEFS[comp.type];
+  var x = comp.x, y = comp.y, w = def.w, h = def.h;
+  if(pin==='Y'||pin==='Q') return {x:x+w, y:y+h/2};
+  if(comp.type==='dff'){
+    if(pin==='D') return {x:x, y:y+h*0.2};
+    if(pin==='CLK') return {x:x, y:y+h*0.5};
+    if(pin==='RST') return {x:x, y:y+h*0.8};
+  }
+  if(comp.type==='not'||comp.type==='out'){
+    if(pin==='A') return {x:x, y:y+h/2};
+  }
+  if(comp.type==='and'||comp.type==='or'||comp.type==='xor'||comp.type==='nand'||comp.type==='nor'){
+    if(pin==='A') return {x:x, y:y+h*0.28};
+    if(pin==='B') return {x:x, y:y+h*0.72};
+  }
+  return {x:0,y:0};
+}
+
+function getGridPos(idx){
+  var col = idx % 12;
+  var row = Math.floor(idx / 12);
+  return {x: 16 + col * 96, y: 16 + row * 96};
+}
+
+function createGateSVG(type, w, h){
+  var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', h);
+  svg.setAttribute('viewBox', '0 0 '+w+' '+h);
+  svg.style.display='block';
+  svg.style.pointerEvents='none';
+  var ns='http://www.w3.org/2000/svg';
+  var g = document.createElementNS(ns,'g');
+  g.setAttribute('stroke','#58a6ff');
+  g.setAttribute('fill','none');
+  g.setAttribute('stroke-width','1.5');
+  
+  function addPath(d){
+    var p=document.createElementNS(ns,'path');
+    p.setAttribute('d',d);
+    g.appendChild(p);
+  }
+  function addCircle(cx,cy,r){
+    var c=document.createElementNS(ns,'circle');
+    c.setAttribute('cx',cx);c.setAttribute('cy',cy);c.setAttribute('r',r);
+    g.appendChild(c);
+  }
+  function addRect(x,y,ww,hh){
+    var r=document.createElementNS(ns,'rect');
+    r.setAttribute('x',x);r.setAttribute('y',y);r.setAttribute('width',ww);r.setAttribute('height',hh);
+    r.setAttribute('rx','2');
+    g.appendChild(r);
+  }
+  function addText(x,y,txt){
+    var t=document.createElementNS(ns,'text');
+    t.setAttribute('x',x);t.setAttribute('y',y);
+    t.setAttribute('fill','#8b949e');t.setAttribute('stroke','none');
+    t.setAttribute('font-size','10');t.setAttribute('text-anchor','middle');
+    t.setAttribute('dominant-baseline','middle');
+    t.textContent=txt;
+    g.appendChild(t);
+  }
+  
+  var cx=w/2, cy=h/2;
+  if(type==='not'){
+    addPath('M12,10 L'+(w-16)+','+cy+' L12,'+(h-10)+' Z');
+    addCircle(w-12, cy, 4);
+  } else if(type==='and'||type==='nand'){
+    addPath('M12,8 L'+(w-24)+',8 Q'+(w-12)+',8 '+(w-12)+','+cy+' Q'+(w-12)+','+(h-8)+' '+(w-24)+','+(h-8)+' L12,'+(h-8)+' Z');
+    if(type==='nand') addCircle(w-6, cy, 4);
+  } else if(type==='or'||type==='nor'){
+    addPath('M10,8 Q30,8 '+(w-12)+','+cy+' Q30,'+(h-8)+' 10,'+(h-8)+' Q28,'+(h-8)+' 10,'+(h-8)+' Q28,8 10,8 Z');
+    addPath('M10,8 Q25,8 '+(w-12)+','+cy);
+    addPath('M10,'+(h-8)+' Q25,'+(h-8)+' '+(w-12)+','+cy);
+    addPath('M10,8 Q35,12 '+(w-12)+','+cy);
+    addPath('M10,'+(h-8)+' Q35,'+(h-12)+' '+(w-12)+','+cy);
+    if(type==='nor') addCircle(w-6, cy, 4);
+  } else if(type==='xor'){
+    addPath('M10,8 Q25,8 '+(w-12)+','+cy);
+    addPath('M10,'+(h-8)+' Q25,'+(h-8)+' '+(w-12)+','+cy);
+    addPath('M10,8 Q35,12 '+(w-12)+','+cy);
+    addPath('M10,'+(h-8)+' Q35,'+(h-12)+' '+(w-12)+','+cy);
+    addPath('M16,8 Q30,12 '+(w-12)+','+cy);
+    addPath('M16,'+(h-8)+' Q30,'+(h-12)+' '+(w-12)+','+cy);
+  } else if(type==='in'){
+    addCircle(cx, cy, 12);
+    addText(cx, cy, 'IN');
+  } else if(type==='out'){
+    addCircle(cx, cy, 12);
+    addText(cx, cy, 'OUT');
+  } else if(type==='clk'){
+    addPath('M12,'+(h-12)+' L12,'+12+' L'+(w/2)+','+12+' L'+(w/2)+','+(h-12)+' L'+(w-12)+','+(h-12)+' L'+(w-12)+','+12);
+  } else if(type==='dff'){
+    addRect(8, 6, w-16, h-12);
+    addText(w/2, h/2, 'DFF');
+    var tri=document.createElementNS(ns,'path');
+    tri.setAttribute('d','M4,'+(h/2-4)+' L12,'+(h/2)+' L4,'+(h/2+4)+' Z');
+    g.appendChild(tri);
+    addText(w/2, 14, 'D');
+    addText(w/2, h-10, 'R');
+    addText(w-14, h/2, 'Q');
+  }
+  
+  svg.appendChild(g);
+  return svg;
+}
+
+function createGateElement(id, type, x, y){
+  var def = GATE_DEFS[type];
+  var el = document.createElement('div');
+  el.className = 'gate';
+  el.setAttribute('data-gate', id);
+  el.setAttribute('data-type', type);
+  el.style.left = x+'px';
+  el.style.top = y+'px';
+  el.style.width = def.w+'px';
+  el.style.height = def.h+'px';
+  
+  var svg = createGateSVG(type, def.w, def.h);
+  el.appendChild(svg);
+  
+  var label = document.createElement('div');
+  label.className = 'gate-label';
+  label.textContent = id;
+  el.appendChild(label);
+  
+  var pins = [];
+  if(type==='in'||type==='clk'){
+    pins.push({name:'Y', side:'out'});
+  } else if(type==='out'){
+    pins.push({name:'A', side:'in'});
+    pins.push({name:'Y', side:'out'});
+  } else if(type==='not'){
+    pins.push({name:'A', side:'in'});
+    pins.push({name:'Y', side:'out'});
+  } else if(type==='and'||type==='or'||type==='xor'||type==='nand'||type==='nor'){
+    pins.push({name:'A', side:'in'});
+    pins.push({name:'B', side:'in'});
+    pins.push({name:'Y', side:'out'});
+  } else if(type==='dff'){
+    pins.push({name:'D', side:'in'});
+    pins.push({name:'CLK', side:'in'});
+    pins.push({name:'RST', side:'in'});
+    pins.push({name:'Q', side:'out'});
+  }
+  
+  pins.forEach(function(p){
+    var pos = getPinPos(id, p.name);
+    var pinEl = document.createElement('div');
+    pinEl.className = 'pin';
+    pinEl.setAttribute('data-pin', p.name);
+    pinEl.setAttribute('data-pin-side', p.side);
+    pinEl.style.left = (pos.x - x - 5)+'px';
+    pinEl.style.top = (pos.y - y - 5)+'px';
+    el.appendChild(pinEl);
+    
+    var lbl = document.createElement('span');
+    lbl.className = 'pin-label';
+    lbl.textContent = p.name;
+    if(p.side==='out'){
+      lbl.style.left = (pos.x - x + 8)+'px';
+      lbl.style.top = (pos.y - y - 5)+'px';
+    } else {
+      lbl.style.left = (pos.x - x - 28)+'px';
+      lbl.style.top = (pos.y - y - 5)+'px';
+    }
+    el.appendChild(lbl);
+  });
+  
+  return el;
+}
+
+function renderGate(id){
+  var comp = components.get(id);
+  if(!comp) return;
+  var existing = board.querySelector('[data-gate="'+id+'"]');
+  if(existing) existing.remove();
+  var el = createGateElement(id, comp.type, comp.x, comp.y);
+  if(id === selectedId) el.classList.add('selected');
+  board.appendChild(el);
+  updatePinStates(id);
+}
+
+function updatePinStates(id){
+  var comp = components.get(id);
+  if(!comp) return;
+  var el = board.querySelector('[data-gate="'+id+'"]');
+  if(!el) return;
+  var def = GATE_DEFS[comp.type];
+  var allPins = def.inputs.concat(def.outputs);
+  allPins.forEach(function(pin){
+    var pinEl = el.querySelector('[data-pin="'+pin+'"]');
+    if(!pinEl) return;
+    var val = 0;
+    if(def.outputs.indexOf(pin) !== -1){
+      val = comp.outputs[pin] || 0;
+    } else {
+      var wire = findWireForInput(id, pin);
+      if(wire){
+        var src = components.get(wire.srcId);
+        if(src) val = src.outputs[wire.srcPin] || 0;
+      }
+    }
+    if(val === 1) pinEl.classList.add('on');
+    else pinEl.classList.remove('on');
+  });
+}
+
+function updateAllPinStates(){
+  components.forEach(function(_, id){ updatePinStates(id); });
+}
+
+function renderWire(w){
+  var id = 'w'+w.id;
+  var existing = wireLayer.querySelector('[data-wire="'+id+'"]');
+  if(existing) existing.remove();
+  
+  var sp = getPinPos(w.srcId, w.srcPin);
+  var dp = getPinPos(w.dstId, w.dstPin);
+  var mx = (sp.x + dp.x) / 2;
+  var d = 'M'+sp.x+','+sp.y+' L'+mx+','+sp.y+' L'+mx+','+dp.y+' L'+dp.x+','+dp.y;
+  
+  var path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d', d);
+  path.setAttribute('data-wire', id);
+  path.classList.add('wire-path');
+  var val = 0;
+  var src = components.get(w.srcId);
+  if(src) val = src.outputs[w.srcPin] || 0;
+  if(val === 1) path.classList.add('on');
+  else path.classList.add('off');
+  wireLayer.appendChild(path);
+}
+
+function renderAllWires(){
+  wireLayer.innerHTML = '';
+  wires.forEach(renderWire);
+}
+
+function updateWire(w){
+  var id = 'w'+w.id;
+  var el = wireLayer.querySelector('[data-wire="'+id+'"]');
+  if(!el) { renderWire(w); return; }
+  var sp = getPinPos(w.srcId, w.srcPin);
+  var dp = getPinPos(w.dstId, w.dstPin);
+  var mx = (sp.x + dp.x) / 2;
+  el.setAttribute('d', 'M'+sp.x+','+sp.y+' L'+mx+','+sp.y+' L'+mx+','+dp.y+' L'+dp.x+','+dp.y);
+  var val = 0;
+  var src = components.get(w.srcId);
+  if(src) val = src.outputs[w.srcPin] || 0;
+  if(val === 1){ el.classList.add('on'); el.classList.remove('off'); }
+  else { el.classList.add('off'); el.classList.remove('on'); }
+}
+
+function updateAllWires(){
+  wires.forEach(updateWire);
+}
+
+function findWireForInput(dstId, dstPin){
+  for(var i=0;i<wires.length;i++){
+    if(wires[i].dstId===dstId && wires[i].dstPin===dstPin) return wires[i];
+  }
+  return null;
+}
+
+function findWireBySrc(srcId, srcPin, dstId, dstPin){
+  for(var i=0;i<wires.length;i++){
+    if(wires[i].srcId===srcId && wires[i].srcPin===srcPin && wires[i].dstId===dstId && wires[i].dstPin===dstPin) return wires[i];
+  }
+  return null;
+}
+
+function removeWire(w){
+  var idx = wires.indexOf(w);
+  if(idx !== -1) wires.splice(idx, 1);
+  var el = wireLayer.querySelector('[data-wire="w'+w.id+'"]');
+  if(el) el.remove();
+}
+
+function computeNextOutput(comp, samples){
+  var t = comp.type;
+  if(t==='in') return {Y: comp.outputs.Y || 0};
+  if(t==='clk') return {Y: comp.outputs.Y || 0};
+  if(t==='out') return {Y: (samples.A===1)?1:0};
+  if(t==='not') return {Y: (samples.A===1)?0:1};
+  if(t==='and') return {Y: (samples.A===1 && samples.B===1)?1:0};
+  if(t==='or') return {Y: (samples.A===1 || samples.B===1)?1:0};
+  if(t==='xor') return {Y: (samples.A!==samples.B)?1:0};
+  if(t==='nand') return {Y: (samples.A===1 && samples.B===1)?0:1};
+  if(t==='nor') return {Y: (samples.A===1 || samples.B===1)?0:1};
+  if(t==='dff'){
+    var d = samples.D||0, clk = samples.CLK||0, rst = samples.RST||0;
+    var prevClk = comp.prevClk||0;
+    if(rst===1) return {Q:0};
+    if(clk===1 && prevClk===0) return {Q:d};
+    return {Q: comp.outputs.Q||0};
+  }
+  return {};
+}
+
+function delayStep(){
+  var k = time + 1;
+  var changed = false;
+  
+  components.forEach(function(comp, id){
+    if(comp.type==='clk'){
+      var p = comp.period || 8;
+      var nv = (k % p) >= (p/2) ? 1 : 0;
+      if(comp.outputs.Y !== nv) changed = true;
+      comp.outputs.Y = nv;
+    }
+  });
+  
+  var samples = {};
+  components.forEach(function(comp, id){
+    samples[id] = {};
+    var def = GATE_DEFS[comp.type];
+    def.inputs.forEach(function(pin){
+      var wire = findWireForInput(id, pin);
+      if(wire){
+        var src = components.get(wire.srcId);
+        samples[id][pin] = src ? (src.outputs[wire.srcPin]||0) : 0;
+      } else {
+        samples[id][pin] = 0;
+      }
+    });
+  });
+  
+  var nextOutputs = {};
+  components.forEach(function(comp, id){
+    nextOutputs[id] = computeNextOutput(comp, samples[id]);
+  });
+  
+  components.forEach(function(comp, id){
+    var no = nextOutputs[id];
+    for(var pin in no){
+      if(comp.outputs[pin] !== no[pin]) changed = true;
+      comp.outputs[pin] = no[pin];
+    }
+    if(comp.type==='dff'){
+      comp.prevClk = samples[id].CLK || 0;
+    }
+  });
+  
+  stable = !changed;
+  time = k;
+}
+
+function reinitSim(){
+  time = 0;
+  running = false;
+  stable = true;
+  if(runInterval){ clearInterval(runInterval); runInterval=null; }
+  components.forEach(function(comp){
+    if(comp.type==='in'){ comp.outputs.Y = comp.outputs.Y||0; }
+    else if(comp.type==='clk'){ comp.outputs.Y = 0; }
+    else if(comp.type==='dff'){ comp.outputs.Q = 0; comp.prevClk = 0; }
+    else { comp.outputs.Y = 0; }
+  });
+  updateRunButton();
+  updateTicksDisplay();
+  updateAllPinStates();
+  updateAllWires();
+  updateStatus();
+}
+
+function updateTicksDisplay(){
+  ticksEl.textContent = 't='+time;
+}
+
+function updateRunButton(){
+  runBtn.setAttribute('aria-pressed', running?'true':'false');
+}
+
+function updateStatus(){
+  statusStable.textContent = stable ? 'stable' : 'unstable';
+  statusStable.className = stable ? '' : 'unstable';
+}
+
+function persist(){
+  try{
+    var state = {
+      components:[],
+      wires:wires,
+      time:time,
+      running:running,
+      stable:stable,
+      nextGridIdx:nextGridIdx,
+      wireIdCounter:wireIdCounter
+    };
+    compOrder.forEach(function(id){
+      var c = components.get(id);
+      if(c) state.components.push({id:id,type:c.type,x:c.x,y:c.y,outputs:c.outputs,prevClk:c.prevClk||0,period:c.period||0});
+    });
+    localStorage.setItem('latch_state', JSON.stringify(state));
+  }catch(e){}
+}
+
+function loadState(){
+  try{
+    var raw = localStorage.getItem('latch_state');
+    if(!raw) return false;
+    var state = JSON.parse(raw);
+    if(!state || !state.components) return false;
+    time = state.time||0;
+    running = false;
+    stable = state.stable!==undefined ? state.stable : true;
+    nextGridIdx = state.nextGridIdx||0;
+    wireIdCounter = state.wireIdCounter||0;
+    state.components.forEach(function(c){
+      components.set(c.id, {type:c.type, x:c.x, y:c.y, outputs:c.outputs||{}, prevClk:c.prevClk||0, period:c.period||0});
+      compOrder.push(c.id);
+      renderGate(c.id);
+    });
+    wires = state.wires||[];
+    renderAllWires();
+    updateAllPinStates();
+    updateTicksDisplay();
+    updateStatus();
+    updateRunButton();
+    return true;
+  }catch(e){ return false; }
+}
+
+function pushUndo(action){
+  undoHistory.push(action);
+  if(undoHistory.length > 100) undoHistory.shift();
+}
+
+// API
+var api = {
+  reset: function(){
+    components.clear();
+    wires = [];
+    compOrder = [];
+    undoHistory = [];
+    nextGridIdx = 0;
+    wireIdCounter = 0;
+    board.querySelectorAll('.gate').forEach(function(el){ el.remove(); });
+    wireLayer.innerHTML = '';
+    reinitSim();
+    persist();
+  },
+  
+  add: function(type, id){
+    if(!GATE_DEFS[type]) return null;
+    if(components.has(id)) return id;
+    var pos = getGridPos(nextGridIdx);
+    nextGridIdx++;
+    var comp = {type:type, x:pos.x, y:pos.y, outputs:{}, prevClk:0, period:8};
+    if(type==='clk') comp.period = 8;
+    components.set(id, comp);
+    compOrder.push(id);
+    renderGate(id);
+    pushUndo({action:'add', type:type, id:id, x:pos.x, y:pos.y});
+    persist();
+    return id;
+  },
+  
+  connect: function(srcId, srcPin, dstId, dstPin){
+    var src = components.get(srcId);
+    var dst = components.get(dstId);
+    if(!src || !dst) return;
+    var srcDef = GATE_DEFS[src.type];
+    var dstDef = GATE_DEFS[dst.type];
+    if(srcDef.outputs.indexOf(srcPin)===-1) return;
+    if(dstDef.inputs.indexOf(dstPin)===-1) return;
+    
+    var existing = findWireForInput(dstId, dstPin);
+    if(existing) removeWire(existing);
+    
+    var w = {id:wireIdCounter++, srcId:srcId, srcPin:srcPin, dstId:dstId, dstPin:dstPin};
+    wires.push(w);
+    renderWire(w);
+    updatePinStates(dstId);
+    pushUndo({action:'connect', srcId:srcId, srcPin:srcPin, dstId:dstId, dstPin:dstPin, oldWire:existing?{id:existing.id,srcId:existing.srcId,srcPin:existing.srcPin,dstId:existing.dstId,dstPin:existing.dstPin}:null});
+    persist();
+  },
+  
+  disconnect: function(dstId, dstPin){
+    var dst = components.get(dstId);
+    if(!dst) return;
+    var dstDef = GATE_DEFS[dst.type];
+    if(dstDef.inputs.indexOf(dstPin)===-1) return;
+    var w = findWireForInput(dstId, dstPin);
+    if(!w) return;
+    removeWire(w);
+    updatePinStates(dstId);
+    pushUndo({action:'disconnect', wire:{id:w.id,srcId:w.srcId,srcPin:w.srcPin,dstId:w.dstId,dstPin:w.dstPin}});
+    persist();
+  },
+  
+  remove: function(id){
+    var comp = components.get(id);
+    if(!comp) return;
+    var removedWires = [];
+    for(var i=wires.length-1;i>=0;i--){
+      if(wires[i].srcId===id || wires[i].dstId===id){
+        removedWires.push(wires[i]);
+        removeWire(wires[i]);
+      }
+    }
+    var el = board.querySelector('[data-gate="'+id+'"]');
+    if(el) el.remove();
+    components.delete(id);
+    var idx = compOrder.indexOf(id);
+    if(idx!==-1) compOrder.splice(idx,1);
+    if(selectedId===id) selectedId=null;
+    pushUndo({action:'remove', id:id, type:comp.type, x:comp.x, y:comp.y, wires:removedWires});
+    persist();
+  },
+  
+  set: function(id, val){
+    var comp = components.get(id);
+    if(!comp || comp.type!=='in') return;
+    val = val===1?1:0;
+    var oldVal = comp.outputs.Y||0;
+    comp.outputs.Y = val;
+    updatePinStates(id);
+    updateAllWires();
+    pushUndo({action:'set', id:id, oldVal:oldVal, newVal:val});
+    persist();
+  },
+  
+  get: function(id, pin){
+    var comp = components.get(id);
+    if(!comp) return 0;
+    var def = GATE_DEFS[comp.type];
+    if(pin !== undefined && pin !== null){
+      if(def.outputs.indexOf(pin)!==-1) return comp.outputs[pin]||0;
+      if(def.inputs.indexOf(pin)!==-1){
+        var wire = findWireForInput(id, pin);
+        if(wire){
+          var src = components.get(wire.srcId);
+          return src ? (src.outputs[wire.srcPin]||0) : 0;
+        }
+        return 0;
+      }
+      return 0;
+    }
+    var primary = def.outputs[0];
+    return comp.outputs[primary]||0;
+  },
+  
+  setClock: function(id, period){
+    var comp = components.get(id);
+    if(!comp || comp.type!=='clk') return;
+    if(!period || period < 2 || period % 2 !== 0 || !isFinite(period)) return;
+    period = Math.floor(period);
+    var oldPeriod = comp.period||8;
+    comp.period = period;
+    comp.outputs.Y = (time % period) >= (period/2) ? 1 : 0;
+    updatePinStates(id);
+    updateAllWires();
+    pushUndo({action:'setClock', id:id, oldPeriod:oldPeriod, newPeriod:period});
+    persist();
+  },
+  
+  tick: function(n){
+    if(n===undefined||n===null) n=1;
+    if(!isFinite(n)||n<0) return;
+    n = Math.floor(n);
+    for(var i=0;i<n;i++) delayStep();
+    updateTicksDisplay();
+    updateAllPinStates();
+    updateAllWires();
+    updateStatus();
+    persist();
+  },
+  
+  time: function(){ return time; },
+  
+  run: function(on){
+    if(on===undefined) on = !running;
+    if(on && !running){
+      running = true;
+      if(runInterval) clearInterval(runInterval);
+      runInterval = setInterval(function(){ api.tick(1); }, 100);
+    } else if(!on && running){
+      running = false;
+      if(runInterval){ clearInterval(runInterval); runInterval=null; }
+    }
+    updateRunButton();
+    persist();
+  },
+  
+  stable: function(){ return stable; },
+  
+  undo: function(){
+    if(undoHistory.length===0) return;
+    var action = undoHistory.pop();
+    
+    if(action.action==='add'){
+      var el = board.querySelector('[data-gate="'+action.id+'"]');
+      if(el) el.remove();
+      for(var i=wires.length-1;i>=0;i--){
+        if(wires[i].srcId===action.id||wires[i].dstId===action.id) removeWire(wires[i]);
+      }
+      components.delete(action.id);
+      var idx = compOrder.indexOf(action.id);
+      if(idx!==-1) compOrder.splice(idx,1);
+    } else if(action.action==='connect'){
+      for(var i=wires.length-1;i>=0;i--){
+        if(wires[i].srcId===action.srcId && wires[i].srcPin===action.srcPin && wires[i].dstId===action.dstId && wires[i].dstPin===action.dstPin) removeWire(wires[i]);
+      }
+      if(action.oldWire){
+        wires.push(action.oldWire);
+        renderWire(action.oldWire);
+      }
+    } else if(action.action==='disconnect'){
+      wires.push(action.wire);
+      renderWire(action.wire);
+    } else if(action.action==='remove'){
+      components.set(action.id, {type:action.type, x:action.x, y:action.y, outputs:{}, prevClk:0, period:8});
+      compOrder.push(action.id);
+      renderGate(action.id);
+      action.wires.forEach(function(w){ wires.push(w); renderWire(w); });
+    } else if(action.action==='set'){
+      var comp = components.get(action.id);
+      if(comp) comp.outputs.Y = action.oldVal;
+    } else if(action.action==='setClock'){
+      var comp2 = components.get(action.id);
+      if(comp2){
+        comp2.period = action.oldPeriod;
+        comp2.outputs.Y = (time % action.oldPeriod) >= (action.oldPeriod/2) ? 1 : 0;
+      }
+    }
+    
+    reinitSim();
+    updateAllPinStates();
+    updateAllWires();
+    persist();
+  },
+  
+  list: function(){
+    return compOrder.map(function(id){
+      return {id:id, type:components.get(id).type};
+    });
+  }
+};
+
+window.__arena = api;
+
+// Toolbar events
+var toolButtons = ['select','in','out','not','and','or','xor','nand','nor','dff','clk'];
+toolButtons.forEach(function(t){
+  var btn = document.getElementById('tool-'+t);
+  if(btn){
+    btn.addEventListener('click', function(e){
+      e.preventDefault();
+      setTool(t);
+    });
+  }
+});
+
+function setTool(t){
+  currentTool = t;
+  toolButtons.forEach(function(tb){
+    var btn = document.getElementById('tool-'+tb);
+    if(btn) btn.classList.toggle('active', tb===t);
+  });
+  statusText.textContent = t==='select'?'Select mode':(t.toUpperCase()+' placement');
+}
+
+document.getElementById('tick').addEventListener('click', function(e){
+  e.preventDefault();
+  api.tick(1);
+});
+
+runBtn.addEventListener('click', function(e){
+  e.preventDefault();
+  api.run();
+});
+
+document.getElementById('reset').addEventListener('click', function(e){
+  e.preventDefault();
+  api.reset();
+});
+
+document.getElementById('undo').addEventListener('click', function(e){
+  e.preventDefault();
+  api.undo();
+});
+
+// Keyboard
+document.addEventListener('keydown', function(e){
+  var tag = e.target.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||e.target.isContentEditable) return;
+  
+  if(e.code==='Space'||e.key===' '){
+    e.preventDefault();
+    api.run();
+  } else if(e.key==='Delete'||e.key==='Backspace'){
+    e.preventDefault();
+    if(selectedId) api.remove(selectedId);
+  } else if(e.key==='Escape'){
+    setTool('select');
+  }
+});
+
+// Board click handling
+var wireDrag = null;
+var tempWirePath = document.createElementNS('http://www.w3.org/2000/svg','path');
+tempWireSvg.appendChild(tempWirePath);
+
+board.addEventListener('mousedown', function(e){
+  var pinEl = e.target.closest('.pin');
+  if(pinEl){
+    var side = pinEl.getAttribute('data-pin-side');
+    var gateEl = pinEl.closest('.gate');
+    var gateId = gateEl ? gateEl.getAttribute('data-gate') : null;
+    var pinName = pinEl.getAttribute('data-pin');
+    if(side==='out' && gateId){
+      wireDrag = {srcId:gateId, srcPin:pinName};
+      e.preventDefault();
+      return;
+    }
+  }
+  
+  if(currentTool==='select'){
+    var gateEl = e.target.closest('.gate');
+    if(gateEl){
+      var gid = gateEl.getAttribute('data-gate');
+      var gtype = gateEl.getAttribute('data-type');
+      if(gtype==='in'){
+        var comp = components.get(gid);
+        if(comp) api.set(gid, (comp.outputs.Y||0)===1?0:1);
+      }
+      selectGate(gid);
+    } else {
+      selectGate(null);
+    }
+  } else if(currentTool!=='select'){
+    var gateEl2 = e.target.closest('.gate');
+    if(!gateEl2){
+      var rect = board.getBoundingClientRect();
+      var x = e.clientX - rect.left;
+      var y = e.clientY - rect.top;
+      var id = 'g'+Date.now()+'_'+Math.floor(Math.random()*1000);
+      api.add(currentTool, id);
+      selectGate(id);
+      setTool('select');
+    }
+  }
+});
+
+board.addEventListener('mousemove', function(e){
+  if(!wireDrag) return;
+  var rect = board.getBoundingClientRect();
+  var mx = e.clientX - rect.left;
+  var my = e.clientY - rect.top;
+  var sp = getPinPos(wireDrag.srcId, wireDrag.srcPin);
+  var midX = (sp.x + mx) / 2;
+  tempWirePath.setAttribute('d','M'+sp.x+','+sp.y+' L'+midX+','+sp.y+' L'+midX+','+my+' L'+mx+','+my);
+});
+
+board.addEventListener('mouseup', function(e){
+  if(!wireDrag) return;
+  var pinEl = e.target.closest('.pin');
+  if(pinEl){
+    var side = pinEl.getAttribute('data-pin-side');
+    var gateEl = pinEl.closest('.gate');
+    var gateId = gateEl ? gateEl.getAttribute('data-gate') : null;
+    var pinName = pinEl.getAttribute('data-pin');
+    if(side==='in' && gateId && gateId!==wireDrag.srcId){
+      api.connect(wireDrag.srcId, wireDrag.srcPin, gateId, pinName);
+    }
+  }
+  wireDrag = null;
+  tempWirePath.setAttribute('d','');
+});
+
+document.addEventListener('mouseup', function(){
+  if(wireDrag){
+    wireDrag = null;
+    tempWirePath.setAttribute('d','');
+  }
+});
+
+function selectGate(id){
+  if(selectedId){
+    var oldEl = board.querySelector('[data-gate="'+selectedId+'"]');
+    if(oldEl) oldEl.classList.remove('selected');
+    if(oldEl) oldEl.removeAttribute('aria-selected');
+  }
+  selectedId = id;
+  if(id){
+    var newEl = board.querySelector('[data-gate="'+id+'"]');
+    if(newEl){
+      newEl.classList.add('selected');
+      newEl.setAttribute('aria-selected','true');
+    }
+  }
+}
+
+// Initialize
+var loaded = loadState();
+if(!loaded){
+  reinitSim();
+}
+
+// Resize handler
+window.addEventListener('resize', function(){
+  // No-op for now; layout is absolute positioned
+});
+
+})();
+</script>
+</body>
+</html>
+```

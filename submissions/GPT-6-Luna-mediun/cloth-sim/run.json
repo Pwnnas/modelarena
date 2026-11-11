@@ -1,0 +1,26 @@
+{
+  "source": "arena run",
+  "endpoint": "openrouter.ai",
+  "apiModel": "openai/gpt-6-luna",
+  "servedModel": "openai/gpt-6-luna",
+  "provider": "OpenAI",
+  "params": {
+    "thinking": "medium"
+  },
+  "startedAt": "2026-10-28T17:08:02.032Z",
+  "wallMs": 124980,
+  "ttftMs": 8454,
+  "thinkingMs": 52345,
+  "promptTokens": 1036,
+  "completionTokens": 14118,
+  "reasoningTokens": 4436,
+  "tokensEstimated": false,
+  "genTokensPerSec": 121.2,
+  "promptTokensPerSec": null,
+  "finishReason": "stop",
+  "replyChars": 30739,
+  "reasoningChars": 9685,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 30742
+}

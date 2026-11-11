@@ -1,0 +1,2222 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Latch — synchronous digital logic workbench</title>
+<style>
+:root {
+  --bg: #080d13;
+  --panel: #0d141e;
+  --panel2: #111a26;
+  --line: #1f2b38;
+  --line2: #2b3949;
+  --ink: #d4dee9;
+  --ink-dim: #8f9bab;
+  --accent: #7ff7ff;
+  --accent-soft: #62e4f4;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 14px;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+#toolbar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 10px;
+  background: linear-gradient(#0d141e, #0a1117);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+#transport {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+button {
+  appearance: none;
+  -webkit-appearance: none;
+  background: #151f2b;
+  color: #d8e2ee;
+  border: 1px solid #2a3645;
+  border-radius: 5px;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1b2735;
+  border-color: #3a4a5d;
+}
+
+button:active {
+  background: #243142;
+  transform: none;
+}
+
+button:focus {
+  outline: 1px solid rgba(127, 247, 255, 0.45);
+  outline-offset: 1px;
+}
+
+button[aria-pressed="true"] {
+  background: #142d33;
+  border-color: #3f9ba9;
+  color: #eaffff;
+  box-shadow: inset 0 0 8px rgba(127, 247, 255, 0.10);
+}
+
+#ticks {
+  min-width: 5ch;
+  padding: 4px 8px;
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  background: #05090f;
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+#status {
+  flex: 1 1 140px;
+  min-width: 100px;
+  color: var(--ink-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#statusText {
+  display: block;
+}
+
+#scope {
+  display: flex;
+  align-items: flex-end;
+  height: 20px;
+  gap: 4px;
+}
+
+#scopeBars {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 18px;
+  overflow: hidden;
+}
+
+.scope-bar {
+  width: 6px;
+  height: 5px;
+  border-radius: 1px;
+  background: #1f2b38;
+}
+
+.scope-bar.high {
+  height: 15px;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(127, 247, 255, 0.55);
+}
+
+#board {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: hidden;
+  background-color: #080d13;
+  background-image:
+    linear-gradient(to right, #131d27 1px, transparent 1px),
+    linear-gradient(to bottom, #131d27 1px, transparent 1px);
+  background-size: 24px 24px;
+  user-select: none;
+}
+
+#board.placing {
+  cursor: crosshair;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#wireLayer {
+  z-index: 1;
+}
+
+#ghostLayer {
+  z-index: 3;
+}
+
+.wire {
+  fill: none;
+  stroke: #405066;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.wire.on {
+  stroke: var(--accent);
+  stroke-width: 3.25;
+}
+
+.ghost {
+  fill: none;
+  stroke: var(--accent-soft);
+  stroke-width: 2.5;
+  stroke-dasharray: 7 6;
+  opacity: 0.8;
+}
+
+.gate {
+  position: absolute;
+  width: 84px;
+  height: 64px;
+  background: #121a24;
+  border: 1px solid #293543;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.03);
+  z-index: 2;
+}
+
+.gate.selected {
+  border-color: var(--accent-soft);
+  box-shadow:
+    0 0 0 1px var(--accent-soft),
+    0 0 18px rgba(98, 228, 244, 0.22),
+    inset 0 0 10px rgba(98, 228, 244, 0.08);
+}
+
+.gate.state1 {
+  background: #102028;
+  border-color: #2b4854;
+}
+
+.symbol {
+  position: absolute;
+  inset: 0;
+  width: 84px;
+  height: 64px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.symbol .body {
+  fill: #1b2532;
+  stroke: #9fb1c6;
+  stroke-width: 2;
+}
+
+.symbol .stub,
+.symbol .wave,
+.symbol .extra {
+  fill: none;
+  stroke: #9fb1c6;
+  stroke-width: 2;
+}
+
+.gate.state1 .symbol .body {
+  fill: #0f262d;
+  stroke: var(--accent);
+}
+
+.gate.state1 .symbol .stub,
+.gate.state1 .symbol .wave,
+.gate.state1 .symbol .extra {
+  stroke: var(--accent);
+}
+
+.gate-id {
+  position: absolute;
+  left: 8px;
+  top: 50px;
+  max-width: 56px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  color: #8290a2;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.gate-value {
+  position: absolute;
+  top: 4px;
+  right: 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #7b8797;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.gate.state1 .gate-value {
+  color: var(--accent);
+}
+
+.pin {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  margin-top: -5px;
+  border-radius: 50%;
+  border: 1px solid #4d5d72;
+  background: #273241;
+  box-sizing: border-box;
+  pointer-events: auto;
+  z-index: 5;
+}
+
+.pin.output {
+  background: #334154;
+}
+
+.pin.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 7px rgba(127, 247, 255, 0.65);
+}
+
+.pin-label {
+  position: absolute;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  color: #91a0b3;
+  pointer-events: none;
+  z-index: 4;
+  white-space: nowrap;
+}
+
+.pin-label.left {
+  left: 14px;
+}
+
+.pin-label.right {
+  right: 9px;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="toolbar" aria-label="Tools">
+    <button id="tool-select" class="tool active" data-type="select" aria-pressed="true">Select</button>
+    <button id="tool-in" class="tool" data-type="in" aria-pressed="false">In</button>
+    <button id="tool-out" class="tool" data-type="out" aria-pressed="false">Out</button>
+    <button id="tool-not" class="tool" data-type="not" aria-pressed="false">NOT</button>
+    <button id="tool-and" class="tool" data-type="and" aria-pressed="false">AND</button>
+    <button id="tool-or" class="tool" data-type="or" aria-pressed="false">OR</button>
+    <button id="tool-xor" class="tool" data-type="xor" aria-pressed="false">XOR</button>
+    <button id="tool-nand" class="tool" data-type="nand" aria-pressed="false">NAND</button>
+    <button id="tool-nor" class="tool" data-type="nor" aria-pressed="false">NOR</button>
+    <button id="tool-dff" class="tool" data-type="dff" aria-pressed="false">DFF</button>
+    <button id="tool-clk" class="tool" data-type="clk" aria-pressed="false">CLK</button>
+  </header>
+
+  <div id="transport">
+    <button id="tick">Step</button>
+    <button id="run" aria-pressed="false">Run</button>
+    <button id="reset">Reset</button>
+    <button id="undo">Undo</button>
+    <div id="ticks">0</div>
+    <div id="status"><span id="statusText">paused · stable</span></div>
+    <div id="scope"><div id="scopeBars"></div></div>
+  </div>
+
+  <main id="board" aria-label="Schematic surface">
+    <svg id="wireLayer" class="layer" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+    <svg id="ghostLayer" class="layer" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var TYPES = ['in', 'clk', 'out', 'not', 'and', 'or', 'xor', 'nand', 'nor', 'dff'];
+  var TYPE_SET = new Set(TYPES);
+
+  var INPUT_PINS = {
+    out: ['A'],
+    not: ['A'],
+    and: ['A', 'B'],
+    or: ['A', 'B'],
+    xor: ['A', 'B'],
+    nand: ['A', 'B'],
+    nor: ['A', 'B'],
+    dff: ['D', 'CLK', 'RST'],
+    in: [],
+    clk: []
+  };
+
+  var OUTPUT_PINS = {
+    in: ['Y'],
+    clk: ['Y'],
+    out: [],
+    not: ['Y'],
+    and: ['Y'],
+    or: ['Y'],
+    xor: ['Y'],
+    nand: ['Y'],
+    nor: ['Y'],
+    dff: ['Q']
+  };
+
+  var PIN_POS = {
+    in: { Y: [84, 32] },
+    clk: { Y: [84, 32] },
+    out: { A: [0, 32] },
+    not: { A: [0, 32], Y: [84, 32] },
+    and: { A: [0, 20], B: [0, 44], Y: [84, 32] },
+    or: { A: [0, 20], B: [0, 44], Y: [84, 32] },
+    xor: { A: [0, 20], B: [0, 44], Y: [84, 32] },
+    nand: { A: [0, 20], B: [0, 44], Y: [84, 32] },
+    nor: { A: [0, 20], B: [0, 44], Y: [84, 32] },
+    dff: { D: [0, 16], CLK: [0, 32], RST: [0, 48], Q: [84, 32] }
+  };
+
+  var DEFAULT_PERIOD = 8;
+  var STORAGE_KEY = 'latch.bench.v1';
+  var HISTORY_KEY = 'latch.bench.undo.v1';
+  var HISTORY_LIMIT = 64;
+  var FAST_THRESHOLD = 512;
+
+  var components = [];
+  var compById = new Map();
+  var drivers = new Map();
+  var wireEls = new Map();
+
+  var time = 0;
+  var stable = true;
+  var running = false;
+  var tool = 'select';
+  var selectedId = null;
+  var history = [];
+
+  var runTimer = null;
+  var drag = null;
+  var boardW = 0;
+  var boardH = 0;
+  var placeCounter = 0;
+  var lastStepChanged = false;
+
+  var board = document.getElementById('board');
+  var wireLayer = document.getElementById('wireLayer');
+  var ghostLayer = document.getElementById('ghostLayer');
+  var ticksEl = document.getElementById('ticks');
+  var runBtn = document.getElementById('run');
+  var tickBtn = document.getElementById('tick');
+  var resetBtn = document.getElementById('reset');
+  var undoBtn = document.getElementById('undo');
+  var statusText = document.getElementById('statusText');
+  var scopeBars = document.getElementById('scopeBars');
+
+  if (!board || !wireLayer || !ghostLayer || !ticksEl || !runBtn || !tickBtn || !resetBtn || !undoBtn || !statusText || !scopeBars) {
+    return;
+  }
+
+  var TOOL_BUTTONS = Array.prototype.slice.call(document.querySelectorAll('#toolbar button.tool'));
+
+  var scopeId = null;
+  var scopeSamples = [];
+
+  function cleanVal(v) {
+    var n = Number(v);
+    return n === 1 ? 1 : 0;
+  }
+
+  function cleanInt(v, def) {
+    var n = Number(v);
+    return Number.isFinite(n) ? Math.round(n) : def;
+  }
+
+  function cleanPeriod(p) {
+    var n = Number(p);
+    if (!Number.isFinite(n)) return DEFAULT_PERIOD;
+    var f = Math.floor(n);
+    if (f >= 2 && (f % 2) === 0) return f;
+    return DEFAULT_PERIOD;
+  }
+
+  function validComponentId(id) {
+    if (id === null || id === undefined) return null;
+    var s = String(id);
+    if (s.length === 0) return null;
+    return s;
+  }
+
+  function wireKey(dstId, dstPin) {
+    return JSON.stringify([dstId, dstPin]);
+  }
+
+  function isInputPin(type, pin) {
+    var arr = INPUT_PINS[type];
+    return Array.isArray(arr) && arr.indexOf(pin) !== -1;
+  }
+
+  function isOutputPin(type, pin) {
+    var arr = OUTPUT_PINS[type];
+    return Array.isArray(arr) && arr.indexOf(pin) !== -1;
+  }
+
+  function waveform(period, t) {
+    var p = cleanPeriod(period);
+    var half = p / 2;
+    var r = t % p;
+    return r >= half ? 1 : 0;
+  }
+
+  function inputValue(comp, pin) {
+    if (!comp || !comp.inputKeys) return 0;
+    var key = comp.inputKeys[pin];
+    if (!key) return 0;
+    var d = drivers.get(key);
+    if (!d) return 0;
+    var src = compById.get(d.srcId);
+    if (!src) return 0;
+    if (!isOutputPin(src.type, d.srcPin)) return 0;
+    return cleanVal(src.val);
+  }
+
+  function outputValue(id, pin) {
+    var c = compById.get(id);
+    if (!c) return 0;
+    if (isOutputPin(c.type, pin)) return cleanVal(c.val);
+    if (c.type === 'out' && pin === 'A') return inputValue(c, pin);
+    return 0;
+  }
+
+  function primaryValue(comp) {
+    if (!comp) return 0;
+    if (comp.type === 'out') return inputValue(comp, 'A');
+    return cleanVal(comp.val);
+  }
+
+  function resizeBoard() {
+    boardW = board.clientWidth;
+    boardH = board.clientHeight;
+  }
+
+  function clampToBoard(x, y) {
+    var nx = Number(x);
+    var ny = Number(y);
+    var cx = Number.isFinite(nx) ? Math.round(nx) : 16;
+    var cy = Number.isFinite(ny) ? Math.round(ny) : 16;
+    var minX = 8;
+    var maxX = Math.max(minX, boardW - 90);
+    var minY = 0;
+    var maxY = Math.max(minY, boardH - 64);
+    return {
+      x: Math.max(minX, Math.min(cx, maxX)),
+      y: Math.max(minY, Math.min(cy, maxY))
+    };
+  }
+
+  function nextGridPosition() {
+    var cols = Math.max(1, Math.min(8, Math.floor((boardW - 32) / 96)));
+    var col = 0;
+    var row = 0;
+
+    for (var attempts = 0; attempts < 700; attempts++) {
+      var x = 16 + col * 96;
+      var y = 16 + row * 96;
+      var occupied = false;
+
+      for (var i = 0; i < components.length; i++) {
+        var c = components[i];
+        if (Math.abs(c.x - x) < 96 && Math.abs(c.y - y) < 96) {
+          occupied = true;
+          break;
+        }
+      }
+
+      if (!occupied) return clampToBoard(x, y);
+
+      col++;
+      if (col >= cols) {
+        col = 0;
+        row++;
+      }
+    }
+
+    var fallbackCol = components.length % cols;
+    var fallbackRow = Math.floor(components.length / cols);
+    return clampToBoard(16 + fallbackCol * 96, 16 + fallbackRow * 96);
+  }
+
+  function sym(inner) {
+    return '<svg class="symbol" viewBox="0 0 84 64" aria-hidden="true">' + inner + '</svg>';
+  }
+
+  var SYMBOLS = {
+    in: sym(
+      '<circle class="body" cx="42" cy="32" r="13"></circle>' +
+      '<line class="stub" x1="55" y1="32" x2="84" y2="32"></line>'
+    ),
+    out: sym(
+      '<line class="stub" x1="0" y1="32" x2="24" y2="32"></line>' +
+      '<rect class="body" x="24" y="18" width="36" height="28" rx="4"></rect>' +
+      '<circle class="body" cx="42" cy="32" r="6"></circle>'
+    ),
+    clk: sym(
+      '<rect class="body" x="18" y="16" width="44" height="32" rx="4"></rect>' +
+      '<polyline class="wave" points="24,40 34,40 34,24 46,24 46,40 58,40"></polyline>' +
+      '<line class="stub" x1="62" y1="32" x2="84" y2="32"></line>'
+    ),
+    not: sym(
+      '<line class="stub" x1="0" y1="32" x2="18" y2="32"></line>' +
+      '<polygon class="body" points="18,14 50,32 18,50"></polygon>' +
+      '<circle class="body" cx="56" cy="32" r="5"></circle>' +
+      '<line class="stub" x1="61" y1="32" x2="84" y2="32"></line>'
+    ),
+    and: sym(
+      '<line class="stub" x1="0" y1="20" x2="18" y2="20"></line>' +
+      '<line class="stub" x1="0" y1="44" x2="18" y2="44"></line>' +
+      '<path class="body" d="M18 14 H36 C52 14 60 22 60 32 C60 42 52 50 36 50 H18 Z"></path>' +
+      '<line class="stub" x1="60" y1="32" x2="84" y2="32"></line>'
+    ),
+    or: sym(
+      '<line class="stub" x1="0" y1="20" x2="18" y2="20"></line>' +
+      '<line class="stub" x1="0" y1="44" x2="18" y2="44"></line>' +
+      '<path class="body" d="M18 14 C38 14 52 22 60 32 C52 42 38 50 18 50 C32 32 32 32 18 14 Z"></path>' +
+      '<line class="stub" x1="60" y1="32" x2="84" y2="32"></line>'
+    ),
+    xor: sym(
+      '<line class="stub" x1="0" y1="20" x2="12" y2="20"></line>' +
+      '<line class="stub" x1="0" y1="44" x2="12" y2="44"></line>' +
+      '<path class="extra" d="M12 14 C22 22 22 42 12 50"></path>' +
+      '<path class="body" d="M22 14 C40 14 54 22 60 32 C54 42 40 50 22 50 C34 32 34 32 22 14 Z"></path>' +
+      '<line class="stub" x1="60" y1="32" x2="84" y2="32"></line>'
+    ),
+    nand: sym(
+      '<line class="stub" x1="0" y1="20" x2="18" y2="20"></line>' +
+      '<line class="stub" x1="0" y1="44" x2="18" y2="44"></line>' +
+      '<path class="body" d="M18 14 H34 C48 14 54 22 54 32 C54 42 48 50 34 50 H18 Z"></path>' +
+      '<circle class="body" cx="60" cy="32" r="5"></circle>' +
+      '<line class="stub" x1="65" y1="32" x2="84" y2="32"></line>'
+    ),
+    nor: sym(
+      '<line class="stub" x1="0" y1="20" x2="18" y2="20"></line>' +
+      '<line class="stub" x1="0" y1="44" x2="18" y2="44"></line>' +
+      '<path class="body" d="M18 14 C36 14 48 22 54 32 C48 42 36 50 18 50 C30 32 30 32 18 14 Z"></path>' +
+      '<circle class="body" cx="60" cy="32" r="5"></circle>' +
+      '<line class="stub" x1="65" y1="32" x2="84" y2="32"></line>'
+    ),
+    dff: sym(
+      '<line class="stub" x1="0" y1="16" x2="24" y2="16"></line>' +
+      '<line class="stub" x1="0" y1="32" x2="24" y2="32"></line>' +
+      '<line class="stub" x1="0" y1="48" x2="24" y2="48"></line>' +
+      '<rect class="body" x="24" y="12" width="36" height="40" rx="4"></rect>' +
+      '<path class="extra" d="M24 26 L32 32 L24 38 Z"></path>' +
+      '<line class="stub" x1="60" y1="32" x2="84" y2="32"></line>'
+    )
+  };
+
+  function symbolMarkup(type) {
+    return SYMBOLS[type] || sym('');
+  }
+
+  function addPin(comp, gateEl, pin, isOut) {
+    var pos = PIN_POS[comp.type] && PIN_POS[comp.type][pin];
+    if (!pos) return;
+
+    var span = document.createElement('span');
+    span.className = 'pin ' + (isOut ? 'output' : 'input');
+    span.setAttribute('data-pin', pin);
+    span.style.left = pos[0] + 'px';
+    span.style.top = pos[1] + 'px';
+    gateEl.appendChild(span);
+
+    comp.pinEls.push({ pin: pin, out: isOut, el: span });
+
+    var label = document.createElement('span');
+    label.className = 'pin-label ' + (isOut ? 'right' : 'left');
+    label.textContent = pin;
+    label.style.top = (pos[1] - 8) + 'px';
+    label.setAttribute('aria-hidden', 'true');
+    gateEl.appendChild(label);
+  }
+
+  function createGateDOM(comp) {
+    var gateEl = document.createElement('div');
+    gateEl.className = 'gate type-' + comp.type;
+    gateEl.setAttribute('data-gate', comp.id);
+    gateEl.setAttribute('data-type', comp.type);
+    gateEl.setAttribute('aria-selected', 'false');
+    gateEl.setAttribute('title', comp.id + ' — ' + comp.type);
+    gateEl.style.left = comp.x + 'px';
+    gateEl.style.top = comp.y + 'px';
+
+    var idEl = document.createElement('div');
+    idEl.className = 'gate-id';
+    idEl.textContent = comp.id;
+    idEl.setAttribute('aria-hidden', 'true');
+    gateEl.appendChild(idEl);
+
+    var valueEl = document.createElement('div');
+    valueEl.className = 'gate-value';
+    valueEl.textContent = '0';
+    gateEl.appendChild(valueEl);
+
+    gateEl.insertAdjacentHTML('beforeend', symbolMarkup(comp.type));
+
+    comp.pinEls = [];
+
+    var inputs = INPUT_PINS[comp.type] || [];
+    var outputs = OUTPUT_PINS[comp.type] || [];
+
+    for (var i = 0; i < inputs.length; i++) {
+      addPin(comp, gateEl, inputs[i], false);
+    }
+    for (var j = 0; j < outputs.length; j++) {
+      addPin(comp, gateEl, outputs[j], true);
+    }
+
+    comp.el = gateEl;
+    comp.valueEl = valueEl;
+    board.appendChild(gateEl);
+  }
+
+  function createComponent(type, id, x, y, value, prev, period) {
+    var comp = {
+      id: id,
+      type: type,
+      x: x,
+      y: y,
+      period: cleanPeriod(period),
+      val: cleanVal(value),
+      prevClk: cleanVal(prev),
+      inputKeys: {},
+      pinEls: [],
+      el: null,
+      valueEl: null
+    };
+
+    var pins = INPUT_PINS[type] || [];
+    for (var i = 0; i < pins.length; i++) {
+      comp.inputKeys[pins[i]] = wireKey(id, pins[i]);
+    }
+
+    components.push(comp);
+    compById.set(id, comp);
+    createGateDOM(comp);
+    return comp;
+  }
+
+  function pinPoint(comp, pin) {
+    var pos = PIN_POS[comp.type] && PIN_POS[comp.type][pin];
+    if (!pos) return { x: comp.x, y: comp.y };
+    return { x: comp.x + pos[0], y: comp.y + pos[1] };
+  }
+
+  function pointsToString(points) {
+    var out = '';
+    for (var i = 0; i < points.length; i++) {
+      if (i) out += ' ';
+      out += String(points[i][0]) + ',' + String(points[i][1]);
+    }
+    return out;
+  }
+
+  function routePoints(sx, sy, dx, dy) {
+    if (dx > sx) {
+      if (sy === dy) return [[sx, sy], [dx, dy]];
+      var mx = Math.round((sx + dx) / 2);
+      return [[sx, sy], [mx, sy], [mx, dy], [dx, dy]];
+    }
+
+    var minMargin = 8;
+    var topY = Math.min(sy, dy) - 16;
+    if (topY >= minMargin) {
+      return [[sx, sy], [sx, topY], [dx, topY], [dx, dy]];
+    }
+
+    var bottomY = Math.max(sy, dy) + 16;
+    var maxMargin = Math.max(minMargin, boardH - minMargin);
+    if (bottomY <= maxMargin) {
+      return [[sx, sy], [sx, bottomY], [dx, bottomY], [dx, dy]];
+    }
+
+    var outX = Math.max(sx, dx) + 24;
+    if (boardW > 0 && outX > boardW - 8) {
+      outX = Math.max(sx + 16, boardW - 8);
+    }
+    return [[sx, sy], [outX, sy], [outX, dy], [dx, dy]];
+  }
+
+  function updateWireGeometry(poly, d) {
+    var src = compById.get(d.srcId);
+    var dst = compById.get(d.dstId);
+    if (!src || !dst) return;
+
+    var sp = pinPoint(src, d.srcPin);
+    var dp = pinPoint(dst, d.dstPin);
+    var points = routePoints(sp.x, sp.y, dp.x, dp.y);
+    poly.setAttribute('points', pointsToString(points));
+  }
+
+  function removeWireElement(key) {
+    var el = wireEls.get(key);
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    wireEls.delete(key);
+  }
+
+  function createWireElement(key) {
+    var existing = wireEls.get(key);
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+    wireEls.delete(key);
+
+    var d = drivers.get(key);
+    if (!d) return;
+
+    var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    poly.setAttribute('data-wire', '');
+    poly.setAttribute('class', 'wire');
+    updateWireGeometry(poly, d);
+    wireLayer.appendChild(poly);
+    wireEls.set(key, poly);
+  }
+
+  function updateWires() {
+    var toDelete = [];
+
+    wireEls.forEach(function (el, key) {
+      var d = drivers.get(key);
+      if (!d) {
+        toDelete.push(key);
+        return;
+      }
+
+      var src = compById.get(d.srcId);
+      var dst = compById.get(d.dstId);
+      if (!src || !dst) {
+        toDelete.push(key);
+        return;
+      }
+
+      updateWireGeometry(el, d);
+      var val = outputValue(d.srcId, d.srcPin);
+      el.setAttribute('class', val === 1 ? 'wire on' : 'wire');
+    });
+
+    for (var i = 0; i < toDelete.length; i++) {
+      var key = toDelete[i];
+      removeWireElement(key);
+      drivers.delete(key);
+    }
+  }
+
+  function updateComponent(comp) {
+    if (!comp.el || !comp.valueEl) return;
+
+    var primary = primaryValue(comp);
+    if (comp.type === 'out') comp.val = primary;
+
+    comp.el.classList.toggle('state1', primary === 1);
+    comp.valueEl.textContent = primary === 1 ? '1' : '0';
+
+    for (var i = 0; i < comp.pinEls.length; i++) {
+      var pe = comp.pinEls[i];
+      var val = pe.out ? primary : inputValue(comp, pe.pin);
+      pe.el.classList.toggle('on', val === 1);
+    }
+  }
+
+  function applySelectionClasses() {
+    for (var i = 0; i < components.length; i++) {
+      var c = components[i];
+      if (!c.el) continue;
+      var sel = c.id === selectedId;
+      c.el.setAttribute('aria-selected', sel ? 'true' : 'false');
+      c.el.classList.toggle('selected', sel);
+    }
+  }
+
+  function updateTicks() {
+    ticksEl.textContent = String(time);
+  }
+
+  function updateStatus() {
+    var bits = [];
+    bits.push(running ? 'running' : 'paused');
+    bits.push(stable ? 'stable' : 'not stable');
+
+    if (selectedId) {
+      var c = compById.get(selectedId);
+      if (c) {
+        bits.push(selectedId + ' · ' + primaryValue(c));
+      } else {
+        selectedId = null;
+      }
+    }
+
+    statusText.textContent = bits.join(' · ');
+  }
+
+  function pushScopeSample() {
+    if (selectedId && scopeId !== selectedId) {
+      scopeId = selectedId;
+      scopeSamples.length = 0;
+    }
+
+    if (!selectedId) return;
+
+    var c = compById.get(selectedId);
+    if (!c) return;
+
+    scopeSamples.push(primaryValue(c));
+    if (scopeSamples.length > 32) scopeSamples.shift();
+  }
+
+  function renderScope() {
+    if (selectedId && !compById.has(selectedId)) {
+      selectedId = null;
+      applySelectionClasses();
+    }
+
+    if (selectedId && scopeId !== selectedId) {
+      scopeId = selectedId;
+      scopeSamples.length = 0;
+      pushScopeSample();
+    } else if (!selectedId) {
+      scopeId = null;
+      scopeSamples.length = 0;
+    }
+
+    scopeBars.textContent = '';
+
+    if (!selectedId) return;
+
+    var count = Math.min(32, scopeSamples.length || 1);
+    for (var i = 0; i < count; i++) {
+      var val = scopeSamples.length ? scopeSamples[i] : 0;
+      var span = document.createElement('span');
+      span.className = 'scope-bar ' + (val === 1 ? 'high' : 'low');
+      scopeBars.appendChild(span);
+    }
+  }
+
+  function refreshUI() {
+    for (var i = 0; i < components.length; i++) {
+      updateComponent(components[i]);
+    }
+
+    updateWires();
+    updateTicks();
+    updateStatus();
+    applySelectionClasses();
+    renderScope();
+  }
+
+  function serializeWires() {
+    var arr = [];
+    drivers.forEach(function (d) {
+      arr.push({
+        dstId: d.dstId,
+        dstPin: d.dstPin,
+        srcId: d.srcId,
+        srcPin: d.srcPin
+      });
+    });
+    return arr;
+  }
+
+  function saveState() {
+    try {
+      var data = {
+        v: 1,
+        time: time,
+        stable: stable,
+        selectedId: selectedId,
+        components: components.map(function (c) {
+          return {
+            id: c.id,
+            type: c.type,
+            x: c.x,
+            y: c.y,
+            period: c.period,
+            val: cleanVal(c.val),
+            prevClk: cleanVal(c.prevClk)
+          };
+        }),
+        wires: serializeWires()
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      // Storage failures are non-fatal in this environment.
+    }
+  }
+
+  function cloneCircuit() {
+    return {
+      components: components.map(function (c) {
+        return {
+          id: c.id,
+          type: c.type,
+          x: c.x,
+          y: c.y,
+          period: c.period,
+          value: c.type === 'in' ? cleanVal(c.val) : 0
+        };
+      }),
+      wires: serializeWires()
+    };
+  }
+
+  function pushHistory() {
+    history.push(cloneCircuit());
+    if (history.length > HISTORY_LIMIT) history.shift();
+  }
+
+  function saveHistory() {
+    try {
+      if (history.length === 0) {
+        localStorage.removeItem(HISTORY_KEY);
+        return;
+      }
+
+      var arr = [];
+      for (var i = 0; i < history.length; i++) {
+        var s = history[i];
+        if (s && Array.isArray(s.components)) {
+          arr.push({
+            components: s.components,
+            wires: Array.isArray(s.wires) ? s.wires : []
+          });
+        }
+      }
+
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(arr));
+    } catch (e) {
+      // Storage failures are non-fatal.
+    }
+  }
+
+  function commitChanges() {
+    refreshUI();
+    saveState();
+    saveHistory();
+  }
+
+  function clearBoardForRebuild() {
+    cancelDrag();
+
+    var wireKeys = [];
+    wireEls.forEach(function (el, key) {
+      wireKeys.push(key);
+    });
+
+    for (var i = 0; i < wireKeys.length; i++) {
+      removeWireElement(wireKeys[i]);
+    }
+
+    wireEls.clear();
+    drivers.clear();
+
+    for (var j = 0; j < components.length; j++) {
+      var c = components[j];
+      if (c.el && c.el.parentNode) c.el.parentNode.removeChild(c.el);
+    }
+
+    components.length = 0;
+    compById.clear();
+
+    var stray = board.querySelectorAll('[data-gate]');
+    for (var k = 0; k < stray.length; k++) {
+      if (stray[k].parentNode) stray[k].parentNode.removeChild(stray[k]);
+    }
+
+    selectedId = null;
+    scopeId = null;
+    scopeSamples.length = 0;
+  }
+
+  function applySavedState(data) {
+    clearBoardForRebuild();
+    resizeBoard();
+
+    time = Math.max(0, cleanInt(data.time, 0));
+    stable = data.stable === true || data.stable === false ? data.stable : true;
+    selectedId = validComponentId(data.selectedId);
+
+    var comps = Array.isArray(data.components) ? data.components : [];
+    for (var i = 0; i < comps.length; i++) {
+      var sc = comps[i];
+      if (!sc) continue;
+
+      var type = sc.type;
+      var id = validComponentId(sc.id);
+      if (!TYPE_SET.has(type) || !id || compById.has(id)) continue;
+
+      var pos = clampToBoard(sc.x, sc.y);
+      createComponent(type, id, pos.x, pos.y, cleanVal(sc.val), cleanVal(sc.prevClk), cleanPeriod(sc.period));
+    }
+
+    var wires = Array.isArray(data.wires) ? data.wires : [];
+    for (var j = 0; j < wires.length; j++) {
+      var w = wires[j];
+      if (!w) continue;
+
+      var dstId = validComponentId(w.dstId);
+      var srcId = validComponentId(w.srcId);
+      var dstPin = typeof w.dstPin === 'string' ? w.dstPin : '';
+      var srcPin = typeof w.srcPin === 'string' ? w.srcPin : '';
+
+      var dst = dstId ? compById.get(dstId) : null;
+      var src = srcId ? compById.get(srcId) : null;
+
+      if (!dst || !src || !isInputPin(dst.type, dstPin) || !isOutputPin(src.type, srcPin)) continue;
+
+      var key = dst.inputKeys[dstPin];
+      if (!key || drivers.has(key)) continue;
+
+      drivers.set(key, {
+        srcId: srcId,
+        srcPin: srcPin,
+        dstId: dstId,
+        dstPin: dstPin
+      });
+      createWireElement(key);
+    }
+
+    if (selectedId && !compById.has(selectedId)) {
+      selectedId = null;
+    }
+
+    for (var k = 0; k < components.length; k++) {
+      if (components[k].type === 'clk') {
+        components[k].val = waveform(components[k].period, time);
+      }
+    }
+  }
+
+  function applyHistorySnapshot(snap) {
+    clearBoardForRebuild();
+    resizeBoard();
+
+    time = 0;
+    stable = true;
+    selectedId = null;
+
+    var comps = snap && Array.isArray(snap.components) ? snap.components : [];
+    for (var i = 0; i < comps.length; i++) {
+      var sc = comps[i];
+      if (!sc) continue;
+
+      var type = sc.type;
+      var id = validComponentId(sc.id);
+      if (!TYPE_SET.has(type) || !id || compById.has(id)) continue;
+
+      var pos = clampToBoard(sc.x, sc.y);
+      var value = type === 'in' ? cleanVal(sc.value) : 0;
+      createComponent(type, id, pos.x, pos.y, value, 0, cleanPeriod(sc.period));
+    }
+
+    var wires = snap && Array.isArray(snap.wires) ? snap.wires : [];
+    for (var j = 0; j < wires.length; j++) {
+      var w = wires[j];
+      if (!w) continue;
+
+      var dstId = validComponentId(w.dstId);
+      var srcId = validComponentId(w.srcId);
+      var dstPin = typeof w.dstPin === 'string' ? w.dstPin : '';
+      var srcPin = typeof w.srcPin === 'string' ? w.srcPin : '';
+
+      var dst = dstId ? compById.get(dstId) : null;
+      var src = srcId ? compById.get(srcId) : null;
+
+      if (!dst || !src || !isInputPin(dst.type, dstPin) || !isOutputPin(src.type, srcPin)) continue;
+
+      var key = dst.inputKeys[dstPin];
+      if (!key || drivers.has(key)) continue;
+
+      drivers.set(key, {
+        srcId: srcId,
+        srcPin: srcPin,
+        dstId: dstId,
+        dstPin: dstPin
+      });
+      createWireElement(key);
+    }
+  }
+
+  function loadFromStorage() {
+    var restored = false;
+
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var data = JSON.parse(raw);
+        if (data && Array.isArray(data.components)) {
+          applySavedState(data);
+          restored = true;
+        }
+      }
+    } catch (e) {
+      restored = false;
+    }
+
+    if (restored) {
+      try {
+        var hist = localStorage.getItem(HISTORY_KEY);
+        if (hist) {
+          var arr = JSON.parse(hist);
+          if (Array.isArray(arr)) {
+            history.length = 0;
+            for (var i = 0; i < arr.length; i++) {
+              var s = arr[i];
+              if (s && Array.isArray(s.components)) {
+                history.push({
+                  components: s.components,
+                  wires: Array.isArray(s.wires) ? s.wires : []
+                });
+              }
+            }
+            if (history.length > HISTORY_LIMIT) {
+              history = history.slice(-HISTORY_LIMIT);
+            }
+          }
+        }
+      } catch (e) {
+        history.length = 0;
+      }
+    } else {
+      history.length = 0;
+      time = 0;
+      stable = true;
+      selectedId = null;
+    }
+
+    pause();
+    setTool('select');
+    refreshUI();
+
+    if (restored) {
+      saveState();
+      saveHistory();
+    }
+  }
+
+  function performStep() {
+    var k = time + 1;
+    var changed = false;
+
+    for (var i = 0; i < components.length; i++) {
+      var c = components[i];
+      if (c.type !== 'clk') continue;
+      var nv = waveform(c.period, k);
+      if (nv !== cleanVal(c.val)) {
+        changed = true;
+        c.val = nv;
+      }
+    }
+
+    var pending = [];
+
+    for (var j = 0; j < components.length; j++) {
+      var gate = components[j];
+
+      if (gate.type === 'in' || gate.type === 'clk' || gate.type === 'out') {
+        continue;
+      }
+
+      var next;
+
+      if (gate.type === 'not') {
+        var a = inputValue(gate, 'A');
+        next = a === 1 ? 0 : 1;
+        pending.push({ c: gate, nv: next });
+      } else if (gate.type === 'and') {
+        var aa = inputValue(gate, 'A');
+        var ab = inputValue(gate, 'B');
+        next = (aa === 1 && ab === 1) ? 1 : 0;
+        pending.push({ c: gate, nv: next });
+      } else if (gate.type === 'or') {
+        var oa = inputValue(gate, 'A');
+        var ob = inputValue(gate, 'B');
+        next = (oa === 1 || ob === 1) ? 1 : 0;
+        pending.push({ c: gate, nv: next });
+      } else if (gate.type === 'xor') {
+        var xa = inputValue(gate, 'A');
+        var xb = inputValue(gate, 'B');
+        next = xa !== xb ? 1 : 0;
+        pending.push({ c: gate, nv: next });
+      } else if (gate.type === 'nand') {
+        var na = inputValue(gate, 'A');
+        var nb = inputValue(gate, 'B');
+        next = (na === 1 && nb === 1) ? 0 : 1;
+        pending.push({ c: gate, nv: next });
+      } else if (gate.type === 'nor') {
+        var ra = inputValue(gate, 'A');
+        var rb = inputValue(gate, 'B');
+        next = (ra === 1 || rb === 1) ? 0 : 1;
+        pending.push({ c: gate, nv: next });
+      } else if (gate.type === 'dff') {
+        var d = inputValue(gate, 'D');
+        var clk = inputValue(gate, 'CLK');
+        var rst = inputValue(gate, 'RST');
+        var oldQ = cleanVal(gate.val);
+        var q = oldQ;
+
+        if (rst === 1) {
+          q = 0;
+        } else if (clk === 1 && gate.prevClk === 0) {
+          q = d;
+        }
+
+        if (q !== oldQ) {
+          // Counted at commit below.
+        }
+
+        pending.push({ c: gate, nv: q, prev: clk });
+      }
+    }
+
+    for (var p = 0; p < pending.length; p++) {
+      var entry = pending[p];
+      var target = entry.c;
+      var nval = cleanVal(entry.nv);
+
+      if (nval !== cleanVal(target.val)) changed = true;
+      target.val = nval;
+
+      if (entry.prev !== undefined) {
+        target.prevClk = cleanVal(entry.prev);
+      }
+    }
+
+    for (var o = 0; o < components.length; o++) {
+      var out = components[o];
+      if (out.type !== 'out') continue;
+
+      var outVal = inputValue(out, 'A');
+      if (outVal !== cleanVal(out.val)) {
+        changed = true;
+        out.val = outVal;
+      }
+    }
+
+    time = k;
+    stable = !changed;
+    lastStepChanged = changed;
+    return changed;
+  }
+
+  function snapshotState() {
+    var vals = [];
+    var prevs = [];
+
+    for (var i = 0; i < components.length; i++) {
+      vals.push(cleanVal(components[i].val));
+      prevs.push(cleanVal(components[i].prevClk));
+    }
+
+    return { vals: vals, prevs: prevs };
+  }
+
+  function restoreSnapshot(snap) {
+    if (!snap || !Array.isArray(snap.vals)) return;
+
+    for (var i = 0; i < components.length && i < snap.vals.length; i++) {
+      components[i].val = cleanVal(snap.vals[i]);
+      components[i].prevClk = cleanVal(snap.prevs && snap.prevs[i]);
+    }
+  }
+
+  function simKey(t) {
+    var s = 'v|';
+
+    for (var i = 0; i < components.length; i++) {
+      var c = components[i];
+      s += cleanVal(c.val) ? '1' : '0';
+      s += ';';
+
+      if (c.type === 'dff') {
+        s += cleanVal(c.prevClk) ? '1' : '0';
+        s += ';';
+      }
+
+      if (c.type === 'clk') {
+        s += 'p' + (t % cleanPeriod(c.period));
+        s += ';';
+      }
+    }
+
+    return s;
+  }
+
+  function doTickFast(steps) {
+    var base = time;
+
+    if (components.length === 0) {
+      var target0 = base + steps;
+      time = Number.isFinite(target0) ? target0 : Number.MAX_SAFE_INTEGER;
+      stable = true;
+      lastStepChanged = false;
+      return;
+    }
+
+    var hasClock = false;
+    for (var i = 0; i < components.length; i++) {
+      if (components[i].type === 'clk') {
+        hasClock = true;
+        break;
+      }
+    }
+
+    var snaps = [];
+    var changedAt = [];
+    var seen = new Map();
+
+    snaps.push(snapshotState());
+    changedAt.push(false);
+    seen.set(simKey(base), 0);
+
+    var step = 0;
+
+    while (step < steps) {
+      performStep();
+      step++;
+
+      snaps.push(snapshotState());
+      changedAt.push(lastStepChanged);
+
+      var key = simKey(time);
+      var prev = seen.get(key);
+
+      if (prev !== undefined) {
+        var cycleLen = step - prev;
+
+        if (cycleLen > 0) {
+          var rel = prev + ((steps - prev) % cycleLen);
+          restoreSnapshot(snaps[rel]);
+
+          var target = base + steps;
+          time = Number.isFinite(target) ? target : Number.MAX_SAFE_INTEGER;
+          stable = rel === prev ? changedAt[step] : changedAt[rel];
+          lastStepChanged = !stable;
+          return;
+        }
+      } else {
+        seen.set(key, step);
+      }
+
+      if (stable && !hasClock) {
+        var fixedTarget = base + steps;
+        time = Number.isFinite(fixedTarget) ? fixedTarget : Number.MAX_SAFE_INTEGER;
+        stable = true;
+        lastStepChanged = false;
+        return;
+      }
+    }
+  }
+
+  function normalizeTickCount(n, hasArg) {
+    if (!hasArg) return 1;
+    if (n === null) return 1;
+
+    var num = Number(n);
+    if (!Number.isFinite(num) || num < 0) return 1;
+    return Math.floor(num);
+  }
+
+  function doTick(n, hasArg) {
+    var steps = normalizeTickCount(n, hasArg);
+
+    if (steps === 0) {
+      refreshUI();
+      saveState();
+      return;
+    }
+
+    if (steps > FAST_THRESHOLD) {
+      doTickFast(steps);
+    } else {
+      for (var i = 0; i < steps; i++) {
+        performStep();
+      }
+    }
+
+    if (selectedId) pushScopeSample();
+    refreshUI();
+    saveState();
+  }
+
+  function scheduleRun() {
+    if (runTimer) {
+      clearTimeout(runTimer);
+      runTimer = null;
+    }
+
+    if (!running) return;
+
+    runTimer = setTimeout(function () {
+      try {
+        doTick(1, 1);
+      } catch (e) {
+        // Keep the transport alive even if an internal issue is caught.
+      }
+
+      if (running) scheduleRun();
+    }, 100);
+  }
+
+  function setRun(on) {
+    var next = !!on;
+
+    if (runTimer) {
+      clearTimeout(runTimer);
+      runTimer = null;
+    }
+
+    running = next;
+    runBtn.setAttribute('aria-pressed', running ? 'true' : 'false');
+    runBtn.classList.toggle('running', running);
+
+    if (running) scheduleRun();
+  }
+
+  function pause() {
+    setRun(false);
+  }
+
+  function setTool(nextTool) {
+    var valid = nextTool === 'select' || TYPE_SET.has(nextTool);
+    tool = valid ? nextTool : 'select';
+
+    for (var i = 0; i < TOOL_BUTTONS.length; i++) {
+      var btn = TOOL_BUTTONS[i];
+      var t = btn.getAttribute('data-type');
+      var on = t === tool;
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.classList.toggle('active', on);
+    }
+
+    board.classList.toggle('placing', tool !== 'select');
+  }
+
+  function selectGate(id) {
+    var cid = validComponentId(id);
+
+    if (!cid || !compById.has(cid)) {
+      if (selectedId) {
+        selectedId = null;
+        scopeId = null;
+        scopeSamples.length = 0;
+        applySelectionClasses();
+        updateStatus();
+        renderScope();
+      }
+      return;
+    }
+
+    if (selectedId !== cid) {
+      selectedId = cid;
+      scopeId = cid;
+      scopeSamples.length = 0;
+      pushScopeSample();
+    }
+
+    applySelectionClasses();
+    updateStatus();
+    renderScope();
+  }
+
+  function makeToolId(type) {
+    while (true) {
+      placeCounter++;
+      var id = type + String(placeCounter);
+      if (!compById.has(id)) return id;
+    }
+  }
+
+  function placeAtPoint(type, e) {
+    var id = makeToolId(type);
+    var rect = board.getBoundingClientRect();
+
+    var x = Math.round((e.clientX - rect.left - 42) / 8) * 8;
+    var y = Math.round((e.clientY - rect.top - 32) / 8) * 8;
+
+    var pos = clampToBoard(x, y);
+
+    if (addInternal(type, id, pos.x, pos.y, 0, 0, DEFAULT_PERIOD)) {
+      commitChanges();
+      selectGate(id);
+    }
+  }
+
+  function addInternal(type, id, x, y, value, prev, period) {
+    var cid = validComponentId(id);
+    if (!cid || !TYPE_SET.has(type) || compById.has(cid)) return false;
+
+    pushHistory();
+    var pos = clampToBoard(x, y);
+    createComponent(type, cid, pos.x, pos.y, value, prev, period);
+    return true;
+  }
+
+  function addApi(type, id) {
+    var cid = validComponentId(id);
+    if (!cid || !TYPE_SET.has(type)) return id;
+
+    if (compById.has(cid)) return cid;
+
+    var pos = nextGridPosition();
+    if (addInternal(type, cid, pos.x, pos.y, 0, 0, DEFAULT_PERIOD)) {
+      commitChanges();
+    }
+
+    return cid;
+  }
+
+  function connectApi(srcId, srcPin, dstId, dstPin) {
+    var sid = validComponentId(srcId);
+    var did = validComponentId(dstId);
+
+    if (!sid || !did) return;
+    if (typeof srcPin !== 'string' || typeof dstPin !== 'string') return;
+
+    var src = compById.get(sid);
+    var dst = compById.get(did);
+
+    if (!src || !dst) return;
+    if (!isOutputPin(src.type, srcPin) || !isInputPin(dst.type, dstPin)) return;
+
+    var key = dst.inputKeys[dstPin];
+    if (!key) return;
+
+    var old = drivers.get(key);
+
+    if (old && old.srcId === sid && old.srcPin === srcPin) {
+      if (!wireEls.has(key)) {
+        createWireElement(key);
+        refreshUI();
+        saveState();
+      }
+      return;
+    }
+
+    pushHistory();
+
+    if (old) {
+      removeWireElement(key);
+    }
+
+    drivers.set(key, {
+      srcId: sid,
+      srcPin: srcPin,
+      dstId: did,
+      dstPin: dstPin
+    });
+
+    createWireElement(key);
+    commitChanges();
+  }
+
+  function disconnectApi(dstId, dstPin) {
+    var did = validComponentId(dstId);
+    if (!did) return;
+    if (typeof dstPin !== 'string') return;
+
+    var dst = compById.get(did);
+    if (!dst) return;
+
+    var key = dst.inputKeys[dstPin];
+    if (!key) return;
+
+    if (!drivers.has(key)) {
+      if (wireEls.has(key)) {
+        removeWireElement(key);
+        refreshUI();
+        saveState();
+      }
+      return;
+    }
+
+    pushHistory();
+    removeWireElement(key);
+    drivers.delete(key);
+    commitChanges();
+  }
+
+  function removeApi(id) {
+    var cid = validComponentId(id);
+    if (!cid) return;
+
+    var comp = compById.get(cid);
+    if (!comp) return;
+
+    pushHistory();
+
+    if (drag && drag.srcId === cid) {
+      cancelDrag();
+    }
+
+    var keys = [];
+    drivers.forEach(function (d, key) {
+      if (d.dstId === cid || d.srcId === cid) keys.push(key);
+    });
+
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      removeWireElement(key);
+      drivers.delete(key);
+    }
+
+    var idx = components.indexOf(comp);
+    if (idx >= 0) components.splice(idx, 1);
+    compById.delete(cid);
+
+    if (comp.el && comp.el.parentNode) comp.el.parentNode.removeChild(comp.el);
+
+    if (selectedId === cid) {
+      selectedId = null;
+      scopeId = null;
+      scopeSamples.length = 0;
+    }
+
+    commitChanges();
+  }
+
+  function setApi(id, value) {
+    var cid = validComponentId(id);
+    if (!cid) return;
+
+    var comp = compById.get(cid);
+    if (!comp || comp.type !== 'in') return;
+
+    var v;
+
+    if (value === 0 || value === '0' || value === false) {
+      v = 0;
+    } else if (value === 1 || value === '1' || value === true) {
+      v = 1;
+    } else {
+      var num = Number(value);
+      if (!Number.isFinite(num) || (num !== 0 && num !== 1)) return;
+      v = num === 1 ? 1 : 0;
+    }
+
+    if (cleanVal(comp.val) === v) return;
+
+    pushHistory();
+    comp.val = v;
+
+    if (selectedId === cid) {
+      scopeId = cid;
+      pushScopeSample();
+    }
+
+    commitChanges();
+  }
+
+  function setClockApi(id, period) {
+    var cid = validComponentId(id);
+    if (!cid) return;
+
+    var comp = compById.get(cid);
+    if (!comp || comp.type !== 'clk') return;
+
+    var raw = Number(period);
+    if (!Number.isFinite(raw)) return;
+
+    var p = Math.floor(raw);
+    if (p < 2 || (p % 2) !== 0) return;
+
+    var changed = false;
+
+    if (comp.period !== p) {
+      pushHistory();
+      comp.period = p;
+      changed = true;
+    }
+
+    var nv = waveform(p, time);
+    if (nv !== cleanVal(comp.val)) {
+      comp.val = nv;
+      changed = true;
+    }
+
+    if (changed) commitChanges();
+  }
+
+  function getApi(id, pin, argc) {
+    var cid = validComponentId(id);
+    if (!cid) return 0;
+
+    var comp = compById.get(cid);
+    if (!comp) return 0;
+
+    if (argc > 1 && pin !== undefined && pin !== null) {
+      if (typeof pin !== 'string') return 0;
+      if (isOutputPin(comp.type, pin)) return cleanVal(comp.val);
+      if (isInputPin(comp.type, pin)) return inputValue(comp, pin);
+      if (comp.type === 'out' && pin === 'A') return inputValue(comp, pin);
+      return 0;
+    }
+
+    if (comp.type === 'out') return inputValue(comp, 'A');
+    return cleanVal(comp.val);
+  }
+
+  function doUndo() {
+    if (history.length === 0) return;
+
+    var snap = history.pop();
+    pause();
+    cancelDrag();
+    applyHistorySnapshot(snap);
+    commitChanges();
+  }
+
+  function doReset() {
+    pause();
+    cancelDrag();
+    clearBoardForRebuild();
+
+    time = 0;
+    stable = true;
+    selectedId = null;
+    scopeId = null;
+    scopeSamples.length = 0;
+
+    setTool('select');
+    history.length = 0;
+
+    refreshUI();
+    saveState();
+    saveHistory();
+  }
+
+  function isTextFocus() {
+    var el = document.activeElement;
+    if (!el) return false;
+
+    var tag = el.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'OPTION') return true;
+
+    if (el.isContentEditable) return true;
+    return false;
+  }
+
+  function beginDrag(pinEl, e) {
+    var gateEl = pinEl.closest('[data-gate]');
+    if (!gateEl) return false;
+
+    var id = gateEl.getAttribute('data-gate');
+    var comp = compById.get(id);
+    if (!comp) return false;
+
+    var pin = pinEl.getAttribute('data-pin');
+    if (!isOutputPin(comp.type, pin)) return false;
+
+    cancelDrag();
+
+    drag = {
+      srcId: id,
+      srcPin: pin,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+      el: document.createElementNS('http://www.w3.org/2000/svg', 'polyline')
+    };
+
+    drag.el.setAttribute('class', 'ghost');
+    drag.el.setAttribute('data-ghost', '');
+    ghostLayer.appendChild(drag.el);
+
+    updateGhost(e);
+
+    document.addEventListener('pointermove', onDragMove);
+    document.addEventListener('pointerup', onDragUp);
+    document.addEventListener('pointercancel', onDragUp);
+
+    return true;
+  }
+
+  function updateGhost(e) {
+    if (!drag) return;
+
+    var src = compById.get(drag.srcId);
+    if (!src) {
+      cancelDrag();
+      return;
+    }
+
+    var rect = board.getBoundingClientRect();
+    var sp = pinPoint(src, drag.srcPin);
+    var dx = e.clientX - rect.left;
+    var dy = e.clientY - rect.top;
+
+    var points = routePoints(sp.x, sp.y, dx, dy);
+    drag.el.setAttribute('points', pointsToString(points));
+  }
+
+  function cancelDrag() {
+    if (!drag) return;
+
+    if (drag.el && drag.el.parentNode) drag.el.parentNode.removeChild(drag.el);
+
+    document.removeEventListener('pointermove', onDragMove);
+    document.removeEventListener('pointerup', onDragUp);
+    document.removeEventListener('pointercancel', onDragUp);
+
+    drag = null;
+  }
+
+  function onDragMove(e) {
+    try {
+      if (!drag) return;
+
+      var dx = e.clientX - drag.startX;
+      var dy = e.clientY - drag.startY;
+
+      if (dx * dx + dy * dy > 16) drag.moved = true;
+
+      updateGhost(e);
+    } catch (err) {
+      cancelDrag();
+    }
+  }
+
+  function onDragUp(e) {
+    try {
+      var d = drag;
+      cancelDrag();
+
+      if (!d) return;
+
+      if (!d.moved) {
+        selectGate(d.srcId);
+
+        var comp = compById.get(d.srcId);
+        if (comp && comp.type === 'in' && tool === 'select') {
+          setApi(comp.id, cleanVal(comp.val) ? 0 : 1);
+        }
+
+        return;
+      }
+
+      var drop = findDropTarget(e.clientX, e.clientY);
+      if (drop && drop.pin) {
+        connectApi(d.srcId, d.srcPin, drop.id, drop.pin);
+      }
+    } catch (err) {
+      cancelDrag();
+    }
+  }
+
+  function findDropTarget(clientX, clientY) {
+    var el = document.elementFromPoint(clientX, clientY);
+    if (!el || !el.closest) return null;
+
+    var gateEl = el.closest('[data-gate]');
+    if (!gateEl) return null;
+
+    var id = gateEl.getAttribute('data-gate');
+    var comp = compById.get(id);
+    if (!comp || !comp.pinEls) return null;
+
+    var best = null;
+    var bestDist = Infinity;
+
+    for (var i = 0; i < comp.pinEls.length; i++) {
+      var pe = comp.pinEls[i];
+      if (pe.out) continue;
+
+      var r = pe.el.getBoundingClientRect();
+      var cx = r.left + r.width / 2;
+      var cy = r.top + r.height / 2;
+      var dx = cx - clientX;
+      var dy = cy - clientY;
+      var dist = dx * dx + dy * dy;
+
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = pe;
+      }
+    }
+
+    if (!best || bestDist > 2500) return null;
+    return { id: id, pin: best.pin };
+  }
+
+  function handleGateClick(gateEl) {
+    var id = gateEl.getAttribute('data-gate');
+    var comp = compById.get(id);
+    if (!comp) return;
+
+    selectGate(id);
+
+    if (tool === 'select' && comp.type === 'in') {
+      setApi(comp.id, cleanVal(comp.val) ? 0 : 1);
+    }
+  }
+
+  board.addEventListener('pointerdown', function (e) {
+    try {
+      if (e.isPrimary === false) return;
+      if (typeof e.button === 'number' && e.button !== 0) return;
+
+      var target = e.target;
+      if (!target || !target.closest) return;
+
+      var pinEl = target.closest('[data-pin]');
+      if (pinEl) {
+        if (beginDrag(pinEl, e)) return;
+
+        var gateElForPin = pinEl.closest('[data-gate]');
+        if (gateElForPin) handleGateClick(gateElForPin);
+        return;
+      }
+
+      var gateEl = target.closest('[data-gate]');
+      if (gateEl) {
+        handleGateClick(gateEl);
+        return;
+      }
+
+      if (tool !== 'select' && TYPE_SET.has(tool)) {
+        placeAtPoint(tool, e);
+      } else {
+        selectGate(null);
+      }
+    } catch (err) {
+      // Never let pointer interaction throw.
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    try {
+      if (isTextFocus()) return;
+
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        if (!e.repeat) setRun(!running);
+        return;
+      }
+
+      if (e.key === 'Escape' || e.code === 'Escape') {
+        setTool('select');
+        return;
+      }
+
+      if (e.key === 'Delete' || e.code === 'Delete' || e.key === 'Backspace' || e.code === 'Backspace') {
+        e.preventDefault();
+        if (selectedId && !e.repeat) {
+          removeApi(selectedId);
+          selectedId = null;
+          applySelectionClasses();
+          updateStatus();
+          renderScope();
+        }
+      }
+    } catch (err) {
+      // Keyboard handlers must not throw.
+    }
+  });
+
+  for (var tb = 0; tb < TOOL_BUTTONS.length; tb++) {
+    (function (btn) {
+      btn.addEventListener('click', function () {
+        try {
+          setTool(btn.getAttribute('data-type'));
+        } catch (err) {
+          // Tool buttons must not throw.
+        }
+      });
+    })(TOOL_BUTTONS[tb]);
+  }
+
+  tickBtn.addEventListener('click', function () {
+    try {
+      doTick(1, 1);
+    } catch (err) {
+      // Transport buttons must not throw.
+    }
+  });
+
+  runBtn.addEventListener('click', function () {
+    try {
+      setRun(!running);
+    } catch (err) {
+      // Transport buttons must not throw.
+    }
+  });
+
+  resetBtn.addEventListener('click', function () {
+    try {
+      doReset();
+    } catch (err) {
+      // Transport buttons must not throw.
+    }
+  });
+
+  undoBtn.addEventListener('click', function () {
+    try {
+      doUndo();
+    } catch (err) {
+      // Transport buttons must not throw.
+    }
+  });
+
+  window.addEventListener('resize', function () {
+    try {
+      resizeBoard();
+    } catch (err) {
+      // Resize must not throw.
+    }
+  });
+
+  window.__arena = {
+    reset: function () {
+      try {
+        doReset();
+      } catch (e) {
+        // API methods must not throw.
+      }
+    },
+    add: function (type, id) {
+      try {
+        return addApi(type, id);
+      } catch (e) {
+        return id;
+      }
+    },
+    connect: function (srcId, srcPin, dstId, dstPin) {
+      try {
+        connectApi(srcId, srcPin, dstId, dstPin);
+      } catch (e) {
+        // API methods must not throw.
+      }
+    },
+    disconnect: function (dstId, dstPin) {
+      try {
+        disconnectApi(dstId, dstPin);
+      } catch (e) {
+        // API methods must not throw.
+      }
+    },
+    remove: function (id) {
+      try {
+        removeApi(id);
+      } catch (e) {
+        // API methods must not throw.
+      }
+    },
+    set: function (id, value) {
+      try {
+        setApi(id, value);
+      } catch (e) {
+        // API methods must not throw.
+      }
+    },
+    get: function (id, pin) {
+      try {
+        return getApi(id, pin, arguments.length);
+      } catch (e) {
+        return 0;
+      }
+    },
+    setClock: function (id, period) {
+      try {
+        setClockApi(id, period);
+      } catch (e) {
+        // API methods must not throw.
+      }
+    },
+    tick: function (n) {
+      try {
+        doTick(n, arguments.length);
+      } catch (e) {
+        // API methods must not throw.
+      }
+    },
+    time: function () {
+      try {
+        return time;
+      } catch (e) {
+        return 0;
+      }
+    },
+    run: function (on) {
+      try {
+        if (arguments.length > 0 && on !== undefined) {
+          setRun(Boolean(on));
+        } else {
+          setRun(!running);
+        }
+      } catch (e) {
+        // API methods must not throw.
+      }
+    },
+    stable: function () {
+      try {
+        return stable;
+      } catch (e) {
+        return true;
+      }
+    },
+    undo: function () {
+      try {
+        doUndo();
+      } catch (e) {
+        // API methods must not throw.
+      }
+    },
+    list: function () {
+      try {
+        var out = [];
+        for (var i = 0; i < components.length; i++) {
+          out.push({ id: components[i].id, type: components[i].type });
+        }
+        return out;
+      } catch (e) {
+        return [];
+      }
+    }
+  };
+
+  resizeBoard();
+  loadFromStorage();
+})();
+</script>
+</body>
+</html>
+```

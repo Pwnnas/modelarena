@@ -89,7 +89,7 @@ function standingsView() {
     .join('');
   const w = S.weights;
   return `<h1>Standings</h1>
-    <p class="lede">Each model builds the same six browser apps from identical prompts. Click a score to see what passed, what failed and a recording of the app.</p>
+    <p class="lede">Each model builds the same ${S.tasks.length} browser apps from identical prompts. Click a score to see what passed, what failed and a recording of the app.</p>
     <div class="standings-wrap"><table class="standings">
       <thead><tr><th>#</th><th>Model</th><th class="num">Arena</th><th class="num">Auto</th><th class="num">Preference</th>${head}${genHead}</tr></thead>
       <tbody>${rows}</tbody>
@@ -155,7 +155,7 @@ function runStats(m, tid) {
     r.promptTokensPerSec ? ['Prompt', `${r.promptTokensPerSec} tok/s`] : null,
   ].filter(Boolean);
   const params = Object.entries(r.params ?? {}).map(([k, v]) => `${k} ${typeof v === 'object' ? JSON.stringify(v) : v}`);
-  const src = [r.servedModel ?? r.apiModel, r.endpoint, ...params].filter(Boolean).join(' · ');
+  const src = [r.servedModel ?? r.apiModel, r.provider && `via ${r.provider}`, r.endpoint, ...params].filter(Boolean).join(' · ');
   const live = S.urls[m]?.[tid] ?? '';
   const file = (name) => esc(live.replace(/index\.html$/, name));
   const links = [r.replyChars ? `<a href="${file('reply.md')}" target="_blank" rel="noopener">reply</a>` : '', r.reasoningChars ? `<a href="${file('thinking.md')}" target="_blank" rel="noopener">thinking</a>` : '']
@@ -341,7 +341,8 @@ function render() {
     if (l.dataset.view === view) l.setAttribute('aria-current', 'page');
     else l.removeAttribute('aria-current');
   }
-  document.querySelector('.meta').textContent = `${plural(S.models.length, 'model')}, ${plural(S.tasks.length, 'task')}, ${plural(S.votes.length, 'vote')}`;
+  document.querySelector('.meta').textContent = `${S.suite === 'v2' ? 'Suite v2 · ' : ''}${plural(S.models.length, 'model')}, ${plural(S.tasks.length, 'task')}, ${plural(S.votes.length, 'vote')}`;
+  document.title = S.suite === 'v2' ? 'Model Arena v2' : 'Model Arena';
   app.innerHTML = view === 'tasks' ? tasksView(a, b) : view === 'judge' ? judgeView(a) : standingsView();
   if (view === 'judge') {
     fitScreens();

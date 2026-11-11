@@ -148,9 +148,10 @@ function terrainH(x, z) {
   let r = 0, amp = 1, norm = 0, f = 0.00062, xx = px, zz = pz, ddx = 0, ddz = 0;
   for (let i = 0; i < 6; i++) {
     const n = vn(xx * f, zz * f, SH[8 + i]);
-    const sg = n < 0 ? 1 : -1;
+    const sq = Math.sqrt(n * n + 0.014);
+    const sg = -(n / sq) / 0.88873;                 // smooth derivative of the ridge shape (no discontinuity)
     ddx += amp * sg * gx_ * f; ddz += amp * sg * gz_ * f;
-    const ab = (Math.sqrt(n * n + 0.014) - 0.11832) / 0.88873;
+    const ab = (sq - 0.11832) / 0.88873;
     let rg = 1 - ab;
     rg = rg * rg;
     const damp = 1 / (1 + (ddx * ddx + ddz * ddz) * 120000);
@@ -292,7 +293,7 @@ vec3 atmo(vec3 d){
   vec3 hc = horizonCol(d);
   vec3 col = mix(hc, u_zenith, pow(y, 0.42));
   float mu = max(dot(d, u_sunDir), 0.0);
-  col += u_glow * (0.22 * pow(mu, 3.0) + 0.55 * pow(mu, 24.0) + 1.1 * pow(mu, 260.0));
+  col += u_glow * (0.16 * pow(mu, 3.0) + 0.55 * pow(mu, 24.0) + 1.1 * pow(mu, 260.0));
   return col;
 }
 vec3 stars(vec3 d){
@@ -558,8 +559,8 @@ void main(){
     float nh = max(dot(Nw, normalize(L - V)), 0.0);
     float nhm = max(dot(Nw, normalize(u_moonDir - V)), 0.0);
     float e1 = 1400.0 / (1.0 + rough * 90000.0), e2 = 160.0 / (1.0 + rough * 9000.0);
-    float amp1 = 14.0 / (1.0 + rough * 9000.0), amp2 = 0.45 + rough * 40.0;
-    vec3 spec = u_sunCol * (pow(nh, e1) * amp1 + pow(nh, e2) * amp2 + pow(nh, 22.0) * 0.05) * smoothstep(-0.02, 0.05, L.y);
+    float amp1 = 14.0 / (1.0 + rough * 9000.0), amp2 = 0.30 + min(rough * 12.0, 0.25);
+    vec3 spec = u_sunCol * (pow(nh, e1) * amp1 + pow(nh, e2) * amp2 + pow(nh, 22.0) * 0.03) * smoothstep(-0.02, 0.05, L.y);
     spec += u_moonCol * 8.0 * (pow(nhm, e1 * 0.65) * amp1 * 0.6 + pow(nhm, e2 * 0.7) * amp2) * u_star;
     col = mix(body, refl, F * ramp) + spec * (0.25 + 0.75 * F) * ramp;
     // shoreline foam
@@ -894,13 +895,13 @@ function computeAtmosphere() {
   const moonUp = smoothstepJS(-0.05, 0.25, A.moonDir[1]) * night;
   A.star = night;
   const aS = lerp3(A.ho, A.zen, 0.6);
-  A.ambSky = [aS[0] * 0.62 + 0.016 * moonUp * 0.6, aS[1] * 0.62 + 0.026 * moonUp * 0.6 + 0.0012 * night, aS[2] * 0.62 + 0.060 * moonUp * 0.6 + 0.003 * night];
+  A.ambSky = [aS[0] * 0.62 + 0.008 * moonUp * 0.6, aS[1] * 0.62 + 0.013 * moonUp * 0.6 + 0.0006 * night, aS[2] * 0.62 + 0.032 * moonUp * 0.6 + 0.0015 * night];
   const g = lerp3(A.ho, A.hs, 0.5);
   const sunUp = smoothstepJS(-2, 12, deg);
   A.ambGnd = [g[0] * 0.20 * 0.9 + A.sunCol[0] * 0.035 * sunUp, g[1] * 0.20 * 0.8 + A.sunCol[1] * 0.032 * sunUp, g[2] * 0.20 * 0.7 + A.sunCol[2] * 0.025 * sunUp];
-  A.ambGnd[0] += 0.002 * night; A.ambGnd[1] += 0.003 * night; A.ambGnd[2] += 0.006 * night;
+  A.ambGnd[0] += 0.001 * night; A.ambGnd[1] += 0.0015 * night; A.ambGnd[2] += 0.003 * night;
   // moon light
-  const mk = 0.20 * moonUp;
+  const mk = 0.095 * moonUp;
   A.moonCol = [0.45 * mk, 0.58 * mk, 1.0 * mk];
   const twi = Math.exp(-Math.pow(deg / 14, 2));
   A.fogB = 0.00016 * (1 + 0.5 * twi);
@@ -1289,7 +1290,7 @@ function frame(now) {
   fpsFrames++;
   if (now - fpsT >= 500) {
     const fps = fpsFrames * 1000 / (now - fpsT);
-    elFps.textContent = Math.round(fps) + ' fps';
+    if (!frozen) elFps.textContent = Math.round(fps) + ' fps';
     fpsFrames = 0; fpsT = now;
     if (fps < 24 && performance.now() > 6000) { if (++slowFrames >= 4 && pixelScale > 0.6) { pixelScale *= 0.85; slowFrames = 0; resize(); } }
     else slowFrames = 0;
@@ -1324,7 +1325,6 @@ const api = {
   getCamera() { return { x: cam.x, y: cam.y, z: cam.z, yaw: cam.yaw, pitch: cam.pitch }; },
   terrainHeight(x, z) { x = Number(x); z = Number(z); return (isFinite(x) && isFinite(z)) ? terrainH(x, z) : 0; },
   stats() { return { chunks: chunks.size, triangles: lastTris }; },
-  _dbg() { return { visible: visible.map(c => ({level:c.level,ix:c.ix,iz:c.iz,x0:c.x0,z0:c.z0,size:c.size,minY:c.minY,maxY:c.maxY})), cam: {...cam}, RANGES, MORPH_START }; },
 };
 Object.defineProperty(window, '__arena', { value: api, writable: false, configurable: true });
 

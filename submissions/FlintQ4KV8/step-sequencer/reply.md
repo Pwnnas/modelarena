@@ -1,0 +1,789 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse — Synthesized Drum Machine</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #07090d;
+    color: #e9edf5;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+  }
+  #app { display: flex; flex-direction: column; min-height: 100vh; }
+  #topbar {
+    display: flex; align-items: center; gap: 16px; padding: 10px 16px;
+    background: linear-gradient(180deg, #12151f, #0c0f16);
+    border-bottom: 1px solid #232a3a; flex-wrap: wrap;
+  }
+  .brand { font-size: 22px; font-weight: 800; letter-spacing: 8px;
+    background: linear-gradient(90deg, #00e5ff, #7b2ff7);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .transport { display: flex; align-items: center; gap: 8px; }
+  #play {
+    width: 56px; height: 56px; border-radius: 50%; border: 2px solid #00e5ff;
+    background: rgba(0, 229, 255, 0.07); color: #00e5ff; font-size: 22px; cursor: pointer;
+    transition: all .15s ease;
+  }
+  #play:hover { transform: scale(1.06); background: rgba(0, 229, 255, 0.14); }
+  #play.playing { background: #00e5ff; color: #04131a; box-shadow: 0 0 34px rgba(0, 229, 255, 0.75); animation: glowPulse 1.4s ease-in-out infinite; }
+  @keyframes glowPulse { 0%, 100% { box-shadow: 0 0 18px rgba(0, 229, 255, 0.45); } 50% { box-shadow: 0 0 40px rgba(0, 229, 255, 0.9); } }
+  .hbtn {
+    background: #171b28; border: 1px solid #232a3a; color: #e9edf5; padding: 8px 12px;
+    border-radius: 6px; cursor: pointer; font-size: 12px; letter-spacing: 0.5px;
+  }
+  .hbtn:hover { background: #1f2536; }
+  .controls { display: flex; align-items: center; gap: 16px; margin-left: auto; }
+  .ctl { display: flex; align-items: center; gap: 8px; font-size: 10px; color: #8b93a7;
+    text-transform: uppercase; letter-spacing: 1.2px; }
+  .ctl input[type="range"] { width: 120px; accent-color: #00e5ff; cursor: pointer; }
+  .ctl output { font-size: 13px; color: #e9edf5; min-width: 36px; text-align: right; font-weight: 700; }
+  #mixer { display: flex; gap: 8px; padding: 10px 16px; overflow-x: auto; }
+  .channel {
+    display: flex; align-items: center; gap: 8px; background: #0e1118; border: 1px solid #1f2635;
+    border-radius: 8px; padding: 6px 10px; min-width: 152px; flex: 1;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--tc); box-shadow: 0 0 8px var(--tc); flex: none; }
+  .cname { font-size: 11px; font-weight: 700; color: #e9edf5; white-space: nowrap; }
+  .mute {
+    flex: none; width: 30px; height: 24px; border-radius: 5px; border: 1px solid #2a3040;
+    background: #141824; color: #8b93a7; font-size: 11px; font-weight: 700; cursor: pointer; padding: 0;
+  }
+  .mute[aria-pressed="true"] { background: #ff2e63; color: #fff; border-color: #ff2e63; box-shadow: 0 0 10px rgba(255, 46, 99, 0.75); }
+  .vol { flex: 1; min-width: 36px; accent-color: #00e5ff; cursor: pointer; }
+  #sequencer {
+    flex: 1; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;
+    overflow-y: auto; max-height: calc(100vh - 250px);
+  }
+  .track-row { display: flex; align-items: center; gap: 10px; background: #0e1118; border: 1px solid #1f2635; border-radius: 8px; padding: 6px 10px; }
+  .track-name { width: 108px; flex: none; font-size: 11px; font-weight: 700; color: #e9edf5; letter-spacing: 0.4px; white-space: nowrap; }
+  .steps { flex: 1; display: grid; grid-template-columns: repeat(16, 1fr); gap: 6px; min-width: 0; }
+  .step {
+    appearance: none; border: 1px solid #262c3d; background: #141824; color: #5d6579; height: 30px;
+    border-radius: 5px; cursor: pointer; font-size: 10px; font-weight: 700; display: flex;
+    align-items: center; justify-content: center; padding: 0; transition: background 90ms ease, box-shadow 90ms ease, color 90ms ease;
+  }
+  .step:hover { border-color: #3a4358; }
+  .step.active { background: var(--tc); box-shadow: 0 0 12px 1px var(--tc); color: #0a0d14; }
+  .step.beat { box-shadow: inset 5px 0 0 rgba(255, 255, 255, 0.14); }
+  .step.playing { box-shadow: 0 0 0 2px #eafffb, 0 0 14px rgba(234, 255, 251, 0.85); }
+  .step.hit { animation: stepHit 0.13s ease-out; }
+  @keyframes stepHit { 0% { transform: scale(1); } 35% { transform: scale(0.76); } 100% { transform: scale(1); } }
+  #viz { width: 100%; height: 140px; background: #0b0e14; display: block; border-top: 1px solid #1f2635; }
+  footer { padding: 6px 16px; font-size: 10px; color: #5b6379; text-align: center; letter-spacing: 2px; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand">PULSE</div>
+    <div class="transport">
+      <button id="play" class="play-btn" type="button">▶</button>
+      <button id="clear" class="hbtn" type="button">Clear</button>
+      <button id="randomize" class="hbtn" type="button">Random</button>
+      <select id="preset" class="hbtn" type="button">
+        <option value="0">Preset · Demo</option>
+        <option value="1">Preset · House</option>
+        <option value="2">Preset · Techno</option>
+      </select>
+    </div>
+    <div class="controls">
+      <label class="ctl" for="tempo">Tempo <input id="tempo" type="range" min="40" max="240" value="120"><output id="tempo-val">120</output></label>
+      <label class="ctl" for="swing">Swing <input id="swing" type="range" min="0" max="100" value="0"><output id="swing-val">0</output></label>
+    </div>
+  </header>
+  <div id="mixer">
+    <div class="channel" data-channel="0"><span class="dot" style="--tc:#ff2e63"></span><span class="cname">Kick</span><button type="button" class="mute" data-mute="0" aria-pressed="false">M</button><input type="range" class="vol" data-volume="0" min="0" max="100" value="80" aria-label="Kick volume"></div>
+    <div class="channel" data-channel="1"><span class="dot" style="--tc:#ff9f43"></span><span class="cname">Snare</span><button type="button" class="mute" data-mute="1" aria-pressed="false">M</button><input type="range" class="vol" data-volume="1" min="0" max="100" value="80" aria-label="Snare volume"></div>
+    <div class="channel" data-channel="2"><span class="dot" style="--tc:#feca57"></span><span class="cname">Closed Hat</span><button type="button" class="mute" data-mute="2" aria-pressed="false">M</button><input type="range" class="vol" data-volume="2" min="0" max="100" value="80" aria-label="Closed Hat volume"></div>
+    <div class="channel" data-channel="3"><span class="dot" style="--tc:#4dd8ff"></span><span class="cname">Open Hat</span><button type="button" class="mute" data-mute="3" aria-pressed="false">M</button><input type="range" class="vol" data-volume="3" min="0" max="100" value="80" aria-label="Open Hat volume"></div>
+    <div class="channel" data-channel="4"><span class="dot" style="--tc:#ff6b81"></span><span class="cname">Clap</span><button type="button" class="mute" data-mute="4" aria-pressed="false">M</button><input type="range" class="vol" data-volume="4" min="0" max="100" value="80" aria-label="Clap volume"></div>
+    <div class="channel" data-channel="5"><span class="dot" style="--tc:#a55eea"></span><span class="cname">Low Tom</span><button type="button" class="mute" data-mute="5" aria-pressed="false">M</button><input type="range" class="vol" data-volume="5" min="0" max="100" value="80" aria-label="Low Tom volume"></div>
+    <div class="channel" data-channel="6"><span class="dot" style="--tc:#7bed9f"></span><span class="cname">High Tom</span><button type="button" class="mute" data-mute="6" aria-pressed="false">M</button><input type="range" class="vol" data-volume="6" min="0" max="100" value="80" aria-label="High Tom volume"></div>
+    <div class="channel" data-channel="7"><span class="dot" style="--tc:#70a1ff"></span><span class="cname">Cowbell</span><button type="button" class="mute" data-mute="7" aria-pressed="false">M</button><input type="range" class="vol" data-volume="7" min="0" max="100" value="80" aria-label="Cowbell volume"></div>
+  </div>
+  <div id="sequencer" data-playhead="-1">
+    <div class="track-row" data-track-index="0">
+      <div class="track-name">Kick</div>
+      <div class="steps">
+        <button type="button" class="step beat" data-track="0" data-step="0" aria-pressed="false">0</button>
+        <button type="button" class="step" data-track="0" data-step="1" aria-pressed="false">1</button>
+        <button type="button" class="step" data-track="0" data-step="2" aria-pressed="false">2</button>
+        <button type="button" class="step" data-track="0" data-step="3" aria-pressed="false">3</button>
+        <button type="button" class="step beat" data-track="0" data-step="4" aria-pressed="false">4</button>
+        <button type="button" class="step" data-track="0" data-step="5" aria-pressed="false">5</button>
+        <button type="button" class="step" data-track="0" data-step="6" aria-pressed="false">6</button>
+        <button type="button" class="step" data-track="0" data-step="7" aria-pressed="false">7</button>
+        <button type="button" class="step" data-track="0" data-step="8" aria-pressed="false">8</button>
+        <button type="button" class="step" data-track="0" data-step="9" aria-pressed="false">9</button>
+        <button type="button" class="step" data-track="0" data-step="10" aria-pressed="false">10</button>
+        <button type="button" class="step" data-track="0" data-step="11" aria-pressed="false">11</button>
+        <button type="button" class="step beat" data-track="0" data-step="12" aria-pressed="false">12</button>
+        <button type="button" class="step" data-track="0" data-step="13" aria-pressed="false">13</button>
+        <button type="button" class="step" data-track="0" data-step="14" aria-pressed="false">14</button>
+        <button type="button" class="step" data-track="0" data-step="15" aria-pressed="false">15</button>
+      </div>
+    </div>
+    <div class="track-row" data-track-index="1">
+      <div class="track-name">Snare</div>
+      <div class="steps">
+        <button type="button" class="step" data-track="1" data-step="0" aria-pressed="false">0</button>
+        <button type="button" class="step" data-track="1" data-step="1" aria-pressed="false">1</button>
+        <button type="button" class="step" data-track="1" data-step="2" aria-pressed="false">2</button>
+        <button type="button" class="step beat" data-track="1" data-step="3" aria-pressed="false">3</button>
+        <button type="button" class="step beat" data-track="1" data-step="4" aria-pressed="false">4</button>
+        <button type="button" class="step" data-track="1" data-step="5" aria-pressed="false">5</button>
+        <button type="button" class="step" data-track="1" data-step="6" aria-pressed="false">6</button>
+        <button type="button" class="step beat" data-track="1" data-step="7" aria-pressed="false">7</button>
+        <button type="button" class="step" data-track="1" data-step="8" aria-pressed="false">8</button>
+        <button type="button" class="step" data-track="1" data-step="9" aria-pressed="false">9</button>
+        <button type="button" class="step" data-track="1" data-step="10" aria-pressed="false">10</button>
+        <button type="button" class="step beat" data-track="1" data-step="11" aria-pressed="false">11</button>
+        <button type="button" class="step beat" data-track="1" data-step="12" aria-pressed="false">12</button>
+        <button type="button" class="step" data-track="1" data-step="13" aria-pressed="false">13</button>
+        <button type="button" class="step" data-track="1" data-step="14" aria-pressed="false">14</button>
+        <button type="button" class="step beat" data-track="1" data-step="15" aria-pressed="false">15</button>
+      </div>
+    </div>
+    <div class="track-row" data-track-index="2">
+      <div class="track-name">Closed Hat</div>
+      <div class="steps">
+        <button type="button" class="step beat" data-track="2" data-step="0" aria-pressed="false">0</button>
+        <button type="button" class="step" data-track="2" data-step="1" aria-pressed="false">1</button>
+        <button type="button" class="step" data-track="2" data-step="2" aria-pressed="false">2</button>
+        <button type="button" class="step" data-track="2" data-step="3" aria-pressed="false">3</button>
+        <button type="button" class="step beat" data-track="2" data-step="4" aria-pressed="false">4</button>
+        <button type="button" class="step" data-track="2" data-step="5" aria-pressed="false">5</button>
+        <button type="button" class="step" data-track="2" data-step="6" aria-pressed="false">6</button>
+        <button type="button" class="step beat" data-track="2" data-step="7" aria-pressed="false">7</button>
+        <button type="button" class="step beat" data-track="2" data-step="8" aria-pressed="false">8</button>
+        <button type="button" class="step" data-track="2" data-step="9" aria-pressed="false">9</button>
+        <button type="button" class="step" data-track="2" data-step="10" aria-pressed="false">10</button>
+        <button type="button" class="step beat" data-track="2" data-step="11" aria-pressed="false">11</button>
+        <button type="button" class="step beat" data-track="2" data-step="12" aria-pressed="false">12</button>
+        <button type="button" class="step" data-track="2" data-step="13" aria-pressed="false">13</button>
+        <button type="button" class="step" data-track="2" data-step="14" aria-pressed="false">14</button>
+        <button type="button" class="step beat" data-track="2" data-step="15" aria-pressed="false">15</button>
+      </div>
+    </div>
+    <div class="track-row" data-track-index="3">
+      <div class="track-name">Open Hat</div>
+      <div class="steps">
+        <button type="button" class="step" data-track="3" data-step="0" aria-pressed="false">0</button>
+        <button type="button" class="step" data-track="3" data-step="1" aria-pressed="false">1</button>
+        <button type="button" class="step" data-track="3" data-step="2" aria-pressed="false">2</button>
+        <button type="button" class="step beat" data-track="3" data-step="3" aria-pressed="false">3</button>
+        <button type="button" class="step" data-track="3" data-step="4" aria-pressed="false">4</button>
+        <button type="button" class="step" data-track="3" data-step="5" aria-pressed="false">5</button>
+        <button type="button" class="step" data-track="3" data-step="6" aria-pressed="false">6</button>
+        <button type="button" class="step beat" data-track="3" data-step="7" aria-pressed="false">7</button>
+        <button type="button" class="step" data-track="3" data-step="8" aria-pressed="false">8</button>
+        <button type="button" class="step" data-track="3" data-step="9" aria-pressed="false">9</button>
+        <button type="button" class="step" data-track="3" data-step="10" aria-pressed="false">10</button>
+        <button type="button" class="step beat" data-track="3" data-step="11" aria-pressed="false">11</button>
+        <button type="button" class="step beat" data-track="3" data-step="12" aria-pressed="false">12</button>
+        <button type="button" class="step" data-track="3" data-step="13" aria-pressed="false">13</button>
+        <button type="button" class="step" data-track="3" data-step="14" aria-pressed="false">14</button>
+        <button type="button" class="step beat" data-track="3" data-step="15" aria-pressed="false">15</button>
+      </div>
+    </div>
+    <div class="track-row" data-track-index="4">
+      <div class="track-name">Clap</div>
+      <div class="steps">
+        <button type="button" class="step" data-track="4" data-step="0" aria-pressed="false">0</button>
+        <button type="button" class="step" data-track="4" data-step="1" aria-pressed="false">1</button>
+        <button type="button" class="step" data-track="4" data-step="2" aria-pressed="false">2</button>
+        <button type="button" class="step beat" data-track="4" data-step="3" aria-pressed="false">3</button>
+        <button type="button" class="step beat" data-track="4" data-step="4" aria-pressed="false">4</button>
+        <button type="button" class="step" data-track="4" data-step="5" aria-pressed="false">5</button>
+        <button type="button" class="step" data-track="4" data-step="6" aria-pressed="false">6</button>
+        <button type="button" class="step beat" data-track="4" data-step="7" aria-pressed="false">7</button>
+        <button type="button" class="step" data-track="4" data-step="8" aria-pressed="false">8</button>
+        <button type="button" class="step" data-track="4" data-step="9" aria-pressed="false">9</button>
+        <button type="button" class="step" data-track="4" data-step="10" aria-pressed="false">10</button>
+        <button type="button" class="step beat" data-track="4" data-step="11" aria-pressed="false">11</button>
+        <button type="button" class="step beat" data-track="4" data-step="12" aria-pressed="false">12</button>
+        <button type="button" class="step" data-track="4" data-step="13" aria-pressed="false">13</button>
+        <button type="button" class="step" data-track="4" data-step="14" aria-pressed="false">14</button>
+        <button type="button" class="step beat" data-track="4" data-step="15" aria-pressed="false">15</button>
+      </div>
+    </div>
+    <div class="track-row" data-track-index="5">
+      <div class="track-name">Low Tom</div>
+      <div class="steps">
+        <button type="button" class="step" data-track="5" data-step="0" aria-pressed="false">0</button>
+        <button type="button" class="step" data-track="5" data-step="1" aria-pressed="false">1</button>
+        <button type="button" class="step" data-track="5" data-step="2" aria-pressed="false">2</button>
+        <button type="button" class="step beat" data-track="5" data-step="3" aria-pressed="false">3</button>
+        <button type="button" class="step beat" data-track="5" data-step="4" aria-pressed="false">4</button>
+        <button type="button" class="step" data-track="5" data-step="5" aria-pressed="false">5</button>
+        <button type="button" class="step" data-track="5" data-step="6" aria-pressed="false">6</button>
+        <button type="button" class="step beat" data-track="5" data-step="7" aria-pressed="false">7</button>
+        <button type="button" class="step" data-track="5" data-step="8" aria-pressed="false">8</button>
+        <button type="button" class="step" data-track="5" data-step="9" aria-pressed="false">9</button>
+        <button type="button" class="step" data-track="5" data-step="10" aria-pressed="false">10</button>
+        <button type="button" class="step beat" data-track="5" data-step="11" aria-pressed="false">11</button>
+        <button type="button" class="step beat" data-track="5" data-step="12" aria-pressed="false">12</button>
+        <button type="button" class="step" data-track="5" data-step="13" aria-pressed="false">13</button>
+        <button type="button" class="step" data-track="5" data-step="14" aria-pressed="false">14</button>
+        <button type="button" class="step beat" data-track="5" data-step="15" aria-pressed="false">15</button>
+      </div>
+    </div>
+    <div class="track-row" data-track-index="6">
+      <div class="track-name">High Tom</div>
+      <div class="steps">
+        <button type="button" class="step" data-track="6" data-step="0" aria-pressed="false">0</button>
+        <button type="button" class="step" data-track="6" data-step="1" aria-pressed="false">1</button>
+        <button type="button" class="step" data-track="6" data-step="2" aria-pressed="false">2</button>
+        <button type="button" class="step beat" data-track="6" data-step="3" aria-pressed="false">3</button>
+        <button type="button" class="step beat" data-track="6" data-step="4" aria-pressed="false">4</button>
+        <button type="button" class="step" data-track="6" data-step="5" aria-pressed="false">5</button>
+        <button type="button" class="step" data-track="6" data-step="6" aria-pressed="false">6</button>
+        <button type="button" class="step beat" data-track="6" data-step="7" aria-pressed="false">7</button>
+        <button type="button" class="step" data-track="6" data-step="8" aria-pressed="false">8</button>
+        <button type="button" class="step" data-track="6" data-step="9" aria-pressed="false">9</button>
+        <button type="button" class="step" data-track="6" data-step="10" aria-pressed="false">10</button>
+        <button type="button" class="step beat" data-track="6" data-step="11" aria-pressed="false">11</button>
+        <button type="button" class="step beat" data-track="6" data-step="12" aria-pressed="false">12</button>
+        <button type="button" class="step" data-track="6" data-step="13" aria-pressed="false">13</button>
+        <button type="button" class="step" data-track="6" data-step="14" aria-pressed="false">14</button>
+        <button type="button" class="step beat" data-track="6" data-step="15" aria-pressed="false">15</button>
+      </div>
+    </div>
+    <div class="track-row" data-track-index="7">
+      <div class="track-name">Cowbell</div>
+      <div class="steps">
+        <button type="button" class="step" data-track="7" data-step="0" aria-pressed="false">0</button>
+        <button type="button" class="step" data-track="7" data-step="1" aria-pressed="false">1</button>
+        <button type="button" class="step" data-track="7" data-step="2" aria-pressed="false">2</button>
+        <button type="button" class="step beat" data-track="7" data-step="3" aria-pressed="false">3</button>
+        <button type="button" class="step beat" data-track="7" data-step="4" aria-pressed="false">4</button>
+        <button type="button" class="step" data-track="7" data-step="5" aria-pressed="false">5</button>
+        <button type="button" class="step" data-track="7" data-step="6" aria-pressed="false">6</button>
+        <button type="button" class="step beat" data-track="7" data-step="7" aria-pressed="false">7</button>
+        <button type="button" class="step" data-track="7" data-step="8" aria-pressed="false">8</button>
+        <button type="button" class="step" data-track="7" data-step="9" aria-pressed="false">9</button>
+        <button type="button" class="step" data-track="7" data-step="10" aria-pressed="false">10</button>
+        <button type="button" class="step beat" data-track="7" data-step="11" aria-pressed="false">11</button>
+        <button type="button" class="step beat" data-track="7" data-step="12" aria-pressed="false">12</button>
+        <button type="button" class="step" data-track="7" data-step="13" aria-pressed="false">13</button>
+        <button type="button" class="step" data-track="7" data-step="14" aria-pressed="false">14</button>
+        <button type="button" class="step beat" data-track="7" data-step="15" aria-pressed="false">15</button>
+      </div>
+    </div>
+  </div>
+  <canvas id="viz" width="1024" height="140"></canvas>
+  <footer>PULSE · 100% Synthesized · No Samples</footer>
+</div>
+<script>
+'use strict';
+
+var STORAGE_KEY = 'pulse.state.v1';
+var LOOKAHEAD = 0.12;
+var STEP_COUNT = 16;
+var TRACK_COUNT = 8;
+
+var TRACK_NAMES = ['Kick','Snare','Closed Hat','Open Hat','Clap','Low Tom','High Tom','Cowbell'];
+var TRACK_COLORS = ['#ff2e63','#ff9f43','#feca57','#4dd8ff','#ff6b81','#a55eea','#7bed9f','#70a1ff'];
+
+var patterns = [];
+var mutes = [false,false,false,false,false,false,false,false];
+var volumes = [80,80,80,80,80,80,80,80];
+var bpm = 120;
+var swing = 0;
+var stepDuration = 60 / (120 * 4);
+var swingAmount = 0;
+
+var isPlaying = false;
+var currentStep = -1;
+var nextGridTime = 0;
+var nextStepIndex = 0;
+var schedulerId = null;
+
+var audioCtx = null;
+var masterGain = null;
+var analyser = null;
+var noiseBuffer = null;
+var trackGains = [];
+var sources = [];
+
+function makePattern(markups) {
+  var p = [];
+  for (var t = 0; t < 8; t++) { p.push(new Array(16).fill(false)); }
+  for (var tm = 0; tm < 8; tm++) {
+    var steps = markups[tm] || [];
+    for (var si = 0; si < steps.length; si++) { p[tm][steps[si]] = true; }
+  }
+  return p;
+}
+
+var DEMO = makePattern([
+  [0,4,8,12],
+  [4,12],
+  [0,2,4,6,8,10,12,14],
+  [14],
+  [4,12],
+  [10],
+  [],
+  [6]
+]);
+var PRESETS = [
+  { name: 'Demo', p: DEMO },
+  { name: 'House', p: makePattern([
+    [0,4,8,12],
+    [4,12],
+    [0,2,4,6,8,10,12,14],
+    [14],
+    [4,12],
+    [],
+    [],
+    [6]
+  ])},
+  { name: 'Techno', p: makePattern([
+    [0,4,8,12],
+    [4,12],
+    [0,2,4,6,8,10,12,14],
+    [14],
+    [],
+    [10],
+    [8],
+    [6]
+  ])}
+];
+
+function loadState() {
+  var loaded = false;
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      var d = JSON.parse(raw);
+      if (d && Array.isArray(d.patterns) && d.patterns.length === 8) { patterns = d.patterns; loaded = true; }
+      if (Array.isArray(d.mutes)) { mutes = d.mutes.slice(0, 8); }
+      if (Array.isArray(d.volumes)) { volumes = d.volumes.slice(0, 8); }
+      if (typeof d.bpm === 'number') { bpm = Math.max(40, Math.min(240, d.bpm)); }
+      if (typeof d.swing === 'number') { swing = Math.max(0, Math.min(100, d.swing)); }
+    }
+  } catch (e) {}
+  if (!loaded) { patterns = DEMO.map(function (p) { return p.slice(); }); }
+  patterns = patterns.map(function (p) { return Array.isArray(p) ? p.slice(0, 16) : new Array(16).fill(false); });
+  while (patterns.length < 8) { patterns.push(new Array(16).fill(false)); }
+  stepDuration = 60 / (bpm * 4);
+  swingAmount = (swing / 100) * stepDuration / 3;
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      patterns: patterns, mutes: mutes, volumes: volumes, bpm: bpm, swing: swing
+    }));
+  } catch (e) {}
+}
+
+function ensureAudioContext() {
+  if (!audioCtx) {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AC();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.9;
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.8;
+    masterGain.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    var len = audioCtx.sampleRate;
+    noiseBuffer = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    var data = noiseBuffer.getChannelData(0);
+    for (var i = 0; i < len; i++) { data[i] = Math.random() * 2 - 1; }
+    for (var tg = 0; tg < 8; tg++) {
+      var g = audioCtx.createGain();
+      g.gain.value = (mutes[tg] ? 0 : volumes[tg] / 100);
+      trackGains[tg] = g;
+      g.connect(masterGain);
+    }
+  }
+  if (audioCtx.state === 'suspended') {
+    try {
+      var pr = audioCtx.resume();
+      if (pr && typeof pr.catch === 'function') { pr.catch(function () {}); }
+    } catch (e) {}
+  }
+  return audioCtx;
+}
+
+function playVoice(t, time) {
+  var ctx = audioCtx;
+  var tg = trackGains[t];
+  var g = ctx.createGain();
+  g.connect(tg);
+
+  if (t === 0) {
+    var osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, time);
+    osc.frequency.exponentialRampToValueAtTime(46, time + 0.11);
+    g.gain.setValueAtTime(0.9, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.28);
+    osc.connect(g);
+    osc.start(time);
+    osc.stop(time + 0.3);
+    sources.push(osc);
+    return;
+  }
+  if (t === 1) {
+    var src = ctx.createBufferSource();
+    src.buffer = noiseBuffer;
+    var bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 0.9;
+    g.gain.setValueAtTime(0.8, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+    src.connect(bp); bp.connect(g);
+    src.start(time); src.stop(time + 0.22);
+    sources.push(src);
+    var o = ctx.createOscillator(); var g2 = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 190;
+    g2.gain.setValueAtTime(0.45, time);
+    g2.gain.exponentialRampToValueAtTime(0.001, time + 0.13);
+    o.connect(g2); g2.connect(tg);
+    o.start(time); o.stop(time + 0.15);
+    sources.push(o);
+    return;
+  }
+  if (t === 2) {
+    var src2 = ctx.createBufferSource();
+    src2.buffer = noiseBuffer;
+    var hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 7500;
+    g.gain.setValueAtTime(0.32, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+    src2.connect(hp); hp.connect(g);
+    src2.start(time); src2.stop(time + 0.06);
+    sources.push(src2);
+    return;
+  }
+  if (t === 3) {
+    var src3 = ctx.createBufferSource();
+    src3.buffer = noiseBuffer;
+    var bp3 = ctx.createBiquadFilter();
+    bp3.type = 'bandpass'; bp3.frequency.value = 7800; bp3.Q.value = 1.1;
+    g.gain.setValueAtTime(0.38, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.34);
+    src3.connect(bp3); bp3.connect(g);
+    src3.start(time); src3.stop(time + 0.36);
+    sources.push(src3);
+    return;
+  }
+  if (t === 4) {
+    var src4 = ctx.createBufferSource();
+    src4.buffer = noiseBuffer;
+    var bp4 = ctx.createBiquadFilter();
+    bp4.type = 'bandpass'; bp4.frequency.value = 1400; bp4.Q.value = 1.1;
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.exponentialRampToValueAtTime(0.85, time + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.28, time + 0.055);
+    g.gain.exponentialRampToValueAtTime(0.8, time + 0.07);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.26);
+    src4.connect(bp4); bp4.connect(g);
+    src4.start(time); src4.stop(time + 0.28);
+    sources.push(src4);
+    return;
+  }
+  if (t === 5) {
+    var osc5 = ctx.createOscillator(); osc5.type = 'sine';
+    osc5.frequency.setValueAtTime(130, time);
+    osc5.frequency.exponentialRampToValueAtTime(58, time + 0.18);
+    g.gain.setValueAtTime(0.7, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.32);
+    osc5.connect(g); osc5.start(time); osc5.stop(time + 0.34);
+    sources.push(osc5);
+    return;
+  }
+  if (t === 6) {
+    var osc6 = ctx.createOscillator(); osc6.type = 'sine';
+    osc6.frequency.setValueAtTime(240, time);
+    osc6.frequency.exponentialRampToValueAtTime(110, time + 0.14);
+    g.gain.setValueAtTime(0.65, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.24);
+    osc6.connect(g); osc6.start(time); osc6.stop(time + 0.26);
+    sources.push(osc6);
+    return;
+  }
+  if (t === 7) {
+    var o1 = ctx.createOscillator(); o1.type = 'square'; o1.frequency.setValueAtTime(540, time);
+    var g1 = ctx.createGain();
+    g1.gain.setValueAtTime(0.22, time);
+    g1.gain.exponentialRampToValueAtTime(0.001, time + 0.16);
+    o1.connect(g1); g1.connect(tg);
+    o1.start(time); o1.stop(time + 0.18);
+    sources.push(o1);
+    var o2 = ctx.createOscillator(); o2.type = 'square'; o2.frequency.setValueAtTime(810, time);
+    var g2b = ctx.createGain();
+    g2b.gain.setValueAtTime(0.16, time);
+    g2b.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
+    o2.connect(g2b); g2b.connect(tg);
+    o2.start(time); o2.stop(time + 0.16);
+    sources.push(o2);
+  }
+}
+
+function stopAllSources() {
+  for (var i = sources.length - 1; i >= 0; i--) {
+    var s = sources[i];
+    try { s.stop(); } catch (e) {}
+  }
+  sources = [];
+}
+
+function schedulerTick() {
+  if (!isPlaying) { schedulerId = null; return; }
+  var ctx = audioCtx;
+  while (nextGridTime < ctx.currentTime + LOOKAHEAD) {
+    var dur = stepDuration;
+    var i = nextStepIndex;
+    var swingDelay = (i % 2 === 1) ? swingAmount : 0;
+    var noteTime = nextGridTime + swingDelay;
+    for (var t = 0; t < 8; t++) {
+      if (patterns[t][i] && !mutes[t]) {
+        playVoice(t, noteTime);
+        triggerHit(t, i);
+      }
+    }
+    if (noteTime <= ctx.currentTime) { currentStep = i; }
+    nextGridTime += dur;
+    nextStepIndex = (i + 1) % 16;
+  }
+  schedulerId = setTimeout(schedulerTick, 25);
+}
+
+function startPlayback() {
+  var ctx = ensureAudioContext();
+  try { var pr = ctx.resume(); if (pr && typeof pr.catch === 'function') { pr.catch(function () {}); } } catch (e) {}
+  isPlaying = true;
+  currentStep = 0;
+  nextStepIndex = 0;
+  nextGridTime = ctx.currentTime + 0.005;
+  var seqEl = document.getElementById('sequencer');
+  if (seqEl) { seqEl.setAttribute('data-playhead', '0'); }
+  if (schedulerId) { clearTimeout(schedulerId); }
+  schedulerId = setTimeout(schedulerTick, 25);
+  startViz();
+}
+
+function stopPlayback() {
+  isPlaying = false;
+  currentStep = -1;
+  var seqEl = document.getElementById('sequencer');
+  if (seqEl) { seqEl.setAttribute('data-playhead', '-1'); }
+  if (schedulerId) { clearTimeout(schedulerId); schedulerId = null; }
+  stopAllSources();
+}
+
+function togglePlayback() {
+  if (isPlaying) { stopPlayback(); } else { startPlayback(); }
+}
+
+function updatePlayButton() {
+  var pb = document.getElementById('play');
+  if (isPlaying) {
+    pb.classList.add('playing');
+    pb.textContent = '■';
+  } else {
+    pb.classList.remove('playing');
+    pb.textContent = '▶';
+  }
+}
+
+var stepButtons = {};
+function buildStepButtons() {
+  var btns = document.querySelectorAll('#sequencer .step');
+  for (var i = 0; i < btns.length; i++) {
+    var b = btns[i];
+    stepButtons[b.getAttribute('data-track') + '-' + b.getAttribute('data-step')] = b;
+  }
+}
+
+function renderAll() {
+  for (var t = 0; t < 8; t++) {
+    var rowEl = document.querySelector('.track-row[data-track-index="' + t + '"]');
+    if (rowEl) { rowEl.style.setProperty('--tc', TRACK_COLORS[t]); }
+    for (var s = 0; s < 16; s++) {
+      var key = t + '-' + s;
+      var btn = stepButtons[key];
+      if (!btn) { continue; }
+      var active = patterns[t][s];
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      btn.classList.toggle('active', active);
+      btn.classList.toggle('beat', (s % 4 === 0));
+    }
+    var mb = document.querySelector('.mute[data-mute="' + t + '"]');
+    if (mb) { mb.setAttribute('aria-pressed', mutes[t] ? 'true' : 'false'); }
+    var vol = document.querySelector('.vol[data-volume="' + t + '"]');
+    if (vol) { vol.value = String(volumes[t]); }
+  }
+}
+
+function triggerHit(t, s) {
+  var btn = stepButtons[t + '-' + s];
+  if (!btn) { return; }
+  btn.classList.remove('hit');
+  void btn.offsetWidth;
+  btn.classList.add('hit');
+}
+
+function refreshPlayheadUI() {
+  var btns = document.querySelectorAll('#sequencer .step');
+  for (var i = 0; i < btns.length; i++) { btns[i].classList.remove('playing'); }
+  if (currentStep >= 0 && currentStep <= 15) {
+    for (var j = 0; j < btns.length; j++) {
+      var b2 = btns[j];
+      if (Number(b2.getAttribute('data-step')) === currentStep) { b2.classList.add('playing'); }
+    }
+  }
+}
+
+var vizCanvas = document.getElementById('viz');
+var vizCtx = vizCanvas.getContext('2d');
+var vizRaf = null;
+function startViz() {
+  if (vizRaf) { return; }
+  var loop = function () { vizRaf = requestAnimationFrame(loop); if (isPlaying) { drawViz(); } };
+  vizRaf = requestAnimationFrame(loop);
+}
+function drawViz() {
+  var w = vizCanvas.width;
+  var h = vizCanvas.height;
+  vizCtx.fillStyle = 'rgba(9,11,17,0.92)';
+  vizCtx.fillRect(0, 0, w, h);
+  var n = analyser ? analyser.frequencyBinCount : 128;
+  var data = new Uint8Array(n);
+  analyser.getByteFrequencyData(data);
+  var bars = 48;
+  var bw = w / bars;
+  for (var i = 0; i < bars; i++) {
+    var bin = Math.floor((i + 0.5) * n / bars);
+    var v = data[bin] / 255;
+    var bh = Math.max(2, v * (h - 8));
+    vizCtx.fillStyle = 'rgba(0, 229, 255, ' + (0.25 + v * 0.6) + ')';
+    vizCtx.fillRect(i * bw + 1, h - bh, bw - 2, bh);
+  }
+}
+
+function onTempo(e) {
+  bpm = Math.max(40, Math.min(240, Number(e.target.value)));
+  stepDuration = 60 / (bpm * 4);
+  swingAmount = (swing / 100) * stepDuration / 3;
+  document.getElementById('tempo-val').textContent = String(Math.round(bpm));
+  saveState();
+}
+function onSwing(e) {
+  swing = Math.max(0, Math.min(100, Number(e.target.value)));
+  swingAmount = (swing / 100) * stepDuration / 3;
+  document.getElementById('swing-val').textContent = String(Math.round(swing));
+  saveState();
+}
+
+function init() {
+  loadState();
+  buildStepButtons();
+  renderAll();
+  updatePlayButton();
+  document.getElementById('tempo-val').textContent = String(Math.round(bpm));
+  document.getElementById('swing-val').textContent = String(Math.round(swing));
+
+  var playBtn = document.getElementById('play');
+  playBtn.addEventListener('click', function () { togglePlayback(); updatePlayButton(); });
+
+  var clearBtn = document.getElementById('clear');
+  clearBtn.addEventListener('click', function () {
+    patterns = patterns.map(function (p) { return new Array(16).fill(false); });
+    renderAll();
+    saveState();
+  });
+
+  var rndBtn = document.getElementById('randomize');
+  rndBtn.addEventListener('click', function () {
+    patterns = patterns.map(function (p) { return p.slice(); });
+    for (var r = 0; r < 8; r++) {
+      for (var rs = 0; rs < 16; rs++) { patterns[r][rs] = Math.random() < 0.38; }
+    }
+    renderAll();
+    saveState();
+  });
+
+  var presetSel = document.getElementById('preset');
+  presetSel.addEventListener('change', function () {
+    var idx = Number(this.value);
+    if (PRESETS[idx]) {
+      patterns = PRESETS[idx].p.map(function (p) { return p.slice(); });
+      renderAll();
+      saveState();
+    }
+  });
+
+  var tempoInput = document.getElementById('tempo');
+  tempoInput.addEventListener('input', onTempo);
+  tempoInput.addEventListener('change', onTempo);
+  var swingInput = document.getElementById('swing');
+  swingInput.addEventListener('input', onSwing);
+  swingInput.addEventListener('change', onSwing);
+
+  var sequencerEl = document.getElementById('sequencer');
+  sequencerEl.addEventListener('click', function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest('.step') : null;
+    if (!btn) { return; }
+    var t = Number(btn.getAttribute('data-track'));
+    var s = Number(btn.getAttribute('data-step'));
+    patterns[t][s] = !patterns[t][s];
+    btn.setAttribute('aria-pressed', patterns[t][s] ? 'true' : 'false');
+    btn.classList.toggle('active', patterns[t][s]);
+    saveState();
+  });
+
+  for (var mt = 0; mt < 8; mt++) {
+    var muteBtn = document.querySelector('.mute[data-mute="' + mt + '"]');
+    if (muteBtn) {
+      muteBtn.addEventListener('click', function () {
+        var i = Number(this.getAttribute('data-mute'));
+        mutes[i] = !mutes[i];
+        this.setAttribute('aria-pressed', mutes[i] ? 'true' : 'false');
+        if (trackGains[i]) { trackGains[i].gain.value = mutes[i] ? 0 : (volumes[i] / 100); }
+        saveState();
+      });
+    }
+    var volInput = document.querySelector('.vol[data-volume="' + mt + '"]');
+    if (volInput) {
+      volInput.addEventListener('input', function () {
+        var i = Number(this.getAttribute('data-volume'));
+        volumes[i] = Number(this.value);
+        if (trackGains[i]) { trackGains[i].gain.value = mutes[i] ? 0 : (volumes[i] / 100); }
+        saveState();
+      });
+    }
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') {
+      var el = document.activeElement;
+      var tag = el ? el.tagName : '';
+      var type = el && el.getAttribute ? el.getAttribute('type') : null;
+      var typing = (tag === 'INPUT' && (type === 'text' || type === 'number' || type === 'email' || type === 'password')) || tag === 'TEXTAREA' || (el ? !!el.isContentEditable : false);
+      if (!typing) {
+        e.preventDefault();
+        if (e.repeat) { return; }
+        togglePlayback();
+      }
+    }
+  });
+  document.addEventListener('keyup', function (e) {
+    if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); }
+  });
+}
+
+init();
+</script>
+</body>
+</html>
+```

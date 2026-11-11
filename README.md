@@ -1,7 +1,7 @@
 # Model Arena
 
 A local benchmark for comparing AI models on **visual, interactive web apps**. Every model gets
-the same six demanding prompts and builds a single-file `index.html` for each. The arena then scores
+the same seven demanding prompts and builds a single-file `index.html` for each. The arena then scores
 each app two ways:
 
 1. **Auto score (0–100 per task).** A headless Chrome drives every page with real mouse and
@@ -18,6 +18,7 @@ each app two ways:
 | `cloth-sim`, Silk | tearable Verlet cloth | stability, grab/cut physics, wind, 60 FPS, shaded fabric |
 | `terrain-flyover`, Horizon | infinite terrain in raw WebGL | determinism, chunk streaming, day/night lighting, atmosphere |
 | `command-palette`, Commander | ⌘K palette in a notes app | fuzzy ranking, ARIA combobox, focus trap, motion and reduced motion |
+| `skills-settings`, Harbor | settings app built by following three attached Claude skills | keeping theme-factory, ux-copy and accessibility-review applied on every panel, not just the first, and reconciling them where they conflict |
 
 ## Setup
 
@@ -76,7 +77,8 @@ npm run serve                          # http://localhost:4173
   Expand a check to see its sub-assertions, what the grader actually observed, and a screenshot
   of the page when it failed. "Open live" runs the app.
 - **Judge:** two anonymous submissions of the same task run live side by side (keys `1` A,
-  `2` B, `3` tie, `4` both bad, `N` next). Names are revealed after you vote.
+  `2` B, `3` tie, `4` both bad, `N` next). Names are revealed after you vote, and pairs with
+  the fewest votes come first.
 
 ## Local models
 
@@ -91,7 +93,12 @@ submissions/<model>/<task>/reply.md     the raw reply (and thinking.md for reaso
 
 - **Options:** `--base-url` (default `$ARENA_BASE_URL` or `http://localhost:8080/v1`),
   `--api-model` (optional when the server serves exactly one model, as `llama-server` does),
-  `--task`, `--force` to re-run tasks that already have a page, `--grade` to grade afterwards,
+  `--task`, `--resume` to continue a stopped run at the task it was on, `--force` to run every
+  task again (a model that already has pages needs one of the two), `--grade` to grade afterwards,
+  `--retries N` (default 5: a server that is busy, down or still loading the model is asked
+  again after 10, 20, 40, 80 and 120 s; a task that still fails gets an `error.txt`),
+  `--thinking off|low|medium|high` (sent as `reasoning_effort`, Ollama's `think` and
+  `chat_template_kwargs`, so one flag works across servers; Qwen only switches thinking on or off),
   and sampling settings `--temperature`, `--top-p`, `--seed`, `--max-tokens`. `--extra '<json>'`
   merges anything else into the request, e.g. `'{"chat_template_kwargs":{"enable_thinking":false}}'`
   to turn off Qwen's thinking on llama-server. A server that needs a key reads `$ARENA_API_KEY`.
@@ -116,6 +123,35 @@ single reply per task is a noisy measure of quality: two runs of the *same* mode
 more than q4 and q8 do. Before concluding that one quantization is better, run each
 configuration two or three times under separate names (`…-q4_k_m-r2`) and compare the spread,
 and grade everything on the same machine.
+
+**OpenRouter.** Use `--base-url https://openrouter.ai/api/v1` with the key in `$ARENA_API_KEY`;
+`--thinking` is sent as OpenRouter's own `reasoning` field. OpenRouter picks a provider per
+request, and providers serve different quantizations, so pin one when the precision matters:
+
+```sh
+node arena.mjs run qwen3.8-27b-bf16-or --base-url https://openrouter.ai/api/v1 \
+  --api-model qwen/qwen3.8-27b --extra '{"provider":{"quantizations":["bf16"],"allow_fallbacks":false}}'
+```
+
+The provider that answered is saved in `run.json` and shown on the submission card. Its time and
+speed measure that provider's hardware, so compare quality, not speed, against a local run.
+
+## Suite v2
+
+A second, harder suite of six tasks lives in `v2/`: Flux (four-state logic lab), Latch
+(unit-delay logic bench), Octet (CHIP-8 console), Tessera (guideline block stacking), Gambit
+(chess with perft-verified move generation) and Keystone (2D CAD constraint solver). Each was
+written from public documentation by a different AI lab's model, then audited and fixed here.
+The originals are kept in `docs/Tasks-for-v2/`.
+
+Add `--v2` to any command. It has its own tasks, submissions, results and votes, so the same
+model name can appear in both suites without mixing:
+
+```sh
+node arena.mjs run qwen3.8-flash-next-low --v2 --base-url http://homeserver:8080/v1 --thinking low --grade
+node arena.mjs board --v2
+node arena.mjs serve --v2             # http://localhost:4174, next to v1 on 4173
+```
 
 ## Scoring
 
@@ -176,6 +212,7 @@ lib/scoring.mjs      leaderboard and Bradley–Terry
 lib/server.mjs       dashboard API; each submission is served from its own *.localhost origin
 dashboard/           standings, task results, blind judging
 tasks/<id>/          PROMPT.md + task.mjs
+v2/                  suite v2: tasks/, submissions/, results/ (`--v2`)
 submissions/<model>/<task>/index.html   (+ run.json, reply.md, thinking.md from `run`)
 results/<model>/<task>/   result.json, showcase.webm, shots/, checks/ (failure screenshots)
 results/votes.json   judge votes

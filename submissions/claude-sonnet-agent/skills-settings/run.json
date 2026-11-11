@@ -1,0 +1,26 @@
+{
+  "source": "arena run",
+  "endpoint": "openrouter.ai",
+  "apiModel": "anthropic/claude-sonnet-5.5",
+  "servedModel": "anthropic/claude-sonnet-5.5",
+  "provider": "Claude Platform on AWS",
+  "params": {
+    "thinking": "medium"
+  },
+  "startedAt": "2026-10-29T19:52:44.120Z",
+  "wallMs": 74002,
+  "ttftMs": 2506,
+  "thinkingMs": 24283,
+  "promptTokens": 6212,
+  "completionTokens": 12381,
+  "reasoningTokens": 2762,
+  "tokensEstimated": false,
+  "genTokensPerSec": 173.2,
+  "promptTokensPerSec": null,
+  "finishReason": "stop",
+  "replyChars": 22347,
+  "reasoningChars": 2967,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 22340
+}

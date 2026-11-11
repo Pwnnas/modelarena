@@ -1,0 +1,26 @@
+{
+  "source": "arena run",
+  "endpoint": "openrouter.ai",
+  "apiModel": "z-ai/glm-5.3-flash",
+  "servedModel": "z-ai/glm-5.3-flash",
+  "provider": "Particle AI",
+  "params": {
+    "thinking": "high"
+  },
+  "startedAt": "2026-10-30T03:38:34.186Z",
+  "wallMs": 232003,
+  "ttftMs": 1049,
+  "thinkingMs": 199669,
+  "promptTokens": 3105,
+  "completionTokens": 50115,
+  "reasoningTokens": 38311,
+  "tokensEstimated": false,
+  "genTokensPerSec": 217.2,
+  "promptTokensPerSec": null,
+  "finishReason": "stop",
+  "replyChars": 36196,
+  "reasoningChars": 133917,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 36205
+}

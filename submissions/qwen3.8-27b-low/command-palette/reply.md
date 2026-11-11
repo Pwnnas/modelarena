@@ -1,0 +1,850 @@
+```html
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commander</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --accent:#5b5bd6;
+  --bg:#f8f9fb;
+  --bg-elevated:#ffffff;
+  --bg-sidebar:#f1f3f5;
+  --bg-hover:rgba(0,0,0,0.04);
+  --bg-active:rgba(91,91,214,0.08);
+  --text:#1a1a2e;
+  --text-secondary:#5a5a7a;
+  --text-tertiary:#9a9ab0;
+  --border:#e2e4e8;
+  --shadow:0 8px 32px rgba(0,0,0,0.12),0 2px 8px rgba(0,0,0,0.08);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.08);
+  --radius:10px;
+  --radius-sm:6px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --transition-theme:background-color 300ms ease,color 300ms ease,border-color 300ms ease,box-shadow 300ms ease;
+}
+html[data-theme="dark"]{
+  --bg:#1a1b2e;
+  --bg-elevated:#24253a;
+  --bg-sidebar:#1e1f33;
+  --bg-hover:rgba(255,255,255,0.05);
+  --bg-active:rgba(91,91,214,0.15);
+  --text:#e8e8f0;
+  --text-secondary:#a0a0c0;
+  --text-tertiary:#6a6a8a;
+  --border:#2e2f4a;
+  --shadow:0 8px 32px rgba(0,0,0,0.4),0 2px 8px rgba(0,0,0,0.3);
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.3);
+}
+html{height:100%;font-family:var(--font);transition:var(--transition-theme)}
+body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);transition:var(--transition-theme);font-size:14px;line-height:1.5}
+
+/* App Layout */
+#app{display:flex;height:100vh;overflow:hidden}
+#sidebar{width:260px;min-width:260px;background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:var(--transition-theme)}
+.sidebar-header{padding:20px 16px 12px;border-bottom:1px solid var(--border)}
+.sidebar-header h1{font-size:15px;font-weight:700;color:var(--text);letter-spacing:-0.2px;margin-bottom:12px}
+#open-palette{
+  display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;
+  background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text-secondary);font-size:13px;cursor:pointer;
+  transition:all 150ms ease;box-shadow:var(--shadow-sm)
+}
+#open-palette:hover{border-color:var(--accent);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+#open-palette:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.notes-list{flex:1;overflow-y:auto;padding:8px}
+.note-item{
+  padding:10px 12px;border-radius:var(--radius-sm);cursor:pointer;
+  transition:background 120ms ease;margin-bottom:2px;
+  border-left:3px solid transparent
+}
+.note-item:hover{background:var(--bg-hover)}
+.note-item.active{background:var(--bg-active);border-left-color:var(--accent)}
+.note-item .note-title{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.note-item .note-preview{font-size:11px;color:var(--text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.editor-header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;transition:var(--transition-theme)}
+.editor-header h2{font-size:16px;font-weight:600;color:var(--text);letter-spacing:-0.3px}
+.editor-header .editor-meta{font-size:12px;color:var(--text-tertiary)}
+#editor{
+  flex:1;width:100%;padding:24px 32px;border:none;outline:none;resize:none;
+  background:var(--bg);color:var(--text);font-size:14px;line-height:1.7;
+  font-family:var(--font);transition:var(--transition-theme)
+}
+#editor::placeholder{color:var(--text-tertiary)}
+
+/* Palette Overlay */
+#palette-overlay{
+  position:fixed;inset:0;z-index:1000;display:flex;align-items:flex-start;justify-content:center;
+  padding-top:15vh;background:rgba(0,0,0,0.3);backdrop-filter:blur(4px);
+  opacity:0;pointer-events:none;transition:opacity 200ms ease
+}
+#palette-overlay.visible{opacity:1;pointer-events:auto}
+#palette-overlay[hidden]{display:none}
+.palette-panel{
+  width:560px;max-width:90vw;background:var(--bg-elevated);border-radius:14px;
+  box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;
+  transform:scale(0.95) translateY(-10px);opacity:0;
+  transition:transform 200ms cubic-bezier(0.4,0,0.2,1),opacity 200ms ease,background-color 300ms ease,border-color 300ms ease
+}
+#palette-overlay.visible .palette-panel{transform:scale(1) translateY(0);opacity:1}
+#palette-overlay.closing .palette-panel{transform:scale(0.95) translateY(-10px);opacity:0}
+
+.palette-input-wrapper{position:relative;padding:4px 16px 0}
+.palette-input-wrapper .search-icon{
+  position:absolute;left:28px;top:50%;transform:translateY(-50%);
+  color:var(--text-tertiary);font-size:14px;pointer-events:none
+}
+#palette-input{
+  width:100%;padding:14px 16px 14px 40px;font-size:15px;color:var(--text);
+  background:transparent;border:none;outline:none;font-family:var(--font);
+  letter-spacing:-0.1px
+}
+#palette-input::placeholder{color:var(--text-tertiary)}
+
+.palette-subpage-chip{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 10px;
+  background:var(--accent);color:#fff;font-size:11px;font-weight:600;
+  border-radius:20px;margin:8px 16px 0;letter-spacing:0.2px
+}
+
+/* Results list */
+#palette-listbox{
+  max-height:360px;overflow-y:auto;padding:8px;position:relative;
+  scroll-behavior:smooth
+}
+#palette-listbox::-webkit-scrollbar{width:6px}
+#palette-listbox::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.group-heading{
+  font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;
+  letter-spacing:0.8px;padding:12px 12px 6px;margin-top:4px;user-select:none
+}
+.group-heading:first-child{margin-top:0}
+
+.palette-option{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;border-radius:var(--radius-sm);cursor:pointer;
+  position:relative;transition:background 80ms ease
+}
+.palette-option.active{background:var(--bg-active)}
+.palette-option .option-title{font-size:13.5px;font-weight:500;color:var(--text);display:flex;align-items:center;gap:8px}
+.palette-option .option-title mark{background:transparent;color:var(--accent);font-weight:700}
+.palette-option .option-icon{
+  width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  background:var(--bg-hover);font-size:13px;color:var(--text-secondary);flex-shrink:0
+}
+.palette-option .keycaps{display:flex;gap:4px}
+.keycap{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:22px;height:22px;padding:0 6px;
+  font-size:10px;font-weight:600;color:var(--text-secondary);
+  background:var(--bg-hover);border:1px solid var(--border);border-radius:4px;
+  letter-spacing:0.3px;box-shadow:0 1px 2px rgba(0,0,0,0.06)
+}
+
+/* Active highlight slider */
+#palette-highlight{
+  position:absolute;left:4px;right:4px;height:0;
+  background:var(--bg-active);border-radius:var(--radius-sm);
+  pointer-events:none;opacity:0;transition:transform 120ms ease,opacity 120ms ease,top 120ms ease
+}
+#palette-highlight.visible{opacity:1}
+
+/* Empty state */
+#palette-empty{
+  display:none;padding:32px 16px;text-align:center;color:var(--text-tertiary);font-size:13px
+}
+#palette-empty .empty-icon{font-size:28px;margin-bottom:8px;opacity:0.5}
+
+/* Toasts */
+#toast-container{
+  position:fixed;bottom:24px;right:24px;z-index:2000;
+  display:flex;flex-direction:column;gap:8px;pointer-events:none
+}
+.toast{
+  display:flex;align-items:center;gap:10px;padding:12px 16px;
+  background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);
+  box-shadow:var(--shadow-sm);font-size:13px;font-weight:500;color:var(--text);
+  transform:translateX(120%);opacity:0;
+  transition:transform 300ms cubic-bezier(0.4,0,0.2,1),opacity 300ms ease;
+  pointer-events:auto
+}
+.toast.show{transform:translateX(0);opacity:1}
+.toast.hide{transform:translateX(120%);opacity:0}
+.toast .toast-icon{color:var(--accent);font-size:16px}
+
+/* Accent swatch */
+.accent-swatch{
+  width:18px;height:18px;border-radius:50%;flex-shrink:0;
+  border:2px solid var(--border);transition:transform 150ms ease
+}
+.palette-option.active .accent-swatch{transform:scale(1.2)}
+
+/* Reduced motion */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    transition-duration:0.01ms !important;
+    animation-duration:0.01ms !important;
+  }
+  #palette-overlay .palette-panel{transition:opacity 150ms ease !important}
+  .toast{transition:opacity 150ms ease !important}
+  .toast.show{transform:none !important}
+  .toast.hide{transform:none !important}
+  #palette-highlight{transition:opacity 100ms ease !important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <h1>Commander</h1>
+      <button id="open-palette">
+        <span>Search</span>
+        <span style="margin-left:auto;display:flex;gap:3px">
+          <span class="keycap" id="mod-key">⌘</span>
+          <span class="keycap">K</span>
+        </span>
+      </button>
+    </div>
+    <div class="notes-list" id="notes-list"></div>
+  </aside>
+  <main id="main">
+    <div class="editor-header">
+      <h2 id="editor-title">Untitled Note</h2>
+      <span class="editor-meta">Edited just now</span>
+    </div>
+    <textarea id="editor" spellcheck="true" placeholder="Start writing…"></textarea>
+  </main>
+</div>
+
+<div id="palette-overlay" role="dialog" aria-modal="true" hidden>
+  <div class="palette-panel">
+    <div class="palette-input-wrapper">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="palette-input" role="combobox" aria-expanded="true" aria-controls="palette-listbox" aria-activedescendant="" autocomplete="off" spellcheck="false" placeholder="Type a command or search…">
+    </div>
+    <div id="palette-subpage-chip" style="display:none"></div>
+    <div role="listbox" id="palette-listbox"></div>
+    <div id="palette-empty">
+      <div class="empty-icon">∅</div>
+      No matching commands
+    </div>
+  </div>
+</div>
+
+<div id="toast-container" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+
+const COMMANDS = [
+  { id:"go-inbox",title:"Go to Inbox",group:"Navigation",keywords:["home"]},
+  { id:"go-today",title:"Go to Today",group:"Navigation"},
+  { id:"go-archive",title:"Go to Archive",group:"Navigation"},
+  { id:"go-settings",title:"Go to Settings",group:"Navigation",keywords:["preferences","options"],shortcut:"Mod+,"},
+  { id:"go-line",title:"Go to Line…",group:"Navigation",keywords:["jump"],shortcut:"Mod+G"},
+  { id:"go-symbol",title:"Go to Symbol…",group:"Navigation",shortcut:"Mod+Shift+O"},
+  { id:"search-notes",title:"Search Notes…",group:"Navigation",keywords:["find"],shortcut:"Mod+Shift+F"},
+  { id:"new-note",title:"New Note",group:"Notes",keywords:["create","add"],shortcut:"Mod+N"},
+  { id:"new-note-template",title:"New Note from Template…",group:"Notes"},
+  { id:"duplicate-note",title:"Duplicate Note",group:"Notes",keywords:["copy","clone"]},
+  { id:"rename-note",title:"Rename Note…",group:"Notes",shortcut:"F2"},
+  { id:"delete-note",title:"Delete Note",group:"Notes",keywords:["remove","trash"]},
+  { id:"pin-note",title:"Pin Note",group:"Notes",keywords:["favorite","star"]},
+  { id:"move-note",title:"Move Note to Folder…",group:"Notes"},
+  { id:"export-pdf",title:"Export Note as PDF",group:"Notes"},
+  { id:"export-md",title:"Export Note as Markdown",group:"Notes"},
+  { id:"share-note",title:"Share Note Link",group:"Notes",keywords:["copy","url"]},
+  { id:"bold",title:"Bold",group:"Editor",shortcut:"Mod+B"},
+  { id:"italic",title:"Italic",group:"Editor",shortcut:"Mod+I"},
+  { id:"insert-link",title:"Insert Link…",group:"Editor",keywords:["url"]},
+  { id:"insert-table",title:"Insert Table",group:"Editor"},
+  { id:"insert-code",title:"Insert Code Block",group:"Editor",keywords:["snippet"]},
+  { id:"insert-checklist",title:"Insert Checklist",group:"Editor",keywords:["todo","task"]},
+  { id:"word-wrap",title:"Toggle Word Wrap",group:"Editor",shortcut:"Alt+Z"},
+  { id:"format-doc",title:"Format Document",group:"Editor",keywords:["prettify","beautify"],shortcut:"Shift+Alt+F"},
+  { id:"sort-asc",title:"Sort Lines Ascending",group:"Editor"},
+  { id:"sort-desc",title:"Sort Lines Descending",group:"Editor"},
+  { id:"toggle-dark-mode",title:"Toggle Dark Mode",group:"View",keywords:["theme","night","appearance"],shortcut:"Mod+Shift+L"},
+  { id:"change-accent",title:"Change Accent Color…",group:"View",keywords:["theme","color"],page:"accent"},
+  { id:"toggle-sidebar",title:"Toggle Sidebar",group:"View",shortcut:"Mod+\\"},
+  { id:"toggle-focus-mode",title:"Toggle Focus Mode",group:"View",keywords:["zen","distraction free"]},
+  { id:"zoom-in",title:"Zoom In",group:"View",shortcut:"Mod+="},
+  { id:"zoom-out",title:"Zoom Out",group:"View",shortcut:"Mod+-"},
+  { id:"zoom-reset",title:"Reset Zoom",group:"View",shortcut:"Mod+0"},
+  { id:"shortcuts",title:"Keyboard Shortcuts",group:"Help",keywords:["keys","hotkeys"],shortcut:"Mod+/"},
+  { id:"release-notes",title:"Release Notes",group:"Help",keywords:["changelog","what's new"]},
+  { id:"feedback",title:"Send Feedback",group:"Help"},
+  { id:"about",title:"About Commander",group:"Help"}
+];
+
+const ACCENTS = [
+  { id:"accent-indigo",title:"Indigo",value:"#5b5bd6" },
+  { id:"accent-emerald",title:"Emerald",value:"#10b981" },
+  { id:"accent-rose",title:"Rose",value:"#e11d48" },
+  { id:"accent-amber",title:"Amber",value:"#f59e0b" },
+  { id:"accent-sky",title:"Sky",value:"#0ea5e9" }
+];
+
+const GROUP_ORDER = ["Navigation","Notes","Editor","View","Help"];
+const GROUP_ICONS = {
+  "Navigation":"⊕","Notes":"✎","Editor":"⌨","View":"◉","Help":"?"
+};
+const ICONS = {};
+COMMANDS.forEach(c => { ICONS[c.id] = c.group ? GROUP_ICONS[c.group] || "•" : "•"; });
+
+// DOM refs
+const overlay = document.getElementById("palette-overlay");
+const panel = overlay.querySelector(".palette-panel");
+const input = document.getElementById("palette-input");
+const listbox = document.getElementById("palette-listbox");
+const emptyState = document.getElementById("palette-empty");
+const openBtn = document.getElementById("open-palette");
+const editor = document.getElementById("editor");
+const toastContainer = document.getElementById("toast-container");
+const subpageChip = document.getElementById("palette-subpage-chip");
+const notesList = document.getElementById("notes-list");
+const modKeyEl = document.getElementById("mod-key");
+
+// Platform detection
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+modKeyEl.textContent = isMac ? "⌘" : "Ctrl";
+
+// State
+let paletteOpen = false;
+let activeIndex = 0;
+let results = [];
+let currentPage = null; // null = root, "accent" = accent sub-page
+let previousFocus = null;
+let recents = [];
+let noteCount = 0;
+let currentNoteContent = "Welcome to Commander\n\nThis is your personal command palette for managing notes. Press Ctrl+K (or ⌘K) to open the palette and search for commands.\n\nTry:\n• Toggle Dark Mode\n• Change Accent Color\n• New Note\n\nEnjoy!";
+
+// Load recents from localStorage
+try {
+  const stored = localStorage.getItem("commander-recents");
+  if (stored) recents = JSON.parse(stored);
+} catch(e) { recents = []; }
+
+function saveRecents() {
+  try { localStorage.setItem("commander-recents", JSON.stringify(recents)); } catch(e) {}
+}
+
+// Initialize notes
+const sampleNotes = [
+  { title: "Project Roadmap", preview: "Q3 goals and milestones…" },
+  { title: "Meeting Notes", preview: "Sync with design team…" },
+  { title: "Ideas", preview: "Brainstorming session notes…" },
+  { title: "Reading List", preview: "Books to read this quarter…" },
+];
+
+function renderNotes() {
+  notesList.innerHTML = "";
+  sampleNotes.forEach((note, i) => {
+    const el = document.createElement("div");
+    el.className = "note-item" + (i === 0 ? " active" : "");
+    el.setAttribute("data-note", "note-" + (i + 1));
+    el.innerHTML = `<div class="note-title">${note.title}</div><div class="note-preview">${note.preview}</div>`;
+    el.addEventListener("click", () => {
+      document.querySelectorAll(".note-item").forEach(n => n.classList.remove("active"));
+      el.classList.add("active");
+      document.getElementById("editor-title").textContent = note.title;
+    });
+    notesList.appendChild(el);
+  });
+  editor.value = currentNoteContent;
+}
+renderNotes();
+
+// Fuzzy matching
+function subsequenceScore(query, text) {
+  query = query.toLowerCase();
+  text = text.toLowerCase();
+  
+  if (query.length === 0) return 0;
+  if (query === text) return 10000;
+  if (text.startsWith(query)) return 9000;
+  
+  // Subsequence match
+  let qi = 0, score = 5000, lastMatchIdx = -1, runLength = 0;
+  const wordBoundaries = new Set([0]);
+  for (let i = 1; i < text.length; i++) {
+    if (text[i-1] === " " || text[i-1] === "-" || text[i-1] === "/" || text[i-1] === "(") wordBoundaries.add(i);
+  }
+  
+  for (let ti = 0; ti < text.length && qi < query.length; ti++) {
+    if (text[ti] === query[qi]) {
+      if (lastMatchIdx >= 0) {
+        const gap = ti - lastMatchIdx - 1;
+        if (gap === 0) {
+          runLength++;
+          score += 100;
+        } else {
+          score -= gap * 20;
+          runLength = 0;
+        }
+      }
+      if (wordBoundaries.has(ti)) score += 200;
+      score -= ti * 2;
+      lastMatchIdx = ti;
+      qi++;
+    }
+  }
+  
+  if (qi < query.length) return -1; // No match
+  score -= text.length * 2;
+  return score;
+}
+
+function fuzzyScore(query, cmd) {
+  if (!query) return { score: 0, matchTitle: null };
+  const titleScore = subsequenceScore(query, cmd.title);
+  if (titleScore > 0) {
+    return { score: titleScore, matchTitle: cmd.title };
+  }
+  if (cmd.keywords) {
+    for (const kw of cmd.keywords) {
+      const kwScore = subsequenceScore(query, kw);
+      if (kwScore > 0) {
+        return { score: kwScore * 0.5, matchTitle: cmd.title };
+      }
+    }
+  }
+  return { score: -1, matchTitle: null };
+}
+
+function getMarkedTitle(query, title) {
+  if (!query) return title;
+  const lowerTitle = title.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  let qi = 0;
+  let html = "";
+  for (let ti = 0; ti < title.length; ti++) {
+    if (qi < lowerQuery.length && lowerTitle[ti] === lowerQuery[qi]) {
+      html += "<mark>" + escapeHtml(title[ti]) + "</mark>";
+      qi++;
+    } else {
+      html += escapeHtml(title[ti]);
+    }
+  }
+  return html;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function getResults() {
+  const query = input.value.trim();
+  
+  if (currentPage === "accent") {
+    if (!query) return ACCENTS.map((a, i) => ({ ...a, index: i }));
+    const matched = ACCENTS.map((a, i) => ({ ...a, index: i, ...fuzzyScore(query, a) }))
+      .filter(a => a.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 50);
+    return matched;
+  }
+  
+  if (!query) {
+    // Show recents + all grouped
+    const allWithScore = COMMANDS.map((c, i) => ({ ...c, index: i, score: 0, matchTitle: c.title }));
+    return { grouped: true, recents: getRecentCommands(), items: allWithScore };
+  }
+  
+  const scored = COMMANDS.map((c, i) => ({ ...c, index: i, ...fuzzyScore(query, c) }))
+    .filter(c => c.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 50);
+  return { grouped: false, items: scored };
+}
+
+function getRecentCommands() {
+  return recents.slice(0, 5).map(id => {
+    const cmd = COMMANDS.find(c => c.id === id);
+    return cmd ? { ...cmd, index: COMMANDS.indexOf(cmd) } : null;
+  }).filter(Boolean);
+}
+
+function renderResults() {
+  const result = getResults();
+  const prevHeight = listbox.offsetHeight;
+  
+  listbox.innerHTML = "";
+  results = [];
+  
+  const addOption = (item, groupLabel) => {
+    const id = "opt-" + item.id;
+    const el = document.createElement("div");
+    el.className = "palette-option";
+    el.id = id;
+    el.setAttribute("role", "option");
+    el.setAttribute("data-command", item.id);
+    el.setAttribute("aria-selected", "false");
+    
+    const isAccent = currentPage === "accent";
+    let titleHtml;
+    if (isAccent) {
+      titleHtml = item.title;
+    } else {
+      titleHtml = getMarkedTitle(input.value.trim(), item.title);
+    }
+    
+    let rightHtml = "";
+    if (isAccent) {
+      rightHtml = `<div class="accent-swatch" style="background:${item.value}"></div>`;
+    } else if (item.shortcut) {
+      rightHtml = `<div class="keycaps">${renderKeycaps(item.shortcut)}</div>`;
+    }
+    
+    el.innerHTML = `<span class="option-title">${isAccent ? "" : `<span class="option-icon">${ICONS[item.id] || "•"}</span>`}${titleHtml}</span>${rightHtml}`;
+    
+    el.addEventListener("mouseenter", () => setActiveIndex(results.length));
+    el.addEventListener("click", () => executeCommand(item));
+    
+    listbox.appendChild(el);
+    results.push({ el, id: id, command: item });
+  };
+  
+  if (result.grouped) {
+    const recentSet = new Set(result.recents.map(r => r.id));
+    if (result.recents.length > 0) {
+      const heading = document.createElement("div");
+      heading.className = "group-heading";
+      heading.textContent = "Recent";
+      listbox.appendChild(heading);
+      result.recents.forEach(item => addOption(item));
+    }
+    GROUP_ORDER.forEach(group => {
+      const groupItems = result.items.filter(i => i.group === group);
+      if (groupItems.length === 0) return;
+      const heading = document.createElement("div");
+      heading.className = "group-heading";
+      heading.textContent = group;
+      listbox.appendChild(heading);
+      groupItems.forEach(item => addOption(item));
+    });
+  } else {
+    result.items.forEach(item => addOption(item));
+  }
+  
+  // Empty state
+  if (results.length === 0) {
+    emptyState.style.display = "block";
+    input.setAttribute("aria-activedescendant", "");
+  } else {
+    emptyState.style.display = "none";
+    activeIndex = 0;
+    setActiveIndex(0);
+  }
+  
+  // Animate height
+  const newHeight = listbox.offsetHeight;
+  if (prevHeight !== newHeight && paletteOpen && results.length > 0) {
+    listbox.style.height = prevHeight + "px";
+    listbox.offsetHeight; // force reflow
+    const anim = listbox.animate(
+      [{ height: prevHeight + "px" }, { height: newHeight + "px" }],
+      { duration: 150, easing: "ease-out" }
+    );
+    anim.onfinish = () => { listbox.style.height = "auto"; listbox.getAnimations().forEach(a => a.cancel()); };
+  }
+}
+
+function renderKeycaps(shortcut) {
+  const parts = shortcut.split("+");
+  return parts.map(p => {
+    let label = p;
+    if (p === "Mod") label = isMac ? "⌘" : "Ctrl";
+    else if (p === "Shift") label = "⇧";
+    else if (p === "Alt") label = isMac ? "⌥" : "Alt";
+    else if (p === ",") label = ",";
+    else if (p === "\\") label = "\\";
+    else if (p === "/") label = "/";
+    else if (p === "=") label = "=";
+    else if (p === "-") label = "−";
+    else if (p === "0") label = "0";
+    else if (p === "G") label = "G";
+    else if (p === "N") label = "N";
+    else if (p === "B") label = "B";
+    else if (p === "I") label = "I";
+    else if (p === "L") label = "L";
+    else if (p === "F") label = "F";
+    else if (p === "Z") label = "Z";
+    else if (p === "O") label = "O";
+    return `<span class="keycap">${label}</span>`;
+  }).join("");
+}
+
+function setActiveIndex(idx) {
+  if (results.length === 0) return;
+  // Wrap
+  if (idx < 0) idx = results.length - 1;
+  if (idx >= results.length) idx = 0;
+  activeIndex = idx;
+  
+  results.forEach((r, i) => {
+    r.el.setAttribute("aria-selected", i === activeIndex ? "true" : "false");
+    r.el.classList.toggle("active", i === activeIndex);
+  });
+  
+  input.setAttribute("aria-activedescendant", results[activeIndex].id);
+  
+  // Scroll into view
+  const activeEl = results[activeIndex].el;
+  activeEl.scrollIntoView({ block: "nearest" });
+}
+
+function openPalette() {
+  if (paletteOpen) return;
+  paletteOpen = true;
+  previousFocus = document.activeElement;
+  currentPage = null;
+  input.value = "";
+  subpageChip.style.display = "none";
+  overlay.hidden = false;
+  overlay.classList.remove("closing");
+  
+  requestAnimationFrame(() => {
+    overlay.classList.add("visible");
+  });
+  
+  renderResults();
+  input.focus();
+  document.body.style.overflow = "hidden";
+}
+
+function closePalette() {
+  if (!paletteOpen) return;
+  paletteOpen = false;
+  overlay.classList.add("closing");
+  overlay.classList.remove("visible");
+  
+  setTimeout(() => {
+    overlay.hidden = true;
+    overlay.classList.remove("closing");
+    document.body.style.overflow = "";
+    if (previousFocus && previousFocus !== document.body) {
+      previousFocus.focus();
+    }
+  }, 200);
+}
+
+function openSubPage(page) {
+  currentPage = page;
+  input.value = "";
+  if (page === "accent") {
+    subpageChip.style.display = "block";
+    subpageChip.innerHTML = `<span>◉</span> Accent Color`;
+  } else {
+    subpageChip.style.display = "none";
+  }
+  renderResults();
+  input.focus();
+}
+
+function executeCommand(item) {
+  if (!item) return;
+  
+  // Record in recents (only for main commands, not accent sub-page selections)
+  if (currentPage !== "accent") {
+    addRecent(item.id);
+  }
+  
+  if (currentPage === "accent") {
+    // Pick accent
+    document.documentElement.style.setProperty("--accent", item.value);
+    addRecent("change-accent");
+    closePalette();
+    showToast("Change Accent Color…");
+    return;
+  }
+  
+  if (item.page === "accent") {
+    openSubPage("accent");
+    return;
+  }
+  
+  closePalette();
+  
+  // Execute command effects
+  switch (item.id) {
+    case "toggle-dark-mode":
+      toggleTheme();
+      break;
+    case "new-note":
+      createNewNote();
+      break;
+    case "toggle-sidebar":
+      toggleSidebar();
+      break;
+    default:
+      break;
+  }
+  
+  showToast(item.title);
+}
+
+function addRecent(id) {
+  recents = recents.filter(r => r !== id);
+  recents.unshift(id);
+  if (recents.length > 5) recents = recents.slice(0, 5);
+  saveRecents();
+}
+
+function toggleTheme() {
+  const current = document.documentElement.dataset.theme;
+  document.documentElement.dataset.theme = current === "light" ? "dark" : "light";
+}
+
+function createNewNote() {
+  noteCount++;
+  const note = { title: "New Note " + noteCount, preview: "Just created…" };
+  sampleNotes.unshift(note);
+  const el = document.createElement("div");
+  el.className = "note-item active";
+  el.setAttribute("data-note", "note-" + noteCount);
+  el.innerHTML = `<div class="note-title">${note.title}</div><div class="note-preview">${note.preview}</div>`;
+  el.addEventListener("click", () => {
+    document.querySelectorAll(".note-item").forEach(n => n.classList.remove("active"));
+    el.classList.add("active");
+    document.getElementById("editor-title").textContent = note.title;
+  });
+  notesList.prepend(el);
+  document.querySelectorAll(".note-item").forEach(n => n.classList.remove("active"));
+  el.classList.add("active");
+  document.getElementById("editor-title").textContent = note.title;
+  editor.value = "";
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  sidebar.style.display = sidebar.style.display === "none" ? "" : "none";
+}
+
+function showToast(title) {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.setAttribute("data-toast", title);
+  toast.innerHTML = `<span class="toast-icon">✓</span><span>${escapeHtml(title)}</span>`;
+  toastContainer.appendChild(toast);
+  
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      toast.classList.add("show");
+    });
+  });
+  
+  setTimeout(() => {
+    toast.classList.add("hide");
+    setTimeout(() => {
+      if (toast.parentNode) toast.remove();
+    }, 300);
+  }, 3000);
+}
+
+// Event handlers
+openBtn.addEventListener("click", openPalette);
+
+overlay.addEventListener("mousedown", (e) => {
+  if (e.target === overlay) closePalette();
+});
+
+document.addEventListener("keydown", (e) => {
+  // Open palette with Ctrl/Cmd+K
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    if (paletteOpen) {
+      closePalette();
+    } else {
+      openPalette();
+    }
+    return;
+  }
+  
+  if (!paletteOpen) return;
+  
+  switch (e.key) {
+    case "Escape":
+      e.preventDefault();
+      if (currentPage === "accent") {
+        currentPage = null;
+        input.value = "";
+        subpageChip.style.display = "none";
+        renderResults();
+      } else {
+        closePalette();
+      }
+      break;
+    case "ArrowDown":
+      e.preventDefault();
+      setActiveIndex(activeIndex + 1);
+      break;
+    case "ArrowUp":
+      e.preventDefault();
+      setActiveIndex(activeIndex - 1);
+      break;
+    case "Home":
+      e.preventDefault();
+      setActiveIndex(0);
+      break;
+    case "End":
+      e.preventDefault();
+      setActiveIndex(results.length - 1);
+      break;
+    case "Enter":
+      e.preventDefault();
+      if (results[activeIndex]) {
+        executeCommand(results[activeIndex].command);
+      }
+      break;
+    case "Backspace":
+      if (input.value === "" && currentPage === "accent") {
+        e.preventDefault();
+        currentPage = null;
+        input.value = "";
+        subpageChip.style.display = "none";
+        renderResults();
+      }
+      break;
+    case "Tab":
+      e.preventDefault();
+      input.focus();
+      break;
+  }
+});
+
+input.addEventListener("input", () => {
+  if (currentPage === "accent" && input.value.trim() === "") {
+    // Still in accent page, just clear filter
+  }
+  renderResults();
+});
+
+// Focus trap
+overlay.addEventListener("keydown", (e) => {
+  if (e.key === "Tab") {
+    e.preventDefault();
+    input.focus();
+  }
+});
+
+// Prevent focus from leaving the palette
+document.addEventListener("focusin", (e) => {
+  if (paletteOpen && !overlay.contains(e.target)) {
+    e.preventDefault();
+    input.focus();
+  }
+});
+
+})();
+</script>
+</body>
+</html>
+```

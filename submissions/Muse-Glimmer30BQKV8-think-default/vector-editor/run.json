@@ -1,0 +1,23 @@
+{
+  "source": "arena run",
+  "endpoint": "192.168.1.172:8080",
+  "apiModel": "D:\\models\\Muse-Glimmer-30B-UD-Q4_K_XL.gguf",
+  "servedModel": "D:\\models\\Muse-Glimmer-30B-UD-Q4_K_XL.gguf",
+  "params": {},
+  "startedAt": "2026-10-28T14:15:18.255Z",
+  "wallMs": 624673,
+  "ttftMs": 2198,
+  "thinkingMs": 525260,
+  "promptTokens": 1535,
+  "completionTokens": 39175,
+  "reasoningTokens": 31790,
+  "tokensEstimated": false,
+  "genTokensPerSec": 62.9,
+  "promptTokensPerSec": 776.9,
+  "finishReason": "stop",
+  "replyChars": 23279,
+  "reasoningChars": 121351,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 23268
+}

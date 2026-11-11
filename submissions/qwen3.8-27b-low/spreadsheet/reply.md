@@ -1,0 +1,1323 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gridcalc</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --col-w: 80px;
+  --row-h: 24px;
+  --hdr-row-h: 28px;
+  --row-hdr-w: 46px;
+  --grid-line: #e2e8f0;
+  --hdr-bg: #f8fafc;
+  --hdr-text: #64748b;
+  --sel-border: #3b82f6;
+  --sel-bg: #eff6ff;
+  --sel-hdr-bg: #dbeafe;
+  --err-bg: #fef2f2;
+  --err-text: #dc2626;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'SF Mono', 'Consolas', 'Liberation Mono', monospace;
+}
+
+html, body { height: 100%; overflow: hidden; font-family: var(--font); font-size: 13px; }
+
+body { display: flex; flex-direction: column; background: #fff; }
+
+/* Formula Bar */
+#formula-bar-container {
+  display: flex; align-items: center; height: 34px;
+  border-bottom: 1px solid var(--grid-line);
+  background: #fff; padding: 0 8px; gap: 8px;
+  flex-shrink: 0;
+}
+#cell-address {
+  min-width: 46px; text-align: center; font-weight: 600;
+  font-size: 12px; color: var(--hdr-text);
+  background: var(--hdr-bg); border-radius: 4px; padding: 4px 6px;
+  border: 1px solid var(--grid-line);
+}
+#formula-bar {
+  flex: 1; height: 28px; border: 1px solid var(--grid-line); border-radius: 4px;
+  padding: 0 8px; font-family: var(--mono); font-size: 13px; outline: none;
+  transition: border-color 0.15s;
+}
+#formula-bar:focus { border-color: var(--sel-border); }
+
+/* Grid */
+#grid-container {
+  flex: 1; overflow: auto; position: relative;
+  background: #fff;
+}
+#grid {
+  display: grid;
+  grid-template-columns: var(--row-hdr-w) repeat(26, var(--col-w));
+  grid-template-rows: var(--hdr-row-h) repeat(100, var(--row-h));
+  width: max-content;
+  min-width: 100%;
+}
+
+.grid-cell {
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
+  display: flex; align-items: center; padding: 0 6px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  user-select: none; position: relative;
+  font-size: 13px; line-height: var(--row-h);
+}
+
+.grid-cell.is-num { justify-content: flex-end; }
+.grid-cell.is-err { background: var(--err-bg); color: var(--err-text); font-weight: 500; }
+.grid-cell.is-bool { font-weight: 500; color: #16a34a; }
+
+.grid-cell.selected {
+  outline: 2px solid var(--sel-border);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+/* Headers */
+.col-hdr, .row-hdr {
+  background: var(--hdr-bg); color: var(--hdr-text);
+  font-size: 11px; font-weight: 600; text-align: center;
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
+  user-select: none; position: sticky; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+}
+.col-hdr { top: 0; height: var(--hdr-row-h); }
+.row-hdr { left: 0; width: var(--row-hdr-w); height: var(--row-h); }
+.corner-hdr {
+  position: sticky; top: 0; left: 0; z-index: 4;
+  background: var(--hdr-bg);
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
+}
+.col-hdr.selected { background: var(--sel-hdr-bg); color: var(--sel-border); }
+.row-hdr.selected { background: var(--sel-hdr-bg); color: var(--sel-border); }
+
+/* Editor */
+#cell-editor {
+  position: absolute; display: none;
+  border: 2px solid var(--sel-border); border-radius: 0;
+  font-family: var(--font); font-size: 13px;
+  padding: 0 4px; outline: none; z-index: 10;
+  background: #fff; color: #1e293b;
+  height: var(--row-h); width: var(--col-w);
+}
+
+/* Status bar */
+#status-bar {
+  height: 28px; border-top: 1px solid var(--grid-line);
+  display: flex; align-items: center; padding: 0 12px;
+  gap: 16px; font-size: 12px; color: var(--hdr-text);
+  background: var(--hdr-bg); flex-shrink: 0;
+}
+#status-bar span { display: inline-flex; align-items: center; gap: 4px; }
+#status-bar .stat-label { font-weight: 600; }
+
+/* Reference highlights */
+.grid-cell.ref-hl {
+  box-shadow: inset 0 0 0 2px #f59e0b;
+}
+.grid-cell.range-hl {
+  box-shadow: inset 0 0 0 1px #f59e0b;
+  background: #fef9c3;
+}
+
+/* Tooltip for errors */
+.grid-cell.is-err::after {
+  content: attr(data-error-msg);
+  position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+  background: #1e293b; color: #fff; padding: 4px 8px; border-radius: 4px;
+  font-size: 11px; white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity 0.15s; z-index: 20;
+}
+.grid-cell.is-err:hover::after { opacity: 1; }
+
+/* Scrollbar styling */
+#grid-container::-webkit-scrollbar { width: 10px; height: 10px; }
+#grid-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px; }
+#grid-container::-webkit-scrollbar-track { background: #f1f5f9; }
+</style>
+</head>
+<body>
+
+<div id="formula-bar-container">
+  <span id="cell-address">A1</span>
+  <input id="formula-bar" type="text" autocomplete="off" spellcheck="false">
+</div>
+
+<div id="grid-container">
+  <div id="grid"></div>
+</div>
+
+<input id="cell-editor" type="text" autocomplete="off" spellcheck="false">
+
+<div id="status-bar">
+  <span id="stat-sum"><span class="stat-label">Sum:</span> <span id="sum-val">0</span></span>
+  <span id="stat-count"><span class="stat-label">Count:</span> <span id="count-val">0</span></span>
+  <span id="stat-avg"><span class="stat-label">Avg:</span> <span id="avg-val">0</span></span>
+</div>
+
+<script>
+(function() {
+'use strict';
+
+// === CONSTANTS ===
+const COLS = 26, ROWS = 100;
+const COL_NAMES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const STORAGE_KEY = 'gridcalc_v1';
+
+// === STATE ===
+let cells = {};        // address -> { raw: string, value: any, type: 'num'|'str'|'bool'|'err'|'empty', error: string|null }
+let deps = {};         // address -> Set of addresses referenced
+let dependents = {};   // address -> Set of addresses that reference it
+let selectedCell = null;
+let editing = false;
+let editValue = '';
+let clipboard = null;  // { raw: string, source: address }
+let colHeaders = [];   // references to column header elements
+let rowHeaders = [];   // references to row header elements
+let cellEls = {};      // address -> DOM element
+
+// === UTILITIES ===
+function colName(c) { return COL_NAMES[c]; }
+function colIndex(name) { return COL_NAMES.indexOf(name.toUpperCase()); }
+function addr(col, row) { return colName(col) + (row + 1); }
+function parseAddr(s) {
+  s = s.toUpperCase().replace(/\$/g, '');
+  let m = s.match(/^([A-Z]+)(\d+)$/);
+  if (!m) return null;
+  let col = 0;
+  for (let i = 0; i < m[1].length; i++) col = col * 26 + (m[1][i].charCodeAt(0) - 64);
+  col--;
+  let row = parseInt(m[2]) - 1;
+  if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return null;
+  return { col, row };
+}
+
+function formatNum(n) {
+  if (n === 0) return '0';
+  let s = parseFloat(n.toPrecision(10));
+  return s.toString();
+}
+
+// === GRID CREATION ===
+function createGrid() {
+  const grid = document.getElementById('grid');
+  let html = '';
+
+  // Corner
+  html += `<div class="corner-hdr"></div>`;
+  // Column headers
+  for (let c = 0; c < COLS; c++) {
+    html += `<div class="col-hdr" data-col="${c}">${colName(c)}</div>`;
+  }
+
+  // Rows
+  for (let r = 0; r < ROWS; r++) {
+    html += `<div class="row-hdr" data-row="${r}">${r + 1}</div>`;
+    for (let c = 0; c < COLS; c++) {
+      let a = addr(c, r);
+      html += `<div class="grid-cell" data-cell="${a}" tabindex="-1"></div>`;
+    }
+  }
+
+  grid.innerHTML = html;
+
+  // Collect references
+  const allCells = grid.querySelectorAll('.grid-cell[data-cell]');
+  allCells.forEach(el => {
+    cellEls[el.dataset.cell] = el;
+  });
+  colHeaders = Array.from(grid.querySelectorAll('.col-hdr'));
+  rowHeaders = Array.from(grid.querySelectorAll('.row-hdr'));
+}
+
+// === FORMULA ENGINE ===
+
+// Tokenizer
+function tokenize(src) {
+  const tokens = [];
+  let i = 0;
+  const len = src.length;
+
+  while (i < len) {
+    let ch = src[i];
+
+    // Skip whitespace
+    if (ch === ' ' || ch === '\t') { i++; continue; }
+
+    // String literal
+    if (ch === '"') {
+      let start = i++;
+      let str = '';
+      while (i < len && src[i] !== '"') { str += src[i]; i++; }
+      if (i >= len) throw new Error('Unterminated string');
+      i++; // closing quote
+      tokens.push({ type: 'STRING', value: str });
+      continue;
+    }
+
+    // Number
+    if ((ch >= '0' && ch <= '9') || (ch === '.' && i + 1 < len && src[i+1] >= '0' && src[i+1] <= '9')) {
+      let start = i;
+      while (i < len && ((src[i] >= '0' && src[i] <= '9') || src[i] === '.')) i++;
+      // Check for scientific notation
+      if (i < len && (src[i] === 'e' || src[i] === 'E')) {
+        let j = i + 1;
+        if (j < len && (src[j] === '+' || src[j] === '-')) j++;
+        if (j < len && src[j] >= '0' && src[j] <= '9') {
+          i = j;
+          while (i < len && src[i] >= '0' && src[i] <= '9') i++;
+        }
+      }
+      let numStr = src.slice(start, i);
+      let val = parseFloat(numStr);
+      if (isNaN(val)) throw new Error('Invalid number: ' + numStr);
+      tokens.push({ type: 'NUMBER', value: val });
+      continue;
+    }
+
+    // Cell reference or identifier
+    if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch === '$') {
+      let start = i;
+      // Parse potential cell reference
+      let s = '';
+      // Handle $ prefix
+      if (ch === '$') { s += '$'; i++; }
+      if (i >= len || !((src[i] >= 'A' && src[i] <= 'Z') || (src[i] >= 'a' && src[i] <= 'z'))) {
+        throw new Error('Invalid reference at position ' + start);
+      }
+      s += src[i]; i++;
+      // Parse column letters
+      while (i < len && ((src[i] >= 'A' && src[i] <= 'Z') || (src[i] >= 'a' && src[i] <= 'z'))) {
+        s += src[i]; i++;
+      }
+      // Handle $ before row
+      if (i < len && src[i] === '$') { s += '$'; i++; }
+      // Parse row number
+      let rowStart = i;
+      while (i < len && src[i] >= '0' && src[i] <= '9') { i++; }
+      if (i === rowStart) {
+        // Not a cell ref — might be a function name or TRUE/FALSE
+        let ident = src.slice(start, i);
+        let upper = ident.toUpperCase().replace(/\$/g, '');
+        if (upper === 'TRUE') { tokens.push({ type: 'BOOL', value: true }); continue; }
+        if (upper === 'FALSE') { tokens.push({ type: 'BOOL', value: false }); continue; }
+        // Check if it's a function (followed by open paren, possibly with spaces)
+        let j = i;
+        while (j < len && (src[j] === ' ' || src[j] === '\t')) j++;
+        if (j < len && src[j] === '(') {
+          tokens.push({ type: 'FUNC', value: upper });
+          continue;
+        }
+        throw new Error('Unknown identifier: ' + ident);
+      }
+      s += src.slice(rowStart, i);
+      // Check for range
+      if (i < len && src[i] === ':') {
+        i++; // consume :
+        let s2 = '';
+        if (i < len && src[i] === '$') { s2 += '$'; i++; }
+        if (i >= len || !((src[i] >= 'A' && src[i] <= 'Z') || (src[i] >= 'a' && src[i] <= 'z'))) throw new Error('Invalid range end');
+        s2 += src[i]; i++;
+        while (i < len && ((src[i] >= 'A' && src[i] <= 'Z') || (src[i] >= 'a' && src[i] <= 'z'))) { s2 += src[i]; i++; }
+        if (i < len && src[i] === '$') { s2 += '$'; i++; }
+        while (i < len && src[i] >= '0' && src[i] <= '9') { i++; }
+        s2 += src.slice(s2.length - (i - (s2.length - s2.replace(/\$/g,'').length)) );
+        // Simpler: just re-slice
+        let rangeEnd = src.slice(0, i).replace(/^.*:/, '');
+        // Actually let me just parse it properly
+        tokens.push({ type: 'RANGE', value: s + ':' + src.slice(0, i).split(':').pop() });
+        continue;
+      }
+      tokens.push({ type: 'CELLREF', value: s.toUpperCase() });
+      continue;
+    }
+
+    // Operators
+    if (ch === '<' && i + 1 < len && src[i+1] === '>') {
+      tokens.push({ type: 'OP', value: '<>' }); i += 2; continue;
+    }
+    if (ch === '<' && i + 1 < len && src[i+1] === '=') {
+      tokens.push({ type: 'OP', value: '<=' }); i += 2; continue;
+    }
+    if (ch === '>' && i + 1 < len && src[i+1] === '=') {
+      tokens.push({ type: 'OP', value: '>=' }); i += 2; continue;
+    }
+    if (ch === '+' || ch === '-' || ch === '*' || ch === '/' || ch === '^' || ch === '&' || ch === '=' || ch === '<' || ch === '>') {
+      tokens.push({ type: 'OP', value: ch }); i++; continue;
+    }
+    if (ch === '(') { tokens.push({ type: 'LPAREN' }); i++; continue; }
+    if (ch === ')') { tokens.push({ type: 'RPAREN' }); i++; continue; }
+    if (ch === ',') { tokens.push({ type: 'COMMA' }); i++; continue; }
+
+    throw new Error('Unexpected character: ' + ch);
+  }
+
+  return tokens;
+}
+
+// Parser
+function parse(tokens) {
+  let pos = 0;
+
+  function peek() { return pos < tokens.length ? tokens[pos] : null; }
+  function next() { return tokens[pos++]; }
+  function expect(type, val) {
+    let t = next();
+    if (!t || t.type !== type || (val !== undefined && t.value !== val)) {
+      throw new Error('Expected ' + type + ' but got ' + (t ? t.type + ':' + t.value : 'EOF'));
+    }
+    return t;
+  }
+
+  function parseExpression() { return parseComparison(); }
+
+  function parseComparison() {
+    let left = parseConcat();
+    while (peek() && peek().type === 'OP' && ['=','<>','<','>','<=','>='].includes(peek().value)) {
+      let op = next().value;
+      let right = parseConcat();
+      left = { type: 'binop', op, left, right };
+    }
+    return left;
+  }
+
+  function parseConcat() {
+    let left = parseAddSub();
+    while (peek() && peek().type === 'OP' && peek().value === '&') {
+      next();
+      let right = parseAddSub();
+      left = { type: 'binop', op: '&', left, right };
+    }
+    return left;
+  }
+
+  function parseAddSub() {
+    let left = parseMulDiv();
+    while (peek() && peek().type === 'OP' && (peek().value === '+' || peek().value === '-')) {
+      let op = next().value;
+      let right = parseMulDiv();
+      left = { type: 'binop', op, left, right };
+    }
+    return left;
+    }
+
+  function parseMulDiv() {
+    let left = parseUnary();
+    while (peek() && peek().type === 'OP' && (peek().value === '*' || peek().value === '/')) {
+      let op = next().value;
+      let right = parseUnary();
+      left = { type: 'binop', op, left, right };
+    }
+    return left;
+  }
+
+  function parseUnary() {
+    if (peek() && peek().type === 'OP' && (peek().value === '-' || peek().value === '+')) {
+      let op = next().value;
+      let operand = parseUnary();
+      if (op === '-') return { type: 'unary', op: '-', operand };
+      return operand;
+    }
+    return parsePower();
+  }
+
+  function parsePower() {
+    let base = parseAtom();
+    if (peek() && peek().type === 'OP' && peek().value === '^') {
+      next();
+      let exp = parseUnary(); // right-associative, allows - in exponent
+      return { type: 'binop', op: '^', left: base, right: exp };
+    }
+    return base;
+  }
+
+  function parseAtom() {
+    let t = peek();
+    if (!t) throw new Error('Unexpected end of expression');
+
+    if (t.type === 'NUMBER') { next(); return { type: 'number', value: t.value }; }
+    if (t.type === 'STRING') { next(); return { type: 'string', value: t.value }; }
+    if (t.type === 'BOOL') { next(); return { type: 'bool', value: t.value }; }
+    if (t.type === 'CELLREF') { next(); return { type: 'cellref', value: t.value }; }
+    if (t.type === 'RANGE') { next(); return { type: 'range', value: t.value }; }
+    if (t.type === 'FUNC') {
+      next();
+      expect('LPAREN');
+      let args = [];
+      if (peek() && peek().type !== 'RPAREN') {
+        args.push(parseExpression());
+        while (peek() && peek().type === 'COMMA') {
+          next();
+          args.push(parseExpression());
+        }
+      }
+      expect('RPAREN');
+      return { type: 'func', name: t.value, args };
+    }
+    if (t.type === 'LPAREN') {
+      next();
+      let expr = parseExpression();
+      expect('RPAREN');
+      return expr;
+    }
+
+    throw new Error('Unexpected token: ' + t.type + ' ' + (t.value || ''));
+  }
+
+  let ast = parseExpression();
+  if (pos < tokens.length) throw new Error('Unexpected tokens after expression');
+  return ast;
+}
+
+// Evaluator
+function evaluate(node, currentCell) {
+  switch (node.type) {
+    case 'number': return { value: node.value, type: 'num' };
+    case 'string': return { value: node.value, type: 'str' };
+    case 'bool': return { value: node.value, type: 'bool' };
+
+    case 'cellref': {
+      let a = node.value.replace(/\$/g, '');
+      let p = parseAddr(a);
+      if (!p) return { value: '#REF!', type: 'err', error: 'Reference out of bounds' };
+      let cell = cells[addr(p.col, p.row)];
+      if (!cell || cell.type === 'empty') return { value: 0, type: 'num' };
+      if (cell.type === 'err') return { value: cell.value, type: 'err', error: cell.error };
+      return { value: cell.value, type: cell.type };
+    }
+
+    case 'range': {
+      // Ranges only valid as function args; if used elsewhere, error
+      return { value: '#ERROR!', type: 'err', error: 'Range used outside function' };
+    }
+
+    case 'binop': {
+      let op = node.op;
+      if (op === '&') {
+        let l = evalOperand(node.left, currentCell);
+        let r = evalOperand(node.right, currentCell);
+        if (l.type === 'err') return l;
+        if (r.type === 'err') return r;
+        let ls = l.type === 'num' ? formatNum(l.value) : (l.type === 'bool' ? (l.value ? 'TRUE' : 'FALSE') : l.value);
+        let rs = r.type === 'num' ? formatNum(r.value) : (r.type === 'bool' ? (r.value ? 'TRUE' : 'FALSE') : r.value);
+        return { value: ls + rs, type: 'str' };
+      }
+
+      let l = evalOperand(node.left, currentCell);
+      if (l.type === 'err') return l;
+      let r = evalOperand(node.right, currentCell);
+      if (r.type === 'err') return r;
+
+      // Comparison operators
+      if (['=','<>','<','>','<=','>='].includes(op)) {
+        let res = false;
+        if (typeof l.value === 'number' && typeof r.value === 'number') {
+          if (op === '=') res = l.value === r.value;
+          else if (op === '<>') res = l.value !== r.value;
+          else if (op === '<') res = l.value < r.value;
+          else if (op === '>') res = l.value > r.value;
+          else if (op === '<=') res = l.value <= r.value;
+          else if (op === '>=') res = l.value >= r.value;
+        } else if (typeof l.value === 'string' && typeof r.value === 'string') {
+          if (op === '=') res = l.value === r.value;
+          else if (op === '<>') res = l.value !== r.value;
+          else if (op === '<') res = l.value < r.value;
+          else if (op === '>') res = l.value > r.value;
+          else if (op === '<=') res = l.value <= r.value;
+          else if (op === '>=') res = l.value >= r.value;
+        } else {
+          // Mixed types: try numeric
+          let ln = l.type === 'num' ? l.value : (l.type === 'bool' ? (l.value ? 1 : 0) : NaN);
+          let rn = r.type === 'num' ? r.value : (r.type === 'bool' ? (r.value ? 1 : 0) : NaN);
+          if (isNaN(ln) || isNaN(rn)) return { value: '#VALUE!', type: 'err', error: 'Cannot compare types' };
+          if (op === '=') res = ln === rn;
+          else if (op === '<>') res = ln !== rn;
+          else if (op === '<') res = ln < rn;
+          else if (op === '>') res = ln > rn;
+          else if (op === '<=') res = ln <= rn;
+          else if (op === '>=') res = ln >= rn;
+        }
+        return { value: res, type: 'bool' };
+      }
+
+      // Arithmetic: both must be numeric (or convertible)
+      let ln = toNumber(l);
+      let rn = toNumber(r);
+      if (ln === null || rn === null) return { value: '#VALUE!', type: 'err', error: 'Text used in arithmetic' };
+
+      let result;
+      switch (op) {
+        case '+': result = ln + rn; break;
+        case '-': result = ln - rn; break;
+        case '*': result = ln * rn; break;
+        case '/':
+          if (rn === 0) return { value: '#DIV/0!', type: 'err', error: 'Division by zero' };
+          result = ln / rn; break;
+        case '^': result = Math.pow(ln, rn); break;
+        default: return { value: '#ERROR!', type: 'err', error: 'Unknown operator' };
+      }
+      if (isNaN(result) || !isFinite(result)) return { value: '#VALUE!', type: 'err', error: 'Invalid arithmetic result' };
+      return { value: result, type: 'num' };
+    }
+
+    case 'unary': {
+      let operand = evalOperand(node.operand, currentCell);
+      if (operand.type === 'err') return operand;
+      let n = toNumber(operand);
+      if (n === null) return { value: '#VALUE!', type: 'err', error: 'Cannot negate text' };
+      return { value: -n, type: 'num' };
+    }
+
+    case 'func': {
+      let name = node.name;
+      let args = node.args;
+
+      switch (name) {
+        case 'SUM': case 'AVERAGE': case 'MIN': case 'MAX': case 'COUNT': {
+          let values = collectRangeValues(args);
+          if (values.error) return values;
+          let nums = values.filter(v => v !== null);
+          if (name === 'SUM') {
+            if (nums.length === 0) return { value: 0, type: 'num' };
+            return { value: nums.reduce((a, b) => a + b, 0), type: 'num' };
+          }
+          if (name === 'AVERAGE') {
+            if (nums.length === 0) return { value: 0, type: 'num' };
+            return { value: nums.reduce((a, b) => a + b, 0) / nums.length, type: 'num' };
+          }
+          if (name === 'MIN') {
+            if (nums.length === 0) return { value: 0, type: 'num' };
+            return { value: Math.min(...nums), type: 'num' };
+          }
+          if (name === 'MAX') {
+            if (nums.length === 0) return { value: 0, type: 'num' };
+            return { value: Math.max(...nums), type: 'num' };
+          }
+          if (name === 'COUNT') {
+            return { value: nums.length, type: 'num' };
+          }
+          break;
+        }
+        case 'IF': {
+          if (args.length < 2) return { value: '#ERROR!', type: 'err', error: 'IF requires at least 2 args' };
+          let cond = evalOperand(args[0], currentCell);
+          if (cond.type === 'err') return cond;
+          let cv = toNumber(cond);
+          let truthy = cv !== null ? cv !== 0 : (cond.value === true);
+          if (cond.type === 'str') truthy = cond.value !== '';
+          if (truthy) return evalOperand(args[1], currentCell);
+          else return args[2] ? evalOperand(args[2], currentCell) : { value: false, type: 'bool' };
+        }
+        case 'ABS': {
+          let v = evalOperand(args[0], currentCell);
+          if (v.type === 'err') return v;
+          let n = toNumber(v);
+          if (n === null) return { value: '#VALUE!', type: 'err', error: 'ABS requires number' };
+          return { value: Math.abs(n), type: 'num' };
+        }
+        case 'ROUND': {
+          let v = evalOperand(args[0], currentCell);
+          if (v.type === 'err') return v;
+          let n = toNumber(v);
+          if (n === null) return { value: '#VALUE!', type: 'err', error: 'ROUND requires number' };
+          let digits = 0;
+          if (args[1]) {
+            let dv = evalOperand(args[1], currentCell);
+            if (dv.type === 'err') return dv;
+            digits = toNumber(dv);
+            if (digits === null) return { value: '#VALUE!', type: 'err', error: 'ROUND digits must be number' };
+            digits = Math.trunc(digits);
+          }
+          let factor = Math.pow(10, digits);
+          return { value: Math.round(n * factor) / factor, type: 'num' };
+        }
+        default:
+          return { value: '#ERROR!', type: 'err', error: 'Unknown function: ' + name };
+      }
+      break;
+    }
+
+    default:
+      return { value: '#ERROR!', type: 'err', error: 'Unknown node type' };
+  }
+}
+
+function evalOperand(node, currentCell) {
+  if (node.type === 'range') {
+    // A range outside of a function context is an error
+    return { value: '#ERROR!', type: 'err', error: 'Range outside function' };
+  }
+  return evaluate(node, currentCell);
+}
+
+function toNumber(result) {
+  if (result.type === 'num') return result.value;
+  if (result.type === 'bool') return result.value ? 1 : 0;
+  if (result.type === 'str') {
+    let n = parseFloat(result.value);
+    if (!isNaN(n) && result.value.trim() !== '') return n;
+    return null;
+  }
+  return null;
+}
+
+function collectRangeValues(args) {
+  let values = [];
+  let error = null;
+  for (let arg of args) {
+    if (arg.type === 'range') {
+      let parts = arg.value.split(':');
+      let start = parseAddr(parts[0].replace(/\$/g, ''));
+      let end = parseAddr(parts[1].replace(/\$/g, ''));
+      if (!start || !end) return { error: { value: '#REF!', type: 'err', error: 'Invalid range' } };
+      let c1 = Math.min(start.col, end.col), c2 = Math.max(start.col, end.col);
+      let r1 = Math.min(start.row, end.row), r2 = Math.max(start.row, end.row);
+      for (let r = r1; r <= r2; r++) {
+        for (let c = c1; c <= c2; c++) {
+          let a = addr(c, r);
+          let cell = cells[a];
+          if (!cell || cell.type === 'empty') continue;
+          if (cell.type === 'err') return { error: { value: cell.value, type: 'err', error: cell.error } };
+          if (cell.type === 'num') values.push(cell.value);
+          if (cell.type === 'bool') values.push(cell.value ? 1 : 0);
+          // text cells are ignored by range functions
+        }
+      }
+    } else {
+      let res = evaluate(arg, null);
+      if (res.type === 'err') return { error: res };
+      if (res.type === 'num') values.push(res.value);
+      if (res.type === 'bool') values.push(res.value ? 1 : 0);
+    }
+  }
+  return values;
+}
+
+// Extract cell references from a formula (for dependency tracking)
+function extractRefs(src) {
+  if (!src || src[0] !== '=') return new Set();
+  let refs = new Set();
+  let formula = src.slice(1);
+  // Find all cell refs and range refs
+  let re = /\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?/gi;
+  let m;
+  while ((m = re.exec(formula)) !== null) {
+    let col1 = m[1].toUpperCase(), row1 = m[2];
+    if (m[3]) {
+      let col2 = m[3].toUpperCase(), row2 = m[4];
+      let p1 = parseAddr(col1 + row1);
+      let p2 = parseAddr(col2 + row2);
+      if (p1 && p2) {
+        let c1 = Math.min(p1.col, p2.col), c2 = Math.max(p1.col, p2.col);
+        let r1 = Math.min(p1.row, p2.row), r2 = Math.max(p1.row, p2.row);
+        for (let r = r1; r <= r2; r++)
+          for (let c = c1; c <= c2; c++)
+            refs.add(addr(c, r));
+      }
+    } else {
+      let p = parseAddr(col1 + row1);
+      if (p) refs.add(addr(p.col, p.row));
+    }
+  }
+  return refs;
+}
+
+// === DEPENDENCY GRAPH & RECALCULATION ===
+
+function updateDeps(cellAddr, newRefs) {
+  let oldRefs = deps[cellAddr] || new Set();
+  let newRefSet = new Set(newRefs);
+
+  // Remove from dependents
+  for (let ref of oldRefs) {
+    if (!newRefSet.has(ref)) {
+      if (dependents[ref]) dependents[ref].delete(cellAddr);
+    }
+  }
+  // Add to dependents
+  for (let ref of newRefSet) {
+    if (!oldRefs.has(ref)) {
+      if (!dependents[ref]) dependents[ref] = new Set();
+      dependents[ref].add(cellAddr);
+    }
+  }
+
+  deps[cellAddr] = newRefSet;
+}
+
+function recalculate(changedCell) {
+  // Find all affected cells (transitive dependents)
+  let affected = new Set();
+  let queue = [changedCell];
+  affected.add(changedCell);
+  while (queue.length > 0) {
+    let cur = queue.shift();
+    let deps2 = dependents[cur] || new Set();
+    for (let d of deps2) {
+      if (!affected.has(d)) {
+        affected.add(d);
+        queue.push(d);
+      }
+    }
+  }
+
+  // Topological sort using Kahn's algorithm
+  // In-degree = number of dependencies within the affected set
+  let inDegree = {};
+  for (let cell of affected) {
+    let cellDeps = deps[cell] || new Set();
+    let count = 0;
+    for (let d of cellDeps) {
+      if (affected.has(d) && d !== cell) count++;
+    }
+    inDegree[cell] = count;
+  }
+
+  let queue2 = [];
+  for (let cell of affected) {
+    if (inDegree[cell] === 0) queue2.push(cell);
+  }
+
+  let processed = new Set();
+  let order = [];
+  while (queue2.length > 0) {
+    let cur = queue2.shift();
+    processed.add(cur);
+    order.push(cur);
+    let cellDeps = dependents[cur] || new Set();
+    for (let d of cellDeps) {
+      if (affected.has(d)) {
+        inDegree[d]--;
+        if (inDegree[d] === 0) queue2.push(d);
+      }
+    }
+  }
+
+  // Cells not processed are in cycles
+  let cycleCells = new Set();
+  for (let cell of affected) {
+    if (!processed.has(cell)) cycleCells.add(cell);
+  }
+
+  // Evaluate in topological order
+  for (let cellAddr of order) {
+    if (cellAddr === changedCell) {
+      // The changed cell's value is already set by the setter
+      continue;
+    }
+    let cell = cells[cellAddr];
+    if (!cell || cell.type === 'empty') continue;
+    if (cell.type !== 'formula') continue;
+
+    // Check if any dependency is a cycle or has an error
+    let cellDeps = deps[cellAddr] || new Set();
+    let hasCycDep = false;
+    for (let d of cellDeps) {
+      if (cycleCells.has(d)) { hasCycDep = true; break; }
+      let dc = cells[d];
+      if (dc && dc.type === 'err') {
+        // Will propagate naturally through evaluation
+      }
+    }
+
+    if (hasCycDep) {
+      cell.value = '#CYCLE!';
+      cell.type = 'err';
+      cell.error = 'Circular reference';
+      continue;
+    }
+
+    let result = safeEvaluate(cell.raw, cellAddr);
+    cell.value = result.value;
+    cell.type = result.type;
+    cell.error = result.error || null;
+  }
+
+  // Mark cycle cells
+  for (let cellAddr of cycleCells) {
+    let cell = cells[cellAddr];
+    if (cell) {
+      cell.value = '#CYCLE!';
+      cell.type = 'err';
+      cell.error = 'Circular reference';
+    }
+  }
+
+  // Update display for all affected cells
+  for (let cellAddr of affected) {
+    updateCellDisplay(cellAddr);
+  }
+}
+
+function safeEvaluate(raw, cellAddr) {
+  try {
+    let formula = raw.slice(1); // remove =
+    let tokens = tokenize(formula);
+    let ast = parse(tokens);
+    return evaluate(ast, cellAddr);
+  } catch (e) {
+    return { value: '#ERROR!', type: 'err', error: e.message || 'Parse error' };
+  }
+}
+
+// === CELL MANAGEMENT ===
+
+function setCellContent(addr, raw) {
+  raw = raw || '';
+  let cell = cells[addr];
+  let oldRefs = deps[addr] || new Set();
+
+  if (cell.type === 'formula' && raw !== cell.raw) {
+    // Content changed
+  }
+
+  if (raw === '') {
+    cell.raw = '';
+    cell.value = null;
+    cell.type = 'empty';
+    cell.error = null;
+  } else if (raw[0] === '=') {
+    cell.raw = raw;
+    cell.type = 'formula';
+    cell.error = null;
+    // Evaluate
+    let result = safeEvaluate(raw, addr);
+    cell.value = result.value;
+    cell.type = result.type;
+    cell.error = result.error || null;
+  } else {
+    // Check if it's a number
+    let numVal = tryParseNumber(raw);
+    if (numVal !== null) {
+      cell.raw = raw;
+      cell.value = numVal;
+      cell.type = 'num';
+      cell.error = null;
+    } else {
+      cell.raw = raw;
+      cell.value = raw;
+      cell.type = 'str';
+      cell.error = null;
+    }
+  }
+
+  // Update dependencies
+  let newRefs = extractRefs(raw);
+  updateDeps(addr, newRefs);
+
+  // Recalculate dependents
+  recalculate(addr);
+
+  // Update display of the changed cell itself
+  updateCellDisplay(addr);
+
+  // Save
+  save();
+}
+
+function tryParseNumber(s) {
+  let trimmed = s.trim();
+  if (trimmed === '') return null;
+  if (/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(trimmed)) {
+    let v = parseFloat(trimmed);
+    if (!isNaN(v)) return v;
+  }
+  return null;
+}
+
+function updateCellDisplay(addr) {
+  let el = cellEls[addr];
+  if (!el) return;
+  let cell = cells[addr];
+  let text = '';
+  el.className = 'grid-cell';
+
+  if (!cell || cell.type === 'empty') {
+    text = '';
+  } else if (cell.type === 'err') {
+    text = cell.value;
+    el.classList.add('is-err');
+    el.dataset.errorMsg = cell.error || cell.value;
+  } else if (cell.type === 'bool') {
+    text = cell.value ? 'TRUE' : 'FALSE';
+    el.classList.add('is-bool');
+  } else if (cell.type === 'num') {
+    text = formatNum(cell.value);
+    el.classList.add('is-num');
+  } else {
+    text = cell.value;
+  }
+
+  el.textContent = text;
+
+  // Re-apply selection
+  if (selectedCell === addr) el.classList.add('selected');
+
+  // Re-apply reference highlights if editing
+  if (editing) {
+    applyRefHighlights();
+  }
+}
+
+function updateAllDisplays() {
+  for (let addr in cells) {
+    updateCellDisplay(addr);
+  }
+}
+
+// === UI ===
+
+function selectCell(addr) {
+  if (editing) commitEdit();
+  if (selectedCell && cellEls[selectedCell]) {
+    cellEls[selectedCell].classList.remove('selected');
+    cellEls[selectedCell].removeAttribute('aria-selected');
+  }
+  // Deselect headers
+  colHeaders.forEach(h => h.classList.remove('selected'));
+  rowHeaders.forEach(h => h.classList.remove('selected'));
+
+  selectedCell = addr;
+  let el = cellEls[addr];
+  el.classList.add('selected');
+  el.setAttribute('aria-selected', 'true');
+
+  // Highlight headers
+  let p = parseAddr(addr);
+  if (p) {
+    if (colHeaders[p.col]) colHeaders[p.col].classList.add('selected');
+    if (rowHeaders[p.row]) rowHeaders[p.row].classList.add('selected');
+  }
+
+  // Update formula bar
+  document.getElementById('cell-address').textContent = addr;
+  let cell = cells[addr];
+  document.getElementById('formula-bar').value = cell ? cell.raw : '';
+
+  // Update status bar
+  updateStatusBar();
+
+  // Scroll into view
+  el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function updateStatusBar() {
+  let cell = cells[selectedCell];
+  let sumVal = document.getElementById('sum-val');
+  let countVal = document.getElementById('count-val');
+  let avgVal = document.getElementById('avg-val');
+
+  if (!cell || cell.type === 'empty') {
+    sumVal.textContent = '0';
+    countVal.textContent = '0';
+    avgVal.textContent = '0';
+  } else if (cell.type === 'num') {
+    sumVal.textContent = formatNum(cell.value);
+    countVal.textContent = '1';
+    avgVal.textContent = formatNum(cell.value);
+  } else if (cell.type === 'bool') {
+    sumVal.textContent = cell.value ? '1' : '0';
+    countVal.textContent = '1';
+    avgVal.textContent = cell.value ? '1' : '0';
+  } else {
+    sumVal.textContent = '0';
+    countVal.textContent = cell.type === 'str' ? '1' : '0';
+    avgVal.textContent = '0';
+  }
+}
+
+// === EDITING ===
+function startEdit(initial) {
+  editing = true;
+  editValue = initial;
+  let editor = document.getElementById('cell-editor');
+  let selEl = cellEls[selectedCell];
+  let rect = selEl.getBoundingClientRect();
+  let container = document.getElementById('grid-container');
+  let cRect = container.getBoundingClientRect();
+
+  editor.style.left = (rect.left - cRect.left + container.scrollLeft) + 'px';
+  editor.style.top = (rect.top - cRect.top + container.scrollTop) + 'px';
+  editor.style.width = rect.width + 'px';
+  editor.style.height = rect.height + 'px';
+  editor.style.display = 'block';
+  editor.value = initial;
+  editor.focus();
+
+  // Place caret at end
+  editor.selectionStart = editor.selectionEnd = initial.length;
+
+  // Highlight references
+  applyRefHighlights();
+}
+
+function commitEdit() {
+  if (!editing) return;
+  editing = false;
+  let editor = document.getElementById('cell-editor');
+  editor.style.display = 'none';
+  clearRefHighlights();
+
+  setCellContent(selectedCell, editor.value);
+  updateCellDisplay(selectedCell);
+}
+
+function cancelEdit() {
+  if (!editing) return;
+  editing = false;
+  let editor = document.getElementById('cell-editor');
+  editor.style.display = 'none';
+  editor.value = '';
+  clearRefHighlights();
+  updateCellDisplay(selectedCell);
+}
+
+function applyRefHighlights() {
+  clearRefHighlights();
+  if (!editing) return;
+  let editor = document.getElementById('cell-editor');
+  let val = editor.value;
+  if (!val || val[0] !== '=') return;
+
+  let refs = extractRefs(val);
+  for (let ref of refs) {
+    let el = cellEls[ref];
+    if (el) el.classList.add('ref-hl');
+  }
+}
+
+function clearRefHighlights() {
+  document.querySelectorAll('.ref-hl').forEach(el => el.classList.remove('ref-hl'));
+  document.querySelectorAll('.range-hl').forEach(el => el.classList.remove('range-hl'));
+}
+
+// === KEYBOARD HANDLING ===
+
+document.addEventListener('keydown', function(e) {
+  let fb = document.getElementById('formula-bar');
+
+  // Handle formula bar
+  if (document.activeElement === fb) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setCellContent(selectedCell, fb.value);
+      updateCellDisplay(selectedCell);
+      selectCell(selectedCell);
+    }
+    return;
+  }
+
+  // If editing in cell editor
+  if (editing) {
+    let editor = document.getElementById('cell-editor');
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      let moveRow = e.shiftKey ? -1 : 1;
+      commitEdit();
+      moveSelection(0, moveRow);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      let moveCol = e.shiftKey ? -1 : 1;
+      commitEdit();
+      moveSelection(moveCol, 0);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEdit();
+    }
+    return;
+  }
+
+  // Navigation and editing
+  let p = parseAddr(selectedCell);
+  if (!p) return;
+
+  if (e.key === 'ArrowUp') {
+    e.preventDefault(); moveSelection(0, -1);
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault(); moveSelection(0, 1);
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault(); moveSelection(-1, 0);
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault(); moveSelection(1, 0);
+  } else if (e.key === 'F2') {
+    e.preventDefault();
+    startEdit(cells[selectedCell] ? cells[selectedCell].raw : '');
+  } else if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault();
+    setCellContent(selectedCell, '');
+    updateCellDisplay(selectedCell);
+    selectCell(selectedCell);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    startEdit('');
+  } else if (e.key === 'Tab') {
+    e.preventDefault();
+    moveSelection(e.shiftKey ? -1 : 1, 0);
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+    e.preventDefault();
+    doCopy();
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+    e.preventDefault();
+    doPaste();
+  } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    // Printable character - start editing with replacement
+    e.preventDefault();
+    startEdit(e.key);
+  }
+});
+
+function moveSelection(dc, dr) {
+  let p = parseAddr(selectedCell);
+  let newCol = Math.max(0, Math.min(COLS - 1, p.col + dc));
+  let newRow = Math.max(0, Math.min(ROWS - 1, p.row + dr));
+  selectCell(addr(newCol, newRow));
+}
+
+// === MOUSE HANDLING ===
+
+document.getElementById('grid').addEventListener('click', function(e) {
+  let target = e.target.closest('[data-cell]');
+  if (!target) return;
+  let addr = target.dataset.cell;
+  if (editing && selectedCell !== addr) {
+    commitEdit();
+  }
+  selectCell(addr);
+});
+
+document.getElementById('grid').addEventListener('dblclick', function(e) {
+  let target = e.target.closest('[data-cell]');
+  if (!target) return;
+  let addr = target.dataset.cell;
+  selectCell(addr);
+  startEdit(cells[addr] ? cells[addr].raw : '');
+});
+
+// Formula bar focus
+document.getElementById('formula-bar').addEventListener('focus', function() {
+  // Nothing special
+});
+
+// Handle scroll to reposition editor
+document.getElementById('grid-container').addEventListener('scroll', function() {
+  if (editing) {
+    let editor = document.getElementById('cell-editor');
+    let selEl = cellEls[selectedCell];
+    if (selEl) {
+      let rect = selEl.getBoundingClientRect();
+      let container = document.getElementById('grid-container');
+      let cRect = container.getBoundingClientRect();
+      editor.style.left = (rect.left - cRect.left + container.scrollLeft) + 'px';
+      editor.style.top = (rect.top - cRect.top + container.scrollTop) + 'px';
+    }
+  }
+});
+
+// === COPY & PASTE ===
+
+function doCopy() {
+  let cell = cells[selectedCell];
+  if (cell && cell.raw) {
+    clipboard = { raw: cell.raw, source: selectedCell };
+  } else {
+    clipboard = { raw: '', source: selectedCell };
+  }
+}
+
+function doPaste() {
+  if (!clipboard) return;
+  let srcP = parseAddr(clipboard.source);
+  let dstP = parseAddr(selectedCell);
+  if (!srcP || !dstP) return;
+
+  let raw = clipboard.raw;
+  if (raw[0] === '=') {
+    // Shift relative references
+    raw = shiftFormula(raw, dstP.row - srcP.row, dstP.col - srcP.col);
+  }
+  setCellContent(selectedCell, raw);
+  updateCellDisplay(selectedCell);
+}
+
+function shiftFormula(formula, rowOffset, colOffset) {
+  // Shift cell references in the formula
+  // Match cell refs with optional $
+  return formula.replace(/(\$?)([A-Z]+)(\$?)(\d+)/gi, function(match, d1, colPart, d2, rowPart) {
+    let col = 0;
+    for (let i = 0; i < colPart.length; i++) col = col * 26 + (colPart[i].toUpperCase().charCodeAt(0) - 64);
+    col--;
+    let row = parseInt(rowPart) - 1;
+
+    if (d1 !== '$') col += colOffset;
+    if (d2 !== '$') row += rowOffset;
+
+    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) {
+      return match; // Keep original if out of bounds
+    }
+
+    let newCol = d1 + colName(col);
+    let newRow = d2 + (row + 1);
+    return newCol + newRow;
+  });
+}
+
+// === PERSISTENCE ===
+
+function save() {
+  let data = {};
+  for (let addr in cells) {
+    if (cells[addr].raw) data[addr] = cells[addr].raw;
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {}
+}
+
+function load() {
+  try {
+    let data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (!data) return;
+    for (let addr in data) {
+      let p = parseAddr(addr);
+      if (!p) continue;
+      setCellContent(addr, data[addr]);
+    }
+  } catch (e) {}
+}
+
+// === INITIALIZATION ===
+
+function init() {
+  // Initialize cells
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      let a = addr(c, r);
+      cells[a] = { raw: '', value: null, type: 'empty', error: null };
+      deps[a] = new Set();
+    }
+  }
+
+  createGrid();
+  load();
+
+  // Select A1
+  selectCell('A1');
+}
+
+init();
+
+})();
+</script>
+</body>
+</html>
+```

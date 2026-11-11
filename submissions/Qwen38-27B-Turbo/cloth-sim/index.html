@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Silk — Cloth Simulation</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #0f0f1a;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  
+  #cloth-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  
+  #controls {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(10, 10, 25, 0.85);
+    backdrop-filter: blur(8px);
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+    font-size: 13px;
+    min-width: 230px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+  
+  #controls h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.5px;
+  }
+  
+  #controls label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+  
+  #controls input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    accent-color: #c45c6e;
+  }
+  
+  #controls input[type="range"] {
+    width: 120px;
+    margin-left: 8px;
+    accent-color: #c45c6e;
+  }
+  
+  #controls button {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #c45c6e, #a04858);
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  
+  #controls button:hover {
+    background: linear-gradient(135deg, #d46c7e, #b05868);
+    transform: translateY(-1px);
+  }
+  
+  #stats {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 11px;
+    color: #888;
+    line-height: 1.6;
+  }
+  
+  #stats span {
+    color: #c45c6e;
+    font-weight: 600;
+  }
+  
+  #pause-indicator {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 48px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.3);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+  
+  .value {
+    color: #c45c6e;
+    font-weight: 600;
+    min-width: 35px;
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+<canvas id="cloth-canvas"></canvas>
+<div id="pause-indicator">Paused</div>
+<div id="controls">
+  <h3>Silk</h3>
+  <label>
+    <span>Wind</span>
+    <input type="checkbox" id="wind">
+  </label>
+  <label>
+    <span>Gravity</span>
+    <span class="value" id="gravity-value">500</span>
+    <input type="range" id="gravity" min="0" max="1000" value="500">
+  </label>
+  <label>
+    <span>Iterations</span>
+    <span class="value" id="iter-value">10</span>
+    <input type="range" id="iterations" min="4" max="20" value="10">
+  </label>
+  <label style="justify-content: flex-start; margin-top: 14px;">
+    <button id="reset">Reset Cloth</button>
+  </label>
+  <div id="stats">
+    FPS: <span id="fps">--</span><br>
+    Particles: <span id="pcount">--</span><br>
+    Constraints: <span id="ccount">--</span>
+  </div>
+</div>
+
+<script>
+// === Constants ===
+const COLS = 60;
+const ROWS = 40;
+const CELL_SIZE = 8;
+const DT = 1/60;
+const GRAVITY_DEFAULT = 500;
+const DAMPING = 0.99;
+const TEAR_THRESHOLD = 1.6;
+
+// === State ===
+let particles = [];
+let constraints = [];
+let paused = false;
+let windOn = false;
+let gravity = GRAVITY_DEFAULT;
+let iterations = 10;
+let grabbedParticle = null;
+let cutting = false;
+let mouse = { x: 0, y: 0 };
+let prevMouse = { x: 0, y: 0 };
+
+// === Canvas Setup ===
+const canvas = document.getElementById('cloth-canvas');
+const ctx = canvas.getContext('2d');
+let width = window.innerWidth;
+let height = window.innerHeight;
+let dpr = window.devicePixelRatio || 1;
+
+function resize() {
+  let oldWidth = width;
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  
+  let delta = (width - oldWidth) / 2;
+  if (delta !== 0 && particles.length > 0) {
+    for (let p of particles) {
+      p.x += delta;
+      p.oldx += delta;
+    }
+  }
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+// === Vector Math ===
+function vec3(x, y, z) { return { x, y, z }; }
+function add(a, b) { return vec3(a.x + b.x, a.y + b.y, a.z + b.z); }
+function sub(a, b) { return vec3(a.x - b.x, a.y - b.y, a.z - b.z); }
+function scale(v, s) { return vec3(v.x * s, v.y * s, v.z * s); }
+function dot(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+function cross(a, b) {
+  return vec3(
+    a.y * b.z - a.z * b.y,
+    a.z * b.x - a.x * b.z,
+    a.x * b.y - a.y * b.x
+  );
+}
+function len(v) { return Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z); }
+function normalize(v) {
+  let l = len(v);
+  if (l === 0) return vec3(0, 0, 1);
+  return scale(v, 1 / l);
+}
+
+// === Cloth Creation ===
+let clothStartX = 0;
+let clothStartY = 80;
+
+function createCloth() {
+  particles = [];
+  constraints = [];
+  
+  clothStartX = (width - (COLS - 1) * CELL_SIZE) / 2;
+  
+  // Create particles
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      let x = clothStartX + col * CELL_SIZE;
+      let y = clothStartY + row * CELL_SIZE;
+      particles.push({
+        x: x,
+        y: y,
+        z: 0,
+        oldx: x,
+        oldy: y,
+        oldz: 0,
+        pinned: row === 0
+      });
+    }
+  }
+  
+  // Structural constraints (horizontal + vertical)
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      let idx = row * COLS + col;
+      
+      if (col < COLS - 1) {
+        constraints.push({ p1: idx, p2: idx + 1, rest: CELL_SIZE, active: true });
+      }
+      
+      if (row < ROWS - 1) {
+        constraints.push({ p1: idx, p2: idx + COLS, rest: CELL_SIZE, active: true });
+      }
+    }
+  }
+  
+  // Shear constraints (both diagonals)
+  for (let row = 0; row < ROWS - 1; row++) {
+    for (let col = 0; col < COLS - 1; col++) {
+      let idx = row * COLS + col;
+      let diagDist = CELL_SIZE * Math.sqrt(2);
+      
+      constraints.push({ p1: idx, p2: idx + COLS + 1, rest: diagDist, active: true });
+      constraints.push({ p1: idx + 1, p2: idx + COLS, rest: diagDist, active: true });
+    }
+  }
+  
+  grabbedParticle = null;
+}
+
+// === Simulation ===
+let time = 0;
+
+function simulate() {
+  time += DT;
+  
+  // Apply forces and integrate
+  for (let i = 0; i < particles.length; i++) {
+    let p = particles[i];
+    
+    let vx = (p.x - p.oldx) * DAMPING;
+    let vy = (p.y - p.oldy) * DAMPING;
+    let vz = (p.z - p.oldz) * DAMPING;
+    
+    let ax = 0;
+    let ay = gravity;
+    let az = 0;
+    
+    if (windOn) {
+      let wx = Math.sin(time * 0.7) * 60 + Math.sin(time * 3 + p.x * 0.02) * 25;
+      let wz = Math.cos(time * 0.5 + p.y * 0.01) * 40 + Math.sin(time * 2.5 + p.x * 0.03) * 15;
+      ax += wx;
+      az += wz;
+    }
+    
+    p.oldx = p.x;
+    p.oldy = p.y;
+    p.oldz = p.z;
+    
+    if (!p.pinned) {
+      p.x += vx + ax * DT * DT;
+      p.y += vy + ay * DT * DT;
+      p.z += vz + az * DT * DT;
+    }
+  }
+  
+  // Solve constraints
+  for (let iter = 0; iter < iterations; iter++) {
+    for (let i = 0; i < constraints.length; i++) {
+      let c = constraints[i];
+      if (!c.active) continue;
+      
+      let p1 = particles[c.p1];
+      let p2 = particles[c.p2];
+      
+      let d = sub(p2, p1);
+      let dist = len(d);
+      if (dist === 0) continue;
+      
+      if (dist > c.rest * TEAR_THRESHOLD) {
+        c.active = false;
+        continue;
+      }
+      
+      let diff = (dist - c.rest) / dist;
+      let correction = scale(d, diff * 0.5);
+      
+      if (!p1.pinned) {
+        particles[c.p1] = add(p1, correction);
+      }
+      if (!p2.pinned) {
+        particles[c.p2] = sub(p2, correction);
+      }
+    }
+  }
+  
+  // Force rest when nearly still
+  let totalKE = 0;
+  for (let p of particles) {
+    let vx = p.x - p.oldx;
+    let vy = p.y - p.oldy;
+    let vz = p.z - p.oldz;
+    totalKE += vx*vx + vy*vy + vz*vz;
+  }
+  if (totalKE < 0.01 && !windOn) {
+    for (let p of particles) {
+      p.oldx = p.x;
+      p.oldy = p.y;
+      p.oldz = p.z;
+    }
+  }
+  
+  // Grabbed particle
+  if (grabbedParticle !== null) {
+    let p = particles[grabbedParticle];
+    p.x = mouse.x;
+    p.y = mouse.y;
+    p.z = 0;
+  }
+}
+
+// === Rendering ===
+const lightDir = normalize(vec3(0.5, -0.6, 1.0));
+const ambientIntensity = 0.15;
+const lightIntensity = 0.85;
+
+function lerpColor(c1, c2, t) {
+  return {
+    r: c1.r + (c2.r - c1.r) * t,
+    g: c1.g + (c2.g - c1.g) * t,
+    b: c1.b + (c2.b - c1.b) * t
+  };
+}
+
+function render() {
+  // Background
+  let bg = ctx.createLinearGradient(0, 0, 0, height);
+  bg.addColorStop(0, '#0f0f1a');
+  bg.addColorStop(1, '#1a1a2e');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, width, height);
+  
+  let shadow = { r: 55, g: 10, b: 18 };
+  let mid = { r: 145, g: 25, b: 42 };
+  let highlight = { r: 225, g: 95, b: 115 };
+  
+  for (let row = 0; row < ROWS - 1; row++) {
+    for (let col = 0; col < COLS - 1; col++) {
+      let i = row * COLS + col;
+      let j = i + 1;
+      let k = i + COLS;
+      let l = k + 1;
+      
+      drawTriangle(particles[i], particles[j], particles[k], shadow, mid, highlight);
+      drawTriangle(particles[j], particles[l], particles[k], shadow, mid, highlight);
+    }
+  }
+}
+
+function drawTriangle(p1, p2, p3, shadow, mid, highlight) {
+  // Check stretch
+  let edge1 = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+  let edge2 = Math.sqrt((p3.x - p2.x) ** 2 + (p3.y - p2.y) ** 2);
+  let edge3 = Math.sqrt((p1.x - p3.x) ** 2 + (p1.y - p3.y) ** 2);
+  
+  if (edge1 > CELL_SIZE * 4 || edge2 > CELL_SIZE * 4 || edge3 > CELL_SIZE * 4) {
+    return;
+  }
+  
+  // Surface normal
+  let v1 = sub(p2, p1);
+  let v2 = sub(p3, p1);
+  let normal = normalize(cross(v1, v2));
+  if (normal.z < 0) normal = scale(normal, -1);
+  
+  // Lighting
+  let diffuse = Math.max(dot(normal, lightDir), 0);
+  let intensity = ambientIntensity + lightIntensity * diffuse;
+  
+  // Specular
+  let viewDir = normalize(vec3(0, 0, 1));
+  let halfDir = normalize(add(lightDir, viewDir));
+  let spec = Math.pow(Math.max(dot(normal, halfDir), 0), 32);
+  intensity += spec * 0.15;
+  
+  // Height shading
+  let avgY = (p1.y + p2.y + p3.y) / 3;
+  let heightFactor = 1.0 - (avgY - clothStartY) / ((ROWS - 1) * CELL_SIZE * 1.5);
+  heightFactor = Math.max(0, Math.min(1, heightFactor));
+  intensity *= (0.75 + 0.25 * heightFactor);
+  
+  // Woven texture
+  let avgX = (p1.x + p2.x + p3.x) / 3;
+  let weave = Math.sin(avgX * 0.12) * Math.sin(avgY * 0.12) * 0.03;
+  intensity += weave;
+  
+  // Color
+  let color;
+  if (intensity < 0.5) {
+    color = lerpColor(shadow, mid, intensity * 2);
+  } else {
+    color = lerpColor(mid, highlight, (intensity - 0.5) * 2);
+  }
+  
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
+  ctx.lineTo(p2.x, p2.y);
+  ctx.lineTo(p3.x, p3.y);
+  ctx.closePath();
+  ctx.fillStyle = `rgb(${Math.floor(color.r)},${Math.floor(color.g)},${Math.floor(color.b)})`;
+  ctx.fill();
+}
+
+// === Interaction ===
+canvas.addEventListener('mousedown', (e) => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  
+  if (e.button === 0 && !e.shiftKey) {
+    grabbedParticle = findClosestParticle(mouse.x, mouse.y, 40);
+  } else if (e.button === 2 || (e.button === 0 && e.shiftKey)) {
+    cutting = true;
+    prevMouse.x = mouse.x;
+    prevMouse.y = mouse.y;
+  }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  
+  if (cutting) {
+    cutConstraints(prevMouse.x, prevMouse.y, mouse.x, mouse.y);
+    prevMouse.x = mouse.x;
+    prevMouse.y = mouse.y;
+  }
+});
+
+canvas.addEventListener('mouseup', (e) => {
+  if (e.button === 0 && !e.shiftKey) {
+    grabbedParticle = null;
+  } else if (e.button === 2 || (e.button === 0 && e.shiftKey)) {
+    cutting = false;
+  }
+});
+
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+function findClosestParticle(x, y, radius) {
+  let closest = null;
+  let closestDist = radius;
+  
+  for (let i = 0; i < particles.length; i++) {
+    let p = particles[i];
+    let dx = p.x - x;
+    let dy = p.y - y;
+    let dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < closestDist) {
+      closestDist = dist;
+      closest = i;
+    }
+  }
+  
+  return closest;
+}
+
+function cutConstraints(x1, y1, x2, y2) {
+  for (let i = 0; i < constraints.length; i++) {
+    let c = constraints[i];
+    if (!c.active) continue;
+    
+    let p1 = particles[c.p1];
+    let p2 = particles[c.p2];
+    
+    if (segmentsIntersect(p1.x, p1.y, p2.x, p2.y, x1, y1, x2, y2)) {
+      c.active = false;
+    }
+  }
+}
+
+function segmentsIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+  let d1 = direction(x3, y3, x4, y4, x1, y1);
+  let d2 = direction(x3, y3, x4, y4, x2, y2);
+  let d3 = direction(x1, y1, x2, y2, x3, y3);
+  let d4 = direction(x1, y1, x2, y2, x4, y4);
+  
+  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+         ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+}
+
+function direction(px, py, qx, qy, rx, ry) {
+  return (qx - px) * (ry - py) - (qy - py) * (rx - px);
+}
+
+// === Controls ===
+document.getElementById('wind').addEventListener('change', (e) => {
+  windOn = e.target.checked;
+});
+
+const gravitySlider = document.getElementById('gravity');
+gravitySlider.addEventListener('input', (e) => {
+  gravity = parseFloat(e.target.value);
+  document.getElementById('gravity-value').textContent = gravity;
+});
+
+const iterSlider = document.getElementById('iterations');
+iterSlider.addEventListener('input', (e) => {
+  iterations = parseInt(e.target.value);
+  document.getElementById('iter-value').textContent = iterations;
+});
+
+document.getElementById('reset').addEventListener('click', () => {
+  createCloth();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+    paused = !paused;
+    document.getElementById('pause-indicator').style.display = paused ? 'block' : 'none';
+  }
+});
+
+// === Stats ===
+let frameCount = 0;
+let lastFpsTime = performance.now();
+
+function updateStats() {
+  frameCount++;
+  let now = performance.now();
+  if (now - lastFpsTime > 1000) {
+    document.getElementById('fps').textContent = frameCount;
+    frameCount = 0;
+    lastFpsTime = now;
+  }
+  
+  let intact = 0;
+  for (let c of constraints) {
+    if (c.active) intact++;
+  }
+  
+  document.getElementById('pcount').textContent = particles.length;
+  document.getElementById('ccount').textContent = intact;
+}
+
+// === Grader Contract ===
+window.__arena = {
+  stats: function() {
+    let sumX = 0, sumY = 0;
+    for (let p of particles) {
+      sumX += p.x;
+      sumY += p.y;
+    }
+    let n = particles.length;
+    
+    let intact = 0;
+    for (let c of constraints) {
+      if (c.active) intact++;
+    }
+    
+    let pinned = 0;
+    for (let p of particles) {
+      if (p.pinned) pinned++;
+    }
+    
+    return {
+      particles: n,
+      constraints: intact,
+      pinned: pinned,
+      centroid: { x: sumX / n, y: sumY / n }
+    };
+  }
+};
+
+// === Main Loop ===
+let accumulator = 0;
+let lastTime = performance.now();
+
+function frame(now) {
+  let dt = (now - lastTime) / 1000;
+  lastTime = now;
+  
+  if (dt > 0.1) dt = 0.1;
+  
+  if (!paused) {
+    accumulator += dt;
+    while (accumulator >= DT) {
+      simulate();
+      accumulator -= DT;
+    }
+  }
+  
+  render();
+  updateStats();
+  
+  requestAnimationFrame(frame);
+}
+
+createCloth();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

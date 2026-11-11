@@ -1,0 +1,26 @@
+{
+  "source": "arena run",
+  "endpoint": "openrouter.ai",
+  "apiModel": "z-ai/glm-5.3-flash",
+  "servedModel": "z-ai/glm-5.3-flash",
+  "provider": "OpenInference",
+  "params": {
+    "thinking": "high"
+  },
+  "startedAt": "2026-10-30T05:28:08.161Z",
+  "wallMs": 1087979,
+  "ttftMs": 892,
+  "thinkingMs": null,
+  "promptTokens": 3655,
+  "completionTokens": 131072,
+  "reasoningTokens": 131072,
+  "tokensEstimated": false,
+  "genTokensPerSec": 120.6,
+  "promptTokensPerSec": null,
+  "finishReason": "length",
+  "replyChars": 0,
+  "reasoningChars": 467466,
+  "reasoningHidden": false,
+  "extracted": "none",
+  "htmlBytes": 0
+}

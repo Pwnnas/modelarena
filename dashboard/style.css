@@ -167,10 +167,12 @@ tr:first-child .rank { color: var(--ink); }
 .subs { display: flex; flex-direction: column; gap: 20px; }
 .sub {
   display: grid; grid-template-columns: minmax(0, 46%) minmax(0, 1fr); gap: 0;
-  background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden;
+  background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; overflow: clip;
   scroll-margin-top: 76px; /* clear the sticky bar when jumping to a model */
 }
-.sub-media { background: var(--stage); display: flex; flex-direction: column; }
+/* overflow: clip (not hidden) on .sub keeps this sticky: the video stays in view
+   while you scroll a long check list. */
+.sub-media { background: var(--stage); display: flex; flex-direction: column; align-self: start; position: sticky; top: 60px; }
 .sub-media video, .sub-media img.hero { width: 100%; aspect-ratio: 16 / 10; display: block; object-fit: contain; background: var(--stage); }
 .thumbs { display: flex; gap: 6px; padding: 8px; overflow-x: auto; }
 .thumbs button { padding: 0; border: 1px solid transparent; border-radius: 3px; background: none; cursor: pointer; flex: 0 0 auto; }

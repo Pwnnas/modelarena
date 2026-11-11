@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vectorly</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #e0e0e0; }
+body { display: flex; flex-direction: column; }
+
+.toolbar { display: flex; align-items: center; height: 48px; background: #16213e; border-bottom: 1px solid #2a2a4a; padding: 0 12px; gap: 4px; flex-shrink: 0; }
+.toolbar-group { display: flex; gap: 2px; padding: 0 8px; }
+.toolbar-group .label { font-size: 11px; color: #6a6a9a; padding: 0 6px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; }
+.tool-btn { width: 36px; height: 36px; border: none; background: transparent; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; position: relative; }
+.tool-btn:hover { background: #2a3a5e; }
+.tool-btn.active { background: #4a6ae4; }
+.tool-btn svg { width: 20px; height: 20px; stroke: #b0b0d0; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tool-btn.active svg { stroke: #ffffff; }
+.tool-btn .shortcut { position: absolute; bottom: 2px; right: 3px; font-size: 9px; color: #6a7a9a; }
+.tool-btn.active .shortcut { color: #c0d0ff; }
+
+.zoom-display { font-size: 12px; color: #a0b0d0; padding: 4px 10px; border-radius: 6px; background: #1e2a4a; margin-left: auto; min-width: 60px; text-align: center; }
+.zoom-display .zoom-val { font-weight: 600; color: #c0d0ff; }
+
+.btn-action { width: 32px; height: 32px; border: none; background: transparent; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+.btn-action:hover { background: #2a3a5e; }
+.btn-action:disabled { opacity: 0.3; cursor: default; }
+.btn-action svg { width: 16px; height: 16px; stroke: #b0b0d0; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.export-btn { height: 32px; padding: 0 14px; border: 1px solid #3a5a8a; background: #2a4a7a; border-radius: 6px; color: #c0d0ff; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
+.export-btn:hover { background: #3a5a9a; border-color: #4a6a9a; }
+
+.main { flex: 1; display: flex; overflow: hidden; }
+.stage-container { flex: 1; position: relative; background: #2a2a3a; overflow: hidden; }
+#stage { width: 100%; height: 100%; display: block; cursor: crosshair; }
+
+.properties { width: 240px; background: #16213e; border-left: 1px solid #2a2a4a; padding: 16px; overflow-y: auto; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
+.properties h3 { font-size: 11px; color: #6a7a9a; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
+.prop-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.prop-field { display: flex; flex-direction: column; gap: 3px; }
+.prop-field.full { grid-column: 1 / -1; }
+.prop-label { font-size: 10px; color: #6a7a9a; text-transform: uppercase; letter-spacing: 0.5px; }
+.prop-input { width: 100%; height: 28px; border: 1px solid #2a3a5a; background: #1a2a4a; border-radius: 4px; color: #e0e0e0; padding: 0 8px; font-size: 12px; outline: none; transition: border-color 0.15s; }
+.prop-input:focus { border-color: #4a6ae4; }
+.prop-input[type="number"] { -moz-appearance: textfield; }
+.prop-input[type="number"]::-webkit-inner-spin-button { display: none; }
+.color-input { width: 100%; height: 28px; border: 1px solid #2a3a5a; border-radius: 4px; padding: 2px; cursor: pointer; background: #1a2a4a; }
+.color-input::-webkit-color-swatch-wrapper { padding: 0; }
+.color-input::-webkit-color-swatch { border: none; border-radius: 3px; }
+.prop-section { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid #2a2a4a; }
+.no-selection { color: #5a6a8a; font-size: 12px; text-align: center; padding: 20px 0; font-style: italic; }
+
+.status-bar { height: 24px; background: #16213e; border-top: 1px solid #2a2a4a; display: flex; align-items: center; padding: 0 12px; font-size: 11px; color: #6a7a9a; gap: 16px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <div class="toolbar-group"><span class="label">Tools</span></div>
+  <button class="tool-btn active" data-tool="select" title="Select (V)">
+    <svg viewBox="0 0 24 24"><path d="M4 4l7 18 3-7 7-3z"/></svg>
+    <span class="shortcut">V</span>
+  </button>
+  <button class="tool-btn" data-tool="rect" title="Rectangle (R)">
+    <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/></svg>
+    <span class="shortcut">R</span>
+  </button>
+  <button class="tool-btn" data-tool="ellipse" title="Ellipse (E)">
+    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="7"/></svg>
+    <span class="shortcut">E</span>
+  </button>
+  <button class="tool-btn" data-tool="line" title="Line (L)">
+    <svg viewBox="0 0 24 24"><line x1="4" y1="20" x2="20" y2="4"/></svg>
+    <span class="shortcut">L</span>
+  </button>
+  <div class="toolbar-group"></div>
+  <div class="toolbar-group"><span class="label">Edit</span></div>
+  <button class="btn-action" id="btn-undo" title="Undo (Ctrl+Z)" disabled>
+    <svg viewBox="0 0 24 24"><path d="M3 10h13a4 4 0 010 8H9"/><path d="M7 6L3 10l4 4"/></svg>
+  </button>
+  <button class="btn-action" id="btn-redo" title="Redo (Ctrl+Shift+Z)" disabled>
+    <svg viewBox="0 0 24 24"><path d="M21 10H8a4 4 0 000 8h7"/><path d="M17 6l4 4-4 4"/></svg>
+  </button>
+  <div class="toolbar-group"></div>
+  <div class="toolbar-group"><span class="label">View</span></div>
+  <button class="btn-action" id="btn-zoom-in" title="Zoom In"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16" y1="16" x2="21" y2="21"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/></svg></button>
+  <button class="btn-action" id="btn-zoom-out" title="Zoom Out"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16" y1="16" x2="21" y2="21"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+  <button class="btn-action" id="btn-zoom-fit" title="Fit View"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
+  <div class="zoom-display"><span class="zoom-val" id="zoom-level">100%</span></div>
+  <div style="flex:1"></div>
+  <button class="export-btn" id="export-svg">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+    Export SVG
+  </button>
+</div>
+<div class="main">
+  <div class="stage-container">
+    <svg id="stage" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="grid-dots" width="20" height="20" patternUnits="userSpaceOnUse">
+          <circle cx="10" cy="10" r="0.5" fill="#3a3a5a"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="#1e1e2e"/>
+      <rect width="100%" height="100%" fill="url(#grid-dots)" opacity="0.5"/>
+      <g id="scene"></g>
+      <g id="chrome"></g>
+    </svg>
+  </div>
+  <div class="properties">
+    <div id="panel-props">
+      <div class="no-selection" id="no-sel-msg">No selection</div>
+      <div id="props-panel" style="display:none;">
+        <h3>Position & Size</h3>
+        <div class="prop-row">
+          <div class="prop-field"><span class="prop-label">X</span><input class="prop-input" type="number" id="prop-x" step="1"></div>
+          <div class="prop-field"><span class="prop-label">Y</span><input class="prop-input" type="number" id="prop-y" step="1"></div>
+          <div class="prop-field"><span class="prop-label">Width</span><input class="prop-input" type="number" id="prop-w" min="1" step="1"></div>
+          <div class="prop-field"><span class="prop-label">Height</span><input class="prop-input" type="number" id="prop-h" min="1" step="1"></div>
+        </div>
+      </div>
+      <div class="prop-section">
+        <h3>Style</h3>
+        <div class="prop-row">
+          <div class="prop-field"><span class="prop-label">Fill</span><input class="color-input" type="color" id="fill-color" value="#4a90d9"></div>
+          <div class="prop-field"><span class="prop-label">Stroke</span><input class="color-input" type="color" id="stroke-color" value="#1a1a3e"></div>
+        </div>
+        <div class="prop-field full"><span class="prop-label">Stroke Width</span><input class="prop-input" type="number" id="stroke-width" min="0" max="100" step="0.5" value="2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="status-bar">
+  <span id="status-tool">Select</span>
+  <span id="status-hint">Click empty area to deselect • Drag on empty area to marquee select</span>
+</div>
+
+<script>
+(function() {
+'use strict';
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const stage = document.getElementById('stage');
+const scene = document.getElementById('scene');
+const chrome = document.getElementById('chrome');
+
+let shapes = [];
+let shapeIdCounter = 0;
+let selection = new Set();
+let tool = 'select';
+let view = { panX: 0, panY: 0, zoom: 1 };
+let currentStyle = { fill: '#4a90d9', stroke: '#1a1a3e', strokeWidth: 2 };
+let history = [];
+let historyIndex = 0;
+let isDragging = false;
+let dragType = null;
+let dragStart = null;
+let dragBaseline = null;
+let marqueeEl = null;
+let dragShapeId = null;
+let resizeHandle = null;
+let resizeBaseline = null;
+let resizeOriginal = null;
+let movingBaseline = null;
+let nudgeActive = false;
+
+function genId() { return 'shape-' + (++shapeIdCounter); }
+
+function initHistory() {
+  history = [snapshot()];
+  historyIndex = 0;
+  updateHistoryButtons();
+}
+
+function snapshot() {
+  return JSON.parse(JSON.stringify(shapes));
+}
+
+function commitHistory() {
+  history.length = historyIndex + 1;
+  history.push(snapshot());
+  historyIndex = history.length - 1;
+  updateHistoryButtons();
+  saveToLocalStorage();
+}
+
+function undo() {
+  if (historyIndex <= 0) return;
+  historyIndex--;
+  shapes = JSON.parse(JSON.stringify(history[historyIndex]));
+  selection.clear();
+  render();
+  updateHistoryButtons();
+  saveToLocalStorage();
+}
+
+function redo() {
+  if (historyIndex >= history.length - 1) return;
+  historyIndex++;
+  shapes = JSON.parse(JSON.stringify(history[historyIndex]));
+  selection.clear();
+  render();
+  updateHistoryButtons();
+  saveToLocalStorage();
+}
+
+function updateHistoryButtons() {
+  document.getElementById('btn-undo').disabled = historyIndex <= 0;
+  document.getElementById('btn-redo').disabled = historyIndex >= history.length - 1;
+}
+
+function saveToLocalStorage() {
+  try {
+    localStorage.setItem('vectorly-drawing', JSON.stringify({ shapes, shapeIdCounter }));
+  } catch(e) {}
+}
+
+function loadFromLocalStorage() {
+  try {
+    const data = localStorage.getItem('vectorly-drawing');
+    if (data) {
+      const parsed = JSON.parse(data);
+      shapes = parsed.shapes || [];
+      shapeIdCounter = parsed.shapeIdCounter || 0;
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+function getShapeBBox(s) {
+  if (s.type === 'line') {
+    const x = Math.min(s.x1, s.x2);
+    const y = Math.min(s.y1, s.y2);
+    const w = Math.abs(s.x2 - s.x1);
+    const h = Math.abs(s.y2 - s.y1);
+    return { x, y, w, h };
+  }
+  return { x: s.x, y: s.y, w: s.w, h: s.h };
+}
+
+function worldToScreen(wx, wy) {
+  return { x: wx * view.zoom + view.panX, y: wy * view.zoom + view.panY };
+}
+
+function screenToWorld(sx, sy) {
+  return { x: (sx - view.panX) / view.zoom, y: (sy - view.panY) / view.zoom };
+}
+
+function getStageCoords(e) {
+  const rect = stage.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const w = screenToWorld(sx, sy);
+  return { sx, sy, wx: w.x, wy: w.y };
+}
+
+function setTool(t) {
+  tool = t;
+  document.querySelectorAll('.tool-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tool === t);
+  });
+  stage.style.cursor = t === 'select' ? 'default' : 'crosshair';
+  const toolNames = { select: 'Select', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line' };
+  document.getElementById('status-tool').textContent = toolNames[t];
+  const hints = {
+    select: 'Click empty area to deselect • Drag on empty area to marquee select',
+    rect: 'Press and drag to draw a rectangle • Shift for square',
+    ellipse: 'Press and drag to draw an ellipse • Shift for circle',
+    line: 'Press and drag to draw a line • Shift for 45° angles'
+  };
+  document.getElementById('status-hint').textContent = hints[t];
+}
+
+function render() {
+  renderScene();
+  renderChrome();
+  renderProperties();
+}
+
+function renderScene() {
+  scene.innerHTML = '';
+  const transformStr = `translate(${view.panX},${view.panY}) scale(${view.zoom})`;
+  scene.setAttribute('transform', transformStr);
+  for (const s of shapes) {
+    let el;
+    if (s.type === 'rect') {
+      el = document.createElementNS(SVG_NS, 'rect');
+      el.setAttribute('x', s.x);
+      el.setAttribute('y', s.y);
+      el.setAttribute('width', Math.max(0, s.w));
+      el.setAttribute('height', Math.max(0, s.h));
+      el.setAttribute('fill', s.fill);
+      el.setAttribute('stroke', s.stroke);
+      el.setAttribute('stroke-width', s.strokeWidth);
+    } else if (s.type === 'ellipse') {
+      el = document.createElementNS(SVG_NS, 'ellipse');
+      el.setAttribute('cx', s.x + s.w / 2);
+      el.setAttribute('cy', s.y + s.h / 2);
+      el.setAttribute('rx', Math.max(0, s.w / 2));
+      el.setAttribute('ry', Math.max(0, s.h / 2));
+      el.setAttribute('fill', s.fill);
+      el.setAttribute('stroke', s.stroke);
+      el.setAttribute('stroke-width', s.strokeWidth);
+    } else if (s.type === 'line') {
+      el = document.createElementNS(SVG_NS, 'line');
+      el.setAttribute('x1', s.x1);
+      el.setAttribute('y1', s.y1);
+      el.setAttribute('x2', s.x2);
+      el.setAttribute('y2', s.y2);
+      el.setAttribute('fill', 'none');
+      el.setAttribute('stroke', s.stroke);
+      el.setAttribute('stroke-width', s.strokeWidth);
+    }
+    if (el) {
+      el.setAttribute('data-shape', s.type);
+      el.setAttribute('data-id', s.id);
+      if (selection.has(s.id)) {
+        el.setAttribute('data-selected', 'true');
+      }
+      scene.appendChild(el);
+    }
+  }
+}
+
+function renderChrome() {
+  chrome.innerHTML = '';
+  
+  for (const id of selection) {
+    const s = shapes.find(sh => sh.id === id);
+    if (!s) continue;
+    const bbox = getShapeBBox(s);
+    const tl = worldToScreen(bbox.x, bbox.y);
+    const w = bbox.w * view.zoom;
+    const h = bbox.h * view.zoom;
+    
+    const outline = document.createElementNS(SVG_NS, 'rect');
+    outline.setAttribute('x', tl.x - 0.5);
+    outline.setAttribute('y', tl.y - 0.5);
+    outline.setAttribute('width', w + 1);
+    outline.setAttribute('height', h + 1);
+    outline.setAttribute('fill', 'none');
+    outline.setAttribute('stroke', '#4a90d9');
+    outline.setAttribute('stroke-width', '1.5');
+    outline.setAttribute('stroke-dasharray', '4 2');
+    outline.setAttribute('pointer-events', 'none');
+    chrome.appendChild(outline);
+  }
+
+  if (selection.size === 1) {
+    const id = [...selection][0];
+    const s = shapes.find(sh => sh.id === id);
+    if (!s) return;
+    const bbox = getShapeBBox(s);
+    const positions = [
+      { name: 'nw', x: bbox.x, y: bbox.y },
+      { name: 'n', x: bbox.x + bbox.w / 2, y: bbox.y },
+      { name: 'ne', x: bbox.x + bbox.w, y: bbox.y },
+      { name: 'e', x: bbox.x + bbox.w, y: bbox.y + bbox.h / 2 },
+      { name: 'se', x: bbox.x + bbox.w, y: bbox.y + bbox.h },
+      { name: 's', x: bbox.x + bbox.w / 2, y: bbox.y + bbox.h },
+      { name: 'sw', x: bbox.x, y: bbox.y + bbox.h },
+      { name: 'w', x: bbox.x, y: bbox.y + bbox.h / 2 },
+    ];
+    
+    for (const pos of positions) {
+      const sp = worldToScreen(pos.x, pos.y);
+      const handleSize = 8;
+      const rect = document.createElementNS(SVG_NS, 'rect');
+      rect.setAttribute('x', sp.x - handleSize / 2);
+      rect.setAttribute('y', sp.y - handleSize / 2);
+      rect.setAttribute('width', handleSize);
+      rect.setAttribute('height', handleSize);
+      rect.setAttribute('fill', '#ffffff');
+      rect.setAttribute('stroke', '#4a90d9');
+      rect.setAttribute('stroke-width', '1.5');
+      rect.setAttribute('rx', '2');
+      rect.setAttribute('data-handle', pos.name);
+      rect.setAttribute('cursor', getHandleCursor(pos.name));
+      rect.style.pointerEvents = 'all';
+      chrome.appendChild(rect);
+    }
+  }
+
+  if (marqueeEl) {
+    const m = document.createElementNS(SVG_NS, 'rect');
+    m.setAttribute('x', Math.min(marqueeEl.x1, marqueeEl.x2));
+    m.setAttribute('y', Math.min(marqueeEl.y1, marqueeEl.y2));
+    m.setAttribute('width', Math.abs(marqueeEl.x2 - marqueeEl.x1));
+    m.setAttribute('height', Math.abs(marqueeEl.y2 - marqueeEl.y1));
+    m.setAttribute('fill', 'rgba(74,144,217,0.1)');
+    m.setAttribute('stroke', '#4a90d9');
+    m.setAttribute('stroke-width', '1');
+    m.setAttribute('stroke-dasharray', '5 3');
+    m.setAttribute('pointer-events', 'none');
+    chrome.appendChild(m);
+  }
+}
+
+function getHandleCursor(name) {
+  const cursors = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
+  return cursors[name] || 'pointer';
+}
+
+function renderProperties() {
+  const noSelMsg = document.getElementById('no-sel-msg');
+  const propsPanel = document.getElementById('props-panel');
+  
+  if (selection.size === 0) {
+    noSelMsg.style.display = 'block';
+    propsPanel.style.display = 'none';
+    return;
+  }
+  
+  noSelMsg.style.display = 'none';
+  propsPanel.style.display = 'block';
+  
+  if (selection.size === 1) {
+    const id = [...selection][0];
+    const s = shapes.find(sh => sh.id === id);
+    if (!s) return;
+    const bbox = getShapeBBox(s);
+    document.getElementById('prop-x').value = Math.round(bbox.x);
+    document.getElementById('prop-y').value = Math.round(bbox.y);
+    document.getElementById('prop-w').value = Math.round(bbox.w);
+    document.getElementById('prop-h').value = Math.round(bbox.h);
+    document.getElementById('prop-w').disabled = false;
+    document.getElementById('prop-h').disabled = false;
+  } else {
+    const bboxes = [...selection].map(id => {
+      const s = shapes.find(sh => sh.id === id);
+      return s ? getShapeBBox(s) : null;
+    }).filter(Boolean);
+    if (bboxes.length === 0) return;
+    const minX = Math.min(...bboxes.map(b => b.x));
+    const minY = Math.min(...bboxes.map(b => b.y));
+    const maxX = Math.max(...bboxes.map(b => b.x + b.w));
+    const maxY = Math.max(...bboxes.map(b => b.y + b.h));
+    document.getElementById('prop-x').value = Math.round(minX);
+    document.getElementById('prop-y').value = Math.round(minY);
+    document.getElementById('prop-w').value = Math.round(maxX - minX);
+    document.getElementById('prop-h').value = Math.round(maxY - minY);
+  }
+}
+
+function findShapeAt(wx, wy) {
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    const s = shapes[i];
+    if (s.type === 'line') {
+      const dx = s.x2 - s.x1;
+      const dy = s.y2 - s.y1;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1) continue;
+      const t = Math.max(0, Math.min(1, ((wx - s.x1) * dx + (wy - s.y1) * dy) / (len * len)));
+      const px = s.x1 + t * dx;
+      const py = s.y1 + t * dy;
+      const dist = Math.sqrt((wx - px) * (wx - px) + (wy - py) * (wy - py));
+      if (dist <= (s.strokeWidth / 2 + 4 / view.zoom)) return s;
+    } else {
+      if (wx >= s.x && wx <= s.x + s.w && wy >= s.y && wy <= s.y + s.h) {
+        if (s.type === 'ellipse') {
+          const cx = s.x + s.w / 2;
+          const cy = s.y + s.h / 2;
+          const rx = s.w / 2;
+          const ry = s.h / 2;
+          if (rx > 0 && ry > 0) {
+            const dx = (wx - cx) / rx;
+            const dy = (wy - cy) / ry;
+            if (dx * dx + dy * dy > 1) continue;
+          }
+        }
+        return s;
+      }
+    }
+  }
+  return null;
+}
+
+function updateZoomDisplay() {
+  document.getElementById('zoom-level').textContent = Math.round(view.zoom * 100) + '%';
+}
+
+function setZoom(newZoom, cx, cy) {
+  newZoom = Math.max(0.1, Math.min(8, newZoom));
+  const worldPt = screenToWorld(cx, cy);
+  view.panX = cx - worldPt.x * newZoom;
+  view.panY = cy - worldPt.y * newZoom;
+  view.zoom = newZoom;
+  updateZoomDisplay();
+  render();
+}
+
+// Events
+stage.addEventListener('mousedown', onMouseDown);
+document.addEventListener('mousemove', onMouseMove);
+document.addEventListener('mouseup', onMouseUp);
+stage.addEventListener('wheel', onWheel, { passive: false });
+stage.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', onKeyDown);
+
+// Tool buttons
+document.querySelectorAll('.tool-btn').forEach(btn => {
+  btn.addEventListener('click', () => setTool(btn.dataset.tool));
+});
+
+// Undo/Redo buttons
+document.getElementById('btn-undo').addEventListener('click', undo);
+document.getElementById('btn-redo').addEventListener('click', redo);
+
+// Zoom buttons
+document.getElementById('btn-zoom-in').addEventListener('click', () => {
+  const rect = stage.getBoundingClientRect();
+  setZoom(view.zoom * 1.2, rect.width / 2, rect.height / 2);
+});
+document.getElementById('btn-zoom-out').addEventListener('click', () => {
+  const rect = stage.getBoundingClientRect();
+  setZoom(view.zoom / 1.2, rect.width / 2, rect.height / 2);
+});
+document.getElementById('btn-zoom-fit').addEventListener('click', () => {
+  view.panX = 0; view.panY = 0; view.zoom = 1;
+  updateZoomDisplay();
+  render();
+});
+
+// Properties
+['prop-x','prop-y','prop-w','prop-h'].forEach(id => {
+  document.getElementById(id).addEventListener('input', onPropChange);
+});
+document.getElementById('fill-color').addEventListener('input', onStyleChange);
+document.getElementById('stroke-color').addEventListener('input', onStyleChange);
+document.getElementById('stroke-width').addEventListener('input', onStyleChange);
+
+// Export
+document.getElementById('export-svg').addEventListener('click', exportSVG);
+
+function onPropChange() {
+  if (selection.size === 0) return;
+  const x = parseFloat(document.getElementById('prop-x').value) || 0;
+  const y = parseFloat(document.getElementById('prop-y').value) || 0;
+  const w = Math.max(1, parseFloat(document.getElementById('prop-w').value) || 1);
+  const h = Math.max(1, parseFloat(document.getElementById('prop-h').value) || 1);
+  
+  for (const id of selection) {
+    const s = shapes.find(sh => sh.id === id);
+    if (!s) continue;
+    if (s.type === 'line') {
+      const bbox = getShapeBBox(s);
+      const scaleX = bbox.w > 0 ? w / bbox.w : 1;
+      const scaleY = bbox.h > 0 ? h / bbox.h : 1;
+      const offX = x - bbox.x;
+      const offY = y - bbox.y;
+      s.x1 = s.x1 * scaleX + offX;
+      s.y1 = s.y1 * scaleY + offY;
+      s.x2 = s.x2 * scaleX + offX;
+      s.y2 = s.y2 * scaleY + offY;
+    } else {
+      s.x = x; s.y = y; s.w = w; s.h = h;
+    }
+  }
+  render();
+}
+
+function onStyleChange() {
+  const fill = document.getElementById('fill-color').value;
+  const stroke = document.getElementById('stroke-color').value;
+  const sw = parseFloat(document.getElementById('stroke-width').value) || 0;
+  currentStyle = { fill, stroke, strokeWidth: sw };
+  
+  for (const id of selection) {
+    const s = shapes.find(sh => sh.id === id);
+    if (!s) continue;
+    if (s.type !== 'line') s.fill = fill;
+    s.stroke = stroke;
+    s.strokeWidth = sw;
+  }
+  if (selection.size > 0) {
+    commitHistory();
+  }
+  render();
+}
+
+function onMouseDown(e) {
+  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    // Middle click or alt+click for panning
+    isDragging = true;
+    dragType = 'pan';
+    dragStart = { sx: e.clientX, sy: e.clientY, panX: view.panX, panY: view.panY };
+    return;
+  }
+  
+  const c = getStageCoords(e);
+  
+  // Check if clicking a handle
+  const handleEl = e.target.closest('[data-handle]');
+  if (handleEl && selection.size === 1) {
+    isDragging = true;
+    dragType = 'resize';
+    resizeHandle = handleEl.dataset.handle;
+    resizeBaseline = snapshot();
+    const id = [...selection][0];
+    resizeOriginal = JSON.parse(JSON.stringify(shapes.find(s => s.id === id)));
+    dragStart = { wx: c.wx, wy: c.wy };
+    return;
+  }
+  
+  // Check space+drag for panning
+  if (spacePressed) {
+    isDragging = true;
+    dragType = 'pan';
+    dragStart = { sx: e.clientX, sy: e.clientY, panX: view.panX, panY: view.panY };
+    return;
+  }
+  
+  if (tool === 'select') {
+    const shape = findShapeAt(c.wx, c.wy);
+    
+    if (shape) {
+      if (e.shiftKey) {
+        if (selection.has(shape.id)) {
+          selection.delete(shape.id);
+        } else {
+          selection.add(shape.id);
+        }
+      } else {
+        if (!selection.has(shape.id)) {
+          selection.clear();
+          selection.add(shape.id);
+        }
+      }
+      // Start moving
+      isDragging = true;
+      dragType = 'move';
+      dragStart = { wx: c.wx, wy: c.wy };
+      movingBaseline = snapshot();
+      render();
+    } else {
+      if (!e.shiftKey) {
+        selection.clear();
+      }
+      // Marquee
+      isDragging = true;
+      dragType = 'marquee';
+      dragStart = { sx: c.sx, sy: c.sy, wx: c.wx, wy: c.wy };
+      marqueeEl = { x1: c.sx, y1: c.sy, x2: c.sx, y2: c.sy };
+      render();
+    }
+  } else if (tool === 'rect' || tool === 'ellipse') {
+    isDragging = true;
+    dragType = 'draw';
+    dragStart = { wx: c.wx, wy: c.wy };
+    dragBaseline = snapshot();
+  } else if (tool === 'line') {
+    isDragging = true;
+    dragType = 'draw-line';
+    dragStart = { wx: c.wx, wy: c.wy };
+    dragBaseline = snapshot();
+  }
+}
+
+function onMouseMove(e) {
+  if (!isDragging) return;
+  
+  const c = getStageCoords(e);
+  
+  if (dragType === 'pan') {
+    view.panX = dragStart.panX + (e.clientX - dragStart.sx);
+    view.panY = dragStart.panY + (e.clientY - dragStart.sy);
+    render();
+  } else if (dragType === 'move') {
+    const dx = c.wx - dragStart.wx;
+    const dy = c.wy - dragStart.wy;
+    const baselineShapes = dragStart.movingBase || movingBaseline;
+    for (const s of shapes) {
+      const orig = movingBaseline.find(o => o.id === s.id);
+      if (orig) {
+        if (orig.type === 'line') {
+          s.x1 = orig.x1 + dx; s.y1 = orig.y1 + dy;
+          s.x2 = orig.x2 + dx; s.y2 = orig.y2 + dy;
+        } else {
+          s.x = orig.x + dx; s.y = orig.y + dy;
+        }
+      }
+    }
+    // Apply snapping
+    applySnapping(dx, dy);
+    render();
+  } else if (dragType === 'resize') {
+    const id = [...selection][0];
+    const s = shapes.find(sh => sh.id === id);
+    if (!s) return;
+    
+    const dx = c.wx - dragStart.wx;
+    const dy = c.wy - dragStart.wy;
+    const orig = resizeOriginal;
+    const h = resizeHandle;
+    
+    let nx = orig.type === 'line' ? Math.min(orig.x1, orig.x2) : orig.x;
+    let ny = orig.type === 'line' ? Math.min(orig.y1, orig.y2) : orig.y;
+    let nw = orig.type === 'line' ? Math.abs(orig.x2 - orig.x1) : orig.w;
+    let nh = orig.type === 'line' ? Math.abs(orig.y2 - orig.y1) : orig.h;
+    
+    if (h === 'nw') { nx += dx; ny += dy; nw -= dx; nh -= dy; }
+    else if (h === 'n') { ny += dy; nh -= dy; }
+    else if (h === 'ne') { ny += dy; nw += dx; nh -= dy; }
+    else if (h === 'e') { nw += dx; }
+    else if (h === 'se') { nw += dx; nh += dy; }
+    else if (h === 's') { nh += dy; }
+    else if (h === 'sw') { nx += dx; nw -= dx; nh += dy; }
+    else if (h === 'w') { nx += dx; nw -= dx; }
+    
+    if (nw < 0) { nx += nw; nw = -nw; }
+    if (nh < 0) { ny += nh; nh = -nh; }
+    nw = Math.max(1, nw);
+    nh = Math.max(1, nh);
+    
+    // Shift: keep aspect ratio
+    if (e.shiftKey && orig.w > 0 && orig.h > 0) {
+      const aspect = orig.w / orig.h;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        nh = nw / aspect;
+      } else {
+        nw = nh * aspect;
+      }
+    }
+    
+    if (s.type === 'line') {
+      const origBbox = getShapeBBox(orig);
+      const scaleX = origBbox.w > 0 ? nw / origBbox.w : 1;
+      const scaleY = origBbox.h > 0 ? nh / origBbox.h : 1;
+      const offX = nx - origBbox.x;
+      const offY = ny - origBbox.y;
+      s.x1 = orig.x1 * scaleX + offX;
+      s.y1 = orig.y1 * scaleY + offY;
+      s.x2 = orig.x2 * scaleX + offX;
+      s.y2 = orig.y2 * scaleY + offY;
+    } else {
+      s.x = nx; s.y = ny; s.w = nw; s.h = nh;
+    }
+    render();
+  } else if (dragType === 'marquee') {
+    marqueeEl.x2 = c.sx;
+    marqueeEl.y2 = c.sy;
+    render();
+  } else if (dragType === 'draw') {
+    // Preview handled in renderPreview
+    renderDrawPreview(c.wx, c.wy, e.shiftKey);
+  } else if (dragType === 'draw-line') {
+    renderDrawLinePreview(c.wx, c.wy, e.shiftKey);
+  }
+}
+
+let spacePressed = false;
+
+function onMouseUp(e) {
+  if (!isDragging) return;
+  const c = getStageCoords(e);
+  
+  if (dragType === 'pan') {
+    isDragging = false;
+    dragType = null;
+  } else if (dragType === 'move') {
+    isDragging = false;
+    dragType = null;
+    const dx = c.wx - dragStart.wx;
+    const dy = c.wy - dragStart.wy;
+    if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) {
+      commitHistory();
+    } else {
+      shapes = JSON.parse(JSON.stringify(movingBaseline));
+      render();
+    }
+    movingBaseline = null;
+  } else if (dragType === 'resize') {
+    isDragging = false;
+    dragType = null;
+    commitHistory();
+    resizeOriginal = null;
+    resizeBaseline = null;
+  } else if (dragType === 'marquee') {
+    isDragging = false;
+    dragType = null;
+    const w1 = screenToWorld(Math.min(marqueeEl.x1, marqueeEl.x2), Math.min(marqueeEl.y1, marqueeEl.y2));
+    const w2 = screenToWorld(Math.max(marqueeEl.x1, marqueeEl.x2), Math.max(marqueeEl.y1, marqueeEl.y2));
+    marqueeEl = null;
+    
+    for (const s of shapes) {
+      const bbox = getShapeBBox(s);
+      if (bbox.x < w2.x && bbox.x + bbox.w > w1.x && bbox.y < w2.y && bbox.y + bbox.h > w1.y) {
+        selection.add(s.id);
+      }
+    }
+    render();
+  } else if (dragType === 'draw') {
+    isDragging = false;
+    dragType = null;
+    const wx = c.wx, wy = c.wy;
+    let dx = wx - dragStart.wx;
+    let dy = wy - dragStart.wy;
+    
+    if (e.shiftKey) {
+      const size = Math.max(Math.abs(dx), Math.abs(dy));
+      dx = size * Math.sign(dx);
+      dy = size * Math.sign(dy);
+    }
+    
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 3 / view.zoom) {
+      shapes = JSON.parse(JSON.stringify(dragBaseline));
+      render();
+      dragBaseline = null;
+      return;
+    }
+    
+    let x = dragStart.wx, y = dragStart.wy;
+    if (dx < 0) { x += dx; dx = -dx; }
+    if (dy < 0) { y += dy; dy = -dy; }
+    
+    const shapeType = tool === 'rect' ? 'rect' : 'ellipse';
+    const id = genId();
+    const s = {
+      id, type: shapeType, x, y, w: dx, h: dy,
+      fill: currentStyle.fill, stroke: currentStyle.stroke, strokeWidth: currentStyle.strokeWidth
+    };
+    shapes.push(s);
+    selection.clear();
+    selection.add(id);
+    setTool('select');
+    commitHistory();
+    render();
+  } else if (dragType === 'draw-line') {
+    isDragging = false;
+    dragType = null;
+    let x2 = c.wx, y2 = c.wy;
+    let x1 = dragStart.wx, y1 = dragStart.wy;
+    
+    if (e.shiftKey) {
+      let dx = x2 - x1, dy = y2 - y1;
+      const angle = Math.atan2(dy, dx);
+      const snappedAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+      const len = Math.sqrt(dx * dx + dy * dy);
+      x2 = x1 + Math.cos(snappedAngle) * len;
+      y2 = y1 + Math.sin(snappedAngle) * len;
+    }
+    
+    const dist = Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+    if (dist < 3 / view.zoom) {
+      shapes = JSON.parse(JSON.stringify(dragBaseline));
+      render();
+      dragBaseline = null;
+      return;
+    }
+    
+    const id = genId();
+    const s = {
+      id, type: 'line', x1, y1, x2, y2,
+      fill: 'none', stroke: currentStyle.stroke, strokeWidth: currentStyle.strokeWidth
+    };
+    shapes.push(s);
+    selection.clear();
+    selection.add(id);
+    setTool('select');
+    commitHistory();
+    render();
+  }
+}
+
+function renderDrawPreview(wx, wy, shift) {
+  let dx = wx - dragStart.wx;
+  let dy = wy - dragStart.wy;
+  
+  if (shift) {
+    const size = Math.max(Math.abs(dx), Math.abs(dy));
+    dx = size * Math.sign(dx);
+    dy = size * Math.sign(dy);
+  }
+  
+  let x = dragStart.wx, y = dragStart.wy;
+  if (dx < 0) { x += dx; dx = -dx; }
+  if (dy < 0) { y += dy; dy = -dy; }
+  
+  chrome.innerHTML = '';
+  let el;
+  if (tool === 'rect') {
+    el = document.createElementNS(SVG_NS, 'rect');
+    el.setAttribute('x', x); el.setAttribute('y', y);
+    el.setAttribute('width', dx); el.setAttribute('height', dy);
+  } else {
+    el = document.createElementNS(SVG_NS, 'ellipse');
+    el.setAttribute('cx', x + dx / 2); el.setAttribute('cy', y + dy / 2);
+    el.setAttribute('rx', dx / 2); el.setAttribute('ry', dy / 2);
+  }
+  el.setAttribute('fill', currentStyle.fill);
+  el.setAttribute('stroke', currentStyle.stroke);
+  el.setAttribute('stroke-width', currentStyle.strokeWidth);
+  el.setAttribute('opacity', '0.7');
+  el.setAttribute('pointer-events', 'none');
+  const transformStr = `translate(${view.panX},${view.panY}) scale(${view.zoom})`;
+  el.setAttribute('transform', transformStr);
+  chrome.appendChild(el);
+}
+
+function renderDrawLinePreview(wx, wy, shift) {
+  let x1 = dragStart.wx, y1 = dragStart.wy;
+  let x2 = wx, y2 = wy;
+  
+  if (shift) {
+    let dx = x2 - x1, dy = y2 - y1;
+    const angle = Math.atan2(dy, dx);
+    const snappedAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+    const len = Math.sqrt(dx * dx + dy * dy);
+    x2 = x1 + Math.cos(snappedAngle) * len;
+    y2 = y1 + Math.sin(snappedAngle) * len;
+  }
+  
+  chrome.innerHTML = '';
+  const el = document.createElementNS(SVG_NS, 'line');
+  el.setAttribute('x1', x1); el.setAttribute('y1', y1);
+  el.setAttribute('x2', x2); el.setAttribute('y2', y2);
+  el.setAttribute('fill', 'none');
+  el.setAttribute('stroke', currentStyle.stroke);
+  el.setAttribute('stroke-width', currentStyle.strokeWidth);
+  el.setAttribute('opacity', '0.7');
+  el.setAttribute('pointer-events', 'none');
+  const transformStr = `translate(${view.panX},${view.panY}) scale(${view.zoom})`;
+  el.setAttribute('transform', transformStr);
+  chrome.appendChild(el);
+}
+
+function applySnapping(dx, dy) {
+  const threshold = 5 / view.zoom;
+  const movingIds = [...selection];
+  const movingShapes = movingIds.map(id => shapes.find(s => s.id === id)).filter(Boolean);
+  const staticShapes = shapes.filter(s => !selection.has(s.id));
+  
+  for (const ms of movingShapes) {
+    const bbox = getShapeBBox(ms);
+    const bx = bbox.x, by = bbox.y, bw = bbox.w, bh = bbox.h;
+    
+    for (const ss of staticShapes) {
+      const sbbox = getShapeBBox(ss);
+      const sx = sbbox.x, sy = sbbox.y, sw = sbbox.w, sh = sbbox.h;
+      
+      const edges = [bx, bx + bw / 2, bx + bw];
+      const sEdges = [sx, sx + sw / 2, sx + sw];
+      
+      for (const e of edges) {
+        for (const se of sEdges) {
+          if (Math.abs(e - se) < threshold) {
+            const shift = se - e;
+            for (const s2 of movingShapes) {
+              if (s2.type === 'line') { s2.x1 += shift; s2.x2 += shift; }
+              else { s2.x += shift; }
+            }
+            drawGuide(se, Math.min(by, sy) - 20, Math.max(by + bh, sy + sh) + 20, 'v');
+            break;
+          }
+        }
+      }
+      
+      const edgesY = [by, by + bh / 2, by + bh];
+      const sEdgesY = [sy, sy + sh / 2, sy + sh];
+      
+      for (const e of edgesY) {
+        for (const se of sEdgesY) {
+          if (Math.abs(e - se) < threshold) {
+            const shift = se - e;
+            for (const s2 of movingShapes) {
+              if (s2.type === 'line') { s2.y1 += shift; s2.y2 += shift; }
+              else { s2.y += shift; }
+            }
+            drawGuide(Math.min(bx, sx) - 20, se, Math.max(bx + bw, sx + sw) + 20, 'h');
+            break;
+          }
+        }
+      }
+    }
+  }
+}
+
+function drawGuide(x1, y1, x2, y2, dir) {
+  const el = document.createElementNS(SVG_NS, 'line');
+  if (dir === 'v') {
+    const sp1 = worldToScreen(x1, y1);
+    const sp2 = worldToScreen(x1, y2);
+    el.setAttribute('x1', sp1.x); el.setAttribute('y1', sp1.y);
+    el.setAttribute('x2', sp2.x); el.setAttribute('y2', sp2.y);
+  } else {
+    const sp1 = worldToScreen(x1, y1);
+    const sp2 = worldToScreen(x2, y1);
+    el.setAttribute('x1', sp1.x); el.setAttribute('y1', sp1.y);
+    el.setAttribute('x2', sp2.x); el.setAttribute('y2', sp2.y);
+  }
+  el.setAttribute('stroke', '#ff4488');
+  el.setAttribute('stroke-width', '1');
+  el.setAttribute('stroke-dasharray', '3 2');
+  el.setAttribute('pointer-events', 'none');
+  chrome.appendChild(el);
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) {
+    const rect = stage.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const delta = -e.deltaY * 0.001;
+    setZoom(view.zoom * (1 + delta), cx, cy);
+  }
+}
+
+function onKeyDown(e) {
+  const tag = document.activeElement.tagName;
+  if (tag === 'INPUT' && (document.activeElement.type === 'text' || document.activeElement.type === 'number')) {
+    return;
+  }
+  
+  if (e.key === ' ') {
+    e.preventDefault();
+    spacePressed = true;
+    stage.style.cursor = 'grab';
+    return;
+  }
+  
+  const isMod = e.ctrlKey || e.metaKey;
+  
+  if (isMod && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    undo();
+    return;
+  }
+  if (isMod && e.key === 'z' && e.shiftKey) {
+    e.preventDefault();
+    redo();
+    return;
+  }
+  if (isMod && e.key === 'y') {
+    e.preventDefault();
+    redo();
+    return;
+  }
+  if (isMod && e.key === 'a') {
+    e.preventDefault();
+    selection.clear();
+    for (const s of shapes) selection.add(s.id);
+    render();
+    return;
+  }
+  if (isMod && e.key === 'd') {
+    e.preventDefault();
+    duplicateSelection();
+    return;
+  }
+  
+  if (e.key === 'v' && !isMod) { setTool('select'); return; }
+  if (e.key === 'r' && !isMod) { setTool('rect'); return; }
+  if (e.key === 'e' && !isMod) { setTool('ellipse'); return; }
+  if (e.key === 'l' && !isMod) { setTool('line'); return; }
+  
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (selection.size > 0 && document.activeElement.tagName !== 'INPUT') {
+      e.preventDefault();
+      deleteSelection();
+      return;
+    }
+  }
+  
+  if (e.key === ']' && selection.size > 0) {
+    e.preventDefault();
+    bringForward();
+    return;
+  }
+  if (e.key === '[' && selection.size > 0) {
+    e.preventDefault();
+    sendBackward();
+    return;
+  }
+  
+  // Arrow nudge
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key) && selection.size > 0) {
+    e.preventDefault();
+    const step = e.shiftKey ? 10 : 1;
+    let dx = 0, dy = 0;
+    if (e.key === 'ArrowLeft') dx = -step;
+    if (e.key === 'ArrowRight') dx = step;
+    if (e.key === 'ArrowUp') dy = -step;
+    if (e.key === 'ArrowDown') dy = step;
+    
+    const baseline = snapshot();
+    for (const id of selection) {
+      const s = shapes.find(sh => sh.id === id);
+      if (!s) continue;
+      if (s.type === 'line') { s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy; }
+      else { s.x += dx; s.y += dy; }
+    }
+    commitHistory();
+    render();
+    return;
+  }
+}
+
+function onKeyUp(e) {
+  if (e.key === ' ') {
+    spacePressed = false;
+    stage.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+  }
+}
+document.addEventListener('keyup', onKeyUp);
+
+function deleteSelection() {
+  shapes = shapes.filter(s => !selection.has(s.id));
+  selection.clear();
+  commitHistory();
+  render();
+}
+
+function duplicateSelection() {
+  if (selection.size === 0) return;
+  const newSelection = new Set();
+  const baseline = snapshot();
+  
+  for (const id of [...selection]) {
+    const s = shapes.find(sh => sh.id === id);
+    if (!s) continue;
+    const clone = JSON.parse(JSON.stringify(s));
+    clone.id = genId();
+    if (clone.type === 'line') { clone.x1 += 10; clone.y1 += 10; clone.x2 += 10; clone.y2 += 10; }
+    else { clone.x += 10; clone.y += 10; }
+    shapes.push(clone);
+    newSelection.add(clone.id);
+  }
+  selection = newSelection;
+  commitHistory();
+  render();
+}
+
+function bringForward() {
+  const selected = shapes.filter(s => selection.has(s.id));
+  const others = shapes.filter(s => !selection.has(s.id));
+  const newShapes = [];
+  let idx = 0;
+  for (const s of shapes) {
+    if (selection.has(s.id)) {
+      // Place after next non-selected
+      newShapes.push(s);
+    } else {
+      newShapes.push(s);
+    }
+  }
+  // Simple approach: move selected shapes one step forward
+  for (let i = shapes.length - 2; i >= 0; i--) {
+    if (selection.has(shapes[i].id) && !selection.has(shapes[i + 1].id)) {
+      [shapes[i], shapes[i + 1]] = [shapes[i + 1], shapes[i]];
+    }
+  }
+  commitHistory();
+  render();
+}
+
+function sendBackward() {
+  for (let i = 1; i < shapes.length; i++) {
+    if (selection.has(shapes[i].id) && !selection.has(shapes[i - 1].id)) {
+      [shapes[i], shapes[i - 1]] = [shapes[i - 1], shapes[i]];
+    }
+  }
+  commitHistory();
+  render();
+}
+
+function exportSVG() {
+  let svgContent = '';
+  for (const s of shapes) {
+    if (s.type === 'rect') {
+      svgContent += `  <rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="${s.fill}" stroke="${s.stroke}" stroke-width="${s.strokeWidth}"/>\n`;
+    } else if (s.type === 'ellipse') {
+      svgContent += `  <ellipse cx="${s.x + s.w / 2}" cy="${s.y + s.h / 2}" rx="${s.w / 2}" ry="${s.h / 2}" fill="${s.fill}" stroke="${s.stroke}" stroke-width="${s.strokeWidth}"/>\n`;
+    } else if (s.type === 'line') {
+      svgContent += `  <line x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="${s.stroke}" stroke-width="${s.strokeWidth}"/>\n`;
+    }
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">\n${svgContent}</svg>`;
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'drawing.svg';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Initialize
+if (!loadFromLocalStorage()) {
+  shapes = [];
+}
+initHistory();
+updateZoomDisplay();
+render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,2132 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vectorly</title>
+<style>
+  :root {
+    --bg: #eef2f7;
+    --panel: #ffffff;
+    --border: #d8e1eb;
+    --text: #0f172a;
+    --muted: #64748b;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --danger: #dc2626;
+    --stage: #f7f9fc;
+    --grid: #d7e3ef;
+  }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 54px;
+    padding: 0 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    z-index: 2;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    margin-right: 8px;
+  }
+
+  .brand-mark {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, #2563eb, #1f8fff);
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  .tool,
+  .icon-btn,
+  .action-btn {
+    height: 36px;
+    min-width: 36px;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #334155;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  }
+
+  .icon-btn { width: 36px; padding: 0; }
+
+  .tool:hover,
+  .icon-btn:hover,
+  .action-btn:hover {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+  }
+
+  .tool:active,
+  .icon-btn:active,
+  .action-btn:active {
+    transform: translateY(0);
+    background: #e8eef6;
+  }
+
+  .tool.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+
+  .tool.active:hover { background: #1d4ed8; }
+
+  .icon-btn:disabled,
+  .action-btn:disabled,
+  .tool:disabled {
+    opacity: 0.38;
+    cursor: default;
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .icon {
+    width: 20px;
+    height: 20px;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .zoom-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .zoom-level {
+    min-width: 52px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    color: #334155;
+    font-weight: 600;
+    padding: 0 4px;
+  }
+
+  .export-btn {
+    margin-left: auto;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .export-btn:hover { background: #1d4ed8; }
+
+  .workspace {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .stage-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 600px;
+    min-height: 400px;
+    background: var(--stage);
+    overflow: hidden;
+  }
+
+  .stage-wrap::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+    opacity: 0.55;
+  }
+
+  #stage {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    outline: none;
+    background: transparent;
+    touch-action: none;
+    user-select: none;
+  }
+
+  body[data-tool="select"] #stage { cursor: default; }
+  body[data-tool="rect"] #stage,
+  body[data-tool="ellipse"] #stage,
+  body[data-tool="line"] #stage { cursor: crosshair; }
+  body[data-tool="select"] #scene [data-shape] { cursor: pointer; }
+  body.space-ready #stage { cursor: grab; }
+  body.panning #stage { cursor: grabbing; }
+
+  #ui .selection-outline {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    pointer-events: none;
+  }
+
+  #ui .selection-line {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    pointer-events: none;
+  }
+
+  #ui .handle {
+    fill: #fff;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    pointer-events: all;
+  }
+
+  #ui .marquee {
+    fill: rgba(37, 99, 235, 0.08);
+    stroke: var(--accent);
+    stroke-width: 1;
+    stroke-dasharray: 4 2;
+    pointer-events: none;
+  }
+
+  #scene .preview {
+    opacity: 0.72;
+    pointer-events: none;
+  }
+
+  [data-handle="nw"], [data-handle="se"] { cursor: nwse-resize; }
+  [data-handle="ne"], [data-handle="sw"] { cursor: nesw-resize; }
+  [data-handle="n"], [data-handle="s"] { cursor: ns-resize; }
+  [data-handle="e"], [data-handle="w"] { cursor: ew-resize; }
+
+  .panel {
+    width: 286px;
+    flex: 0 0 286px;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    padding: 16px;
+    overflow: auto;
+    z-index: 2;
+  }
+
+  .panel section {
+    margin-bottom: 18px;
+  }
+
+  .panel h2 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .status {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #e5edf5;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+
+  .field label {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 650;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  input[type="number"] {
+    width: 100%;
+    height: 32px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0 9px;
+    font: inherit;
+    color: var(--text);
+    background: #fff;
+  }
+
+  input[type="color"] {
+    width: 100%;
+    height: 34px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 2px;
+    background: #fff;
+    cursor: pointer;
+  }
+
+  input:disabled {
+    background: #f3f4f6;
+    color: #94a3b8;
+    cursor: not-allowed;
+  }
+
+  input:focus {
+    outline: 2px solid rgba(37, 99, 235, 0.22);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+
+  .help {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.75;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+
+  kbd {
+    font: inherit;
+    font-size: 11px;
+    border: 1px solid #cbd5e1;
+    border-bottom-width: 2px;
+    background: #f8fafc;
+    border-radius: 5px;
+    padding: 1px 5px;
+    color: #334155;
+  }
+</style>
+</head>
+<body data-tool="select">
+  <div class="app">
+    <header class="toolbar">
+      <div class="brand"><span class="brand-mark">V</span>Vectorly</div>
+
+      <div class="group" role="toolbar" aria-label="Tools">
+        <button class="tool active" type="button" data-tool="select" title="Select (V)" aria-label="Select tool">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 3l8 18 2-8 8-2z"></path>
+          </svg>
+        </button>
+        <button class="tool" type="button" data-tool="rect" title="Rectangle (R)" aria-label="Rectangle tool">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3.5" y="4.5" width="17" height="15" rx="2"></rect>
+          </svg>
+        </button>
+        <button class="tool" type="button" data-tool="ellipse" title="Ellipse (E)" aria-label="Ellipse tool">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <ellipse cx="12" cy="12" rx="9" ry="7"></ellipse>
+          </svg>
+        </button>
+        <button class="tool" type="button" data-tool="line" title="Line (L)" aria-label="Line tool">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <line x1="4" y1="20" x2="20" y2="4"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="group">
+        <button id="undo" class="icon-btn" type="button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 9L4 13l4 4"></path>
+            <path d="M4 13h9a5 5 0 010 10h-3"></path>
+          </svg>
+        </button>
+        <button id="redo" class="icon-btn" type="button" title="Redo (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)" aria-label="Redo">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M16 9l4 4-4 4"></path>
+            <path d="M20 13h-9a5 5 0 000 10h3"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="group zoom-control">
+        <button id="zoom-out" class="icon-btn" type="button" title="Zoom out (-)" aria-label="Zoom out">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <span id="zoom-level" class="zoom-level">100%</span>
+        <button id="zoom-in" class="icon-btn" type="button" title="Zoom in (+)" aria-label="Zoom in">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button id="zoom-reset" class="icon-btn" type="button" title="Reset zoom (0)" aria-label="Reset zoom">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="7"></circle>
+            <line x1="12" y1="7" x2="12" y2="12"></line>
+            <line x1="12" y1="12" x2="15" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+
+      <button id="export-svg" class="export-btn" type="button" title="Export SVG">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3v12"></path>
+          <path d="M6 11l6 6 6-6"></path>
+          <path d="M4 20h16"></path>
+        </svg>
+        Export SVG
+      </button>
+    </header>
+
+    <div class="workspace">
+      <div class="stage-wrap">
+        <svg id="stage" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          <rect id="stage-bg" x="0" y="0" width="100%" height="100%" fill="transparent" pointer-events="all"></rect>
+          <g id="scene" shape-rendering="geometricPrecision"></g>
+          <g id="ui" pointer-events="none"></g>
+        </svg>
+      </div>
+
+      <aside class="panel" id="panel">
+        <section>
+          <h2>Selection</h2>
+          <div id="selection-status" class="status">No selection</div>
+          <div class="row">
+            <div class="field">
+              <label for="prop-x">X</label>
+              <input id="prop-x" data-field="x" type="number" step="any" value="" disabled>
+            </div>
+            <div class="field">
+              <label for="prop-y">Y</label>
+              <input id="prop-y" data-field="y" type="number" step="any" value="" disabled>
+            </div>
+            <div class="field">
+              <label for="prop-w">Width</label>
+              <input id="prop-w" data-field="w" type="number" step="any" value="" disabled>
+            </div>
+            <div class="field">
+              <label for="prop-h">Height</label>
+              <input id="prop-h" data-field="h" type="number" step="any" value="" disabled>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Style</h2>
+          <div class="row">
+            <div class="field">
+              <label for="fill-color">Fill</label>
+              <input id="fill-color" type="color" value="#3b82f6">
+            </div>
+            <div class="field">
+              <label for="stroke-color">Stroke</label>
+              <input id="stroke-color" type="color" value="#111827">
+            </div>
+          </div>
+          <div class="field">
+            <label for="stroke-width">Stroke width</label>
+            <input id="stroke-width" type="number" min="0" max="100" step="any" value="2">
+          </div>
+        </section>
+
+        <section class="help">
+          <kbd>V</kbd> select · <kbd>R</kbd> rect · <kbd>E</kbd> ellipse · <kbd>L</kbd> line<br>
+          <kbd>Shift</kbd> constrain while drawing/resizing<br>
+          <kbd>Shift+Click</kbd> toggle selection · drag empty stage for marquee<br>
+          <kbd>Ctrl/Cmd+Z</kbd> undo · <kbd>Ctrl/Cmd+Shift+Z</kbd> or <kbd>Ctrl/Cmd+Y</kbd> redo<br>
+          <kbd>Ctrl/Cmd+A</kbd> select all · <kbd>Ctrl/Cmd+D</kbd> duplicate<br>
+          <kbd>]</kbd> bring forward · <kbd>[</kbd> send backward<br>
+          <kbd>Ctrl/Cmd + Wheel</kbd> zoom · <kbd>Space+Drag</kbd> or middle drag pans
+        </section>
+      </aside>
+    </div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const STORAGE_KEY = 'vectorly-drawing-v1';
+  const HISTORY_LIMIT = 300;
+
+  const DEFAULT_STYLE = {
+    fill: '#3b82f6',
+    stroke: '#111827',
+    strokeWidth: 2
+  };
+
+  const HANDLE_NAMES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+  const HANDLE_FRACTIONS = {
+    nw: [0, 0], n: [0.5, 0], ne: [1, 0], e: [1, 0.5],
+    se: [1, 1], s: [0.5, 1], sw: [0, 1], w: [0, 0.5]
+  };
+  const HANDLE_DIRS = {
+    nw: [-1, -1], n: [0, -1], ne: [1, -1], e: [1, 0],
+    se: [1, 1], s: [0, 1], sw: [-1, 1], w: [-1, 0]
+  };
+
+  const stage = document.getElementById('stage');
+  const scene = document.getElementById('scene');
+  const ui = document.getElementById('ui');
+  const zoomLevel = document.getElementById('zoom-level');
+
+  const toolButtons = Array.from(document.querySelectorAll('[data-tool]'));
+  const undoBtn = document.getElementById('undo');
+  const redoBtn = document.getElementById('redo');
+  const exportBtn = document.getElementById('export-svg');
+  const zoomInBtn = document.getElementById('zoom-in');
+  const zoomOutBtn = document.getElementById('zoom-out');
+  const zoomResetBtn = document.getElementById('zoom-reset');
+
+  const selectionStatus = document.getElementById('selection-status');
+  const numericInputs = [
+    document.getElementById('prop-x'),
+    document.getElementById('prop-y'),
+    document.getElementById('prop-w'),
+    document.getElementById('prop-h')
+  ];
+
+  const fillInput = document.getElementById('fill-color');
+  const strokeInput = document.getElementById('stroke-color');
+  const strokeWidthInput = document.getElementById('stroke-width');
+
+  let shapes = [];
+  let selected = new Set();
+  let currentStyle = { ...DEFAULT_STYLE };
+  let tool = 'select';
+  let viewport = { x: 0, y: 0, scale: 1 };
+  let elements = new Map();
+
+  let history = [];
+  let hIndex = 0;
+  let lastSerialized = '';
+  let lastMergeKey = '';
+  let lastCommitTime = 0;
+
+  let spacePressed = false;
+  let drag = null;
+  let saveTimer = null;
+
+  function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+  }
+
+  function safeNum(v, fallback) {
+    if (typeof fallback === 'undefined') fallback = 0;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.round(n * 1000) / 1000;
+  }
+
+  function sanitizeColor(value, fallback) {
+    if (typeof value !== 'string') return fallback.toLowerCase();
+    let s = value.trim();
+    if (/^#([0-9a-f]{3})$/i.test(s)) {
+      return ('#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3]).toLowerCase();
+    }
+    if (/^#([0-9a-f]{6})$/i.test(s)) {
+      return s.toLowerCase();
+    }
+    return fallback.toLowerCase();
+  }
+
+  function sanitizeStyle(style) {
+    const s = style && typeof style === 'object' ? style : {};
+    return {
+      fill: sanitizeColor(s.fill, DEFAULT_STYLE.fill),
+      stroke: sanitizeColor(s.stroke, DEFAULT_STYLE.stroke),
+      strokeWidth: clamp(safeNum(s.strokeWidth, DEFAULT_STYLE.strokeWidth), 0, 100)
+    };
+  }
+
+  function newId() {
+    return 'sh-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9);
+  }
+
+  function svgEl(tag) {
+    return document.createElementNS(SVGNS, tag);
+  }
+
+  function bboxOf(s) {
+    if (!s) return { x: 0, y: 0, w: 0, h: 0 };
+    if (s.type === 'line') {
+      const x1 = safeNum(s.x1), y1 = safeNum(s.y1), x2 = safeNum(s.x2), y2 = safeNum(s.y2);
+      const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+      const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+      return { x: safeNum(minX), y: safeNum(minY), w: Math.max(0, safeNum(maxX - minX)), h: Math.max(0, safeNum(maxY - minY)) };
+    }
+    return { x: safeNum(s.x), y: safeNum(s.y), w: Math.max(0, safeNum(s.w)), h: Math.max(0, safeNum(s.h)) };
+  }
+
+  function normalizeBBox(b) {
+    return { x: safeNum(b.x), y: safeNum(b.y), w: Math.max(0, safeNum(b.w)), h: Math.max(0, safeNum(b.h)) };
+  }
+
+  function sanitizeShape(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const type = raw.type;
+    if (type !== 'rect' && type !== 'ellipse' && type !== 'line') return null;
+
+    const id = typeof raw.id === 'string' && raw.id.length ? raw.id : newId();
+    const style = sanitizeStyle(raw);
+
+    if (type === 'rect' || type === 'ellipse') {
+      const x = safeNum(raw.x, 0);
+      const y = safeNum(raw.y, 0);
+      const w = Math.max(0, safeNum(raw.w, 0));
+      const h = Math.max(0, safeNum(raw.h, 0));
+      if (w < 0.01 && h < 0.01) return null;
+      return { id, type, x, y, w, h, fill: style.fill, stroke: style.stroke, strokeWidth: style.strokeWidth };
+    }
+
+    const x1 = safeNum(raw.x1, 0), y1 = safeNum(raw.y1, 0);
+    const x2 = safeNum(raw.x2, 0), y2 = safeNum(raw.y2, 0);
+    if (Math.hypot(x2 - x1, y2 - y1) < 0.01) return null;
+    return { id, type, x1, y1, x2, y2, fill: style.fill, stroke: style.stroke, strokeWidth: style.strokeWidth };
+  }
+
+  function loadSaved() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      const loadedShapes = Array.isArray(data.shapes) ? data.shapes : [];
+      const used = new Set();
+      shapes = [];
+      for (const rawShape of loadedShapes) {
+        const s = sanitizeShape(rawShape);
+        if (!s) continue;
+        if (used.has(s.id)) s.id = newId();
+        used.add(s.id);
+        shapes.push(s);
+      }
+      currentStyle = sanitizeStyle(data.currentStyle);
+    } catch (e) {
+      shapes = [];
+      currentStyle = { ...DEFAULT_STYLE };
+    }
+  }
+
+  function saveNow() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ shapes, currentStyle }));
+    } catch (e) {
+      // Ignore storage quota / private mode issues.
+    }
+  }
+
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveNow, 250);
+  }
+
+  function serializeHistory() {
+    return JSON.stringify(shapes);
+  }
+
+  function commit(op, key) {
+    const json = serializeHistory();
+    if (json === history[hIndex]) return;
+
+    const now = Date.now();
+    const mergeKey = (op || '') + '|' + (key || '');
+    if (key && mergeKey === lastMergeKey && now - lastCommitTime < 500 && hIndex === history.length - 1) {
+      history[hIndex] = json;
+      lastSerialized = json;
+      lastCommitTime = now;
+      scheduleSave();
+      updateHistoryButtons();
+      return;
+    }
+
+    history.splice(hIndex + 1);
+    history.push(json);
+    if (history.length > HISTORY_LIMIT) {
+      history.splice(0, history.length - HISTORY_LIMIT);
+    }
+    hIndex = history.length - 1;
+    lastSerialized = json;
+    lastMergeKey = mergeKey;
+    lastCommitTime = now;
+
+    scheduleSave();
+    updateHistoryButtons();
+  }
+
+  function applyHistory(index) {
+    if (index < 0 || index >= history.length) return;
+    let parsed;
+    try {
+      parsed = JSON.parse(history[index]);
+    } catch (e) {
+      return;
+    }
+
+    if (!Array.isArray(parsed)) return;
+
+    shapes = parsed;
+    selected = new Set(Array.from(selected).filter(id => shapes.some(s => s && s.id === id)));
+    lastSerialized = history[index];
+    lastMergeKey = '';
+    lastCommitTime = 0;
+
+    renderAll();
+    scheduleSave();
+  }
+
+  function undo() {
+    if (hIndex <= 0) return;
+    hIndex--;
+    applyHistory(hIndex);
+  }
+
+  function redo() {
+    if (hIndex >= history.length - 1) return;
+    hIndex++;
+    applyHistory(hIndex);
+  }
+
+  function updateHistoryButtons() {
+    undoBtn.disabled = hIndex <= 0;
+    redoBtn.disabled = hIndex >= history.length - 1;
+  }
+
+  function updateToolButtons() {
+    for (const btn of toolButtons) {
+      btn.classList.toggle('active', btn.dataset.tool === tool);
+    }
+  }
+
+  function clearSelection() {
+    if (selected.size === 0) return;
+    selected.clear();
+    updateSelectedAttributes();
+    renderUI();
+    updatePanel();
+  }
+
+  function setTool(newTool) {
+    if (newTool !== 'select' && newTool !== 'rect' && newTool !== 'ellipse' && newTool !== 'line') return;
+    if (newTool === tool) {
+      updateToolButtons();
+      return;
+    }
+
+    if (newTool !== 'select' && selected.size > 0) {
+      selected.clear();
+      updateSelectedAttributes();
+      renderUI();
+      updatePanel();
+    }
+
+    tool = newTool;
+    document.body.dataset.tool = tool;
+    updateToolButtons();
+    renderUI();
+  }
+
+  function getShape(id) {
+    for (const s of shapes) {
+      if (s && s.id === id) return s;
+    }
+    return null;
+  }
+
+  function selectedIdsArray() {
+    return Array.from(selected);
+  }
+
+  function getLocalPoint(e) {
+    const r = stage.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  function toDoc(local) {
+    return {
+      x: (local.x - viewport.x) / viewport.scale,
+      y: (local.y - viewport.y) / viewport.scale
+    };
+  }
+
+  function toDocSafe(e) {
+    return toDoc(getLocalPoint(e));
+  }
+
+  function getStageRect() {
+    return stage.getBoundingClientRect();
+  }
+
+  function updateViewport() {
+    const sx = safeNum(viewport.scale);
+    scene.setAttribute('transform', 'translate(' + safeNum(viewport.x) + ' ' + safeNum(viewport.y) + ') scale(' + sx + ')');
+    zoomLevel.textContent = Math.round(viewport.scale * 100) + '%';
+    renderUI();
+  }
+
+  function resetZoom() {
+    viewport = { x: 0, y: 0, scale: 1 };
+    updateViewport();
+  }
+
+  function zoomAt(localX, localY, factor) {
+    const oldScale = viewport.scale;
+    const newScale = clamp(oldScale * factor, 0.1, 8.0);
+    if (newScale === oldScale) return;
+
+    const docX = (localX - viewport.x) / oldScale;
+    const docY = (localY - viewport.y) / oldScale;
+
+    viewport.x = localX - docX * newScale;
+    viewport.y = localY - docY * newScale;
+    viewport.scale = newScale;
+    updateViewport();
+  }
+
+  function zoomCenter(factor) {
+    const r = getStageRect();
+    zoomAt(r.width / 2, r.height / 2, factor);
+  }
+
+  function updateSelectedAttributes() {
+    for (const s of shapes) {
+      if (!s) continue;
+      const el = elements.get(s.id);
+      if (!el) continue;
+      if (selected.has(s.id)) el.setAttribute('data-selected', 'true');
+      else el.removeAttribute('data-selected');
+    }
+  }
+
+  function applyGeometryToElement(el, s) {
+    if (!el || !s) return;
+
+    if (s.type === 'rect') {
+      const b = bboxOf(s);
+      el.setAttribute('x', b.x);
+      el.setAttribute('y', b.y);
+      el.setAttribute('width', b.w);
+      el.setAttribute('height', b.h);
+    } else if (s.type === 'ellipse') {
+      const b = bboxOf(s);
+      el.setAttribute('cx', b.x + b.w / 2);
+      el.setAttribute('cy', b.y + b.h / 2);
+      el.setAttribute('rx', b.w / 2);
+      el.setAttribute('ry', b.h / 2);
+    } else if (s.type === 'line') {
+      el.setAttribute('x1', safeNum(s.x1));
+      el.setAttribute('y1', safeNum(s.y1));
+      el.setAttribute('x2', safeNum(s.x2));
+      el.setAttribute('y2', safeNum(s.y2));
+    }
+  }
+
+  function applyStyleToElement(el, s) {
+    if (!el || !s) return;
+    el.setAttribute('fill', sanitizeColor(s.fill, DEFAULT_STYLE.fill));
+    el.setAttribute('stroke', sanitizeColor(s.stroke, DEFAULT_STYLE.stroke));
+    el.setAttribute('stroke-width', clamp(safeNum(s.strokeWidth, DEFAULT_STYLE.strokeWidth), 0, 100));
+  }
+
+  function makeShapeElement(s) {
+    if (!s) return null;
+    let tag = null;
+    if (s.type === 'rect') tag = 'rect';
+    else if (s.type === 'ellipse') tag = 'ellipse';
+    else if (s.type === 'line') tag = 'line';
+    else return null;
+
+    const el = svgEl(tag);
+    el.setAttribute('data-shape', s.type);
+    el.setAttribute('data-id', s.id);
+    if (selected.has(s.id)) el.setAttribute('data-selected', 'true');
+
+    applyGeometryToElement(el, s);
+    applyStyleToElement(el, s);
+    return el;
+  }
+
+  function renderScene() {
+    scene.textContent = '';
+    elements.clear();
+
+    for (const s of shapes) {
+      const el = makeShapeElement(s);
+      if (el) {
+        scene.appendChild(el);
+        elements.set(s.id, el);
+      }
+    }
+  }
+
+  function updateShapeElement(s) {
+    if (!s) return;
+    const el = elements.get(s.id);
+    if (!el) return;
+    applyGeometryToElement(el, s);
+    applyStyleToElement(el, s);
+  }
+
+  function localRectFromDoc(b) {
+    return {
+      x: viewport.x + viewport.scale * b.x,
+      y: viewport.y + viewport.scale * b.y,
+      w: viewport.scale * b.w,
+      h: viewport.scale * b.h
+    };
+  }
+
+  function renderUI() {
+    ui.textContent = '';
+
+    if (drag && drag.type === 'marquee') {
+      drawMarquee();
+    }
+
+    if (tool !== 'select') return;
+    if (selected.size === 0) return;
+
+    const selectedShapes = [];
+    for (const s of shapes) {
+      if (s && selected.has(s.id)) selectedShapes.push(s);
+    }
+
+    for (const s of selectedShapes) {
+      drawSelectionChrome(s);
+    }
+
+    if (selected.size === 1 && selectedShapes[0]) {
+      drawHandles(selectedShapes[0]);
+    }
+  }
+
+  function drawSelectionChrome(s) {
+    if (s.type === 'line') {
+      const x1 = viewport.x + viewport.scale * safeNum(s.x1);
+      const y1 = viewport.y + viewport.scale * safeNum(s.y1);
+      const x2 = viewport.x + viewport.scale * safeNum(s.x2);
+      const y2 = viewport.y + viewport.scale * safeNum(s.y2);
+      const el = svgEl('line');
+      el.setAttribute('class', 'selection-line');
+      el.setAttribute('x1', x1);
+      el.setAttribute('y1', y1);
+      el.setAttribute('x2', x2);
+      el.setAttribute('y2', y2);
+      ui.appendChild(el);
+    } else {
+      const b = bboxOf(s);
+      const local = localRectFromDoc(b);
+      const el = svgEl('rect');
+      el.setAttribute('class', 'selection-outline');
+      el.setAttribute('x', local.x);
+      el.setAttribute('y', local.y);
+      el.setAttribute('width', Math.max(0, local.w));
+      el.setAttribute('height', Math.max(0, local.h));
+      ui.appendChild(el);
+    }
+  }
+
+  function drawHandles(s) {
+    const local = localRectFromDoc(bboxOf(s));
+    const handleSize = 10;
+    const half = handleSize / 2;
+
+    for (const name of HANDLE_NAMES) {
+      const frac = HANDLE_FRACTIONS[name];
+      const cx = local.x + frac[0] * local.w;
+      const cy = local.y + frac[1] * local.h;
+
+      const el = svgEl('rect');
+      el.setAttribute('class', 'handle');
+      el.setAttribute('data-handle', name);
+      el.setAttribute('x', cx - half);
+      el.setAttribute('y', cy - half);
+      el.setAttribute('width', handleSize);
+      el.setAttribute('height', handleSize);
+      ui.appendChild(el);
+    }
+  }
+
+  function drawMarquee() {
+    const start = drag.startLocal || { x: 0, y: 0 };
+    const current = drag.currentLocal || start;
+    const dx = current.x - start.x;
+    const dy = current.y - start.y;
+    if (Math.hypot(dx, dy) < 3) return;
+
+    const x = Math.min(start.x, current.x);
+    const y = Math.min(start.y, current.y);
+    const w = Math.abs(dx);
+    const h = Math.abs(dy);
+
+    const el = svgEl('rect');
+    el.setAttribute('class', 'marquee');
+    el.setAttribute('x', x);
+    el.setAttribute('y', y);
+    el.setAttribute('width', Math.max(1, w));
+    el.setAttribute('height', Math.max(1, h));
+    ui.appendChild(el);
+  }
+
+  function getDrawGeometry(type, start, current, shift) {
+    const sx = safeNum(start.x), sy = safeNum(start.y);
+    let dx = safeNum(current.x) - sx;
+    let dy = safeNum(current.y) - sy;
+
+    if (type === 'line') {
+      let x2 = sx + dx;
+      let y2 = sy + dy;
+      if (shift) {
+        const len = Math.hypot(dx, dy);
+        const angle = Math.atan2(dy, dx);
+        const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+        x2 = sx + len * Math.cos(snapped);
+        y2 = sy + len * Math.sin(snapped);
+      }
+      return { x2: safeNum(x2), y2: safeNum(y2) };
+    }
+
+    if (shift) {
+      const size = Math.max(Math.abs(dx), Math.abs(dy));
+      dx = (dx < 0 ? -1 : 1) * size;
+      dy = (dy < 0 ? -1 : 1) * size;
+    }
+
+    const x = Math.min(sx, sx + dx);
+    const y = Math.min(sy, sy + dy);
+    return { x: safeNum(x), y: safeNum(y), w: safeNum(Math.abs(dx)), h: safeNum(Math.abs(dy)) };
+  }
+
+  function makeShapeFromPoints(type, start, current, shift) {
+    const style = sanitizeStyle(currentStyle);
+    const geo = getDrawGeometry(type, start, current, shift);
+
+    if (type === 'line') {
+      const dx = geo.x2 - safeNum(start.x);
+      const dy = geo.y2 - safeNum(start.y);
+      if (Math.hypot(dx, dy) < 3) return null;
+      return {
+        id: newId(),
+        type: 'line',
+        x1: safeNum(start.x),
+        y1: safeNum(start.y),
+        x2: geo.x2,
+        y2: geo.y2,
+        fill: style.fill,
+        stroke: style.stroke,
+        strokeWidth: style.strokeWidth
+      };
+    }
+
+    const w = geo.w;
+    const h = geo.h;
+    if (Math.hypot(w, h) < 3) return null;
+
+    return {
+      id: newId(),
+      type,
+      x: geo.x,
+      y: geo.y,
+      w,
+      h,
+      fill: style.fill,
+      stroke: style.stroke,
+      strokeWidth: style.strokeWidth
+    };
+  }
+
+  function createPreviewElement(type, start) {
+    let tag = null;
+    if (type === 'rect') tag = 'rect';
+    else if (type === 'ellipse') tag = 'ellipse';
+    else if (type === 'line') tag = 'line';
+    else return null;
+
+    const el = svgEl(tag);
+    el.setAttribute('class', 'preview');
+    const style = sanitizeStyle(currentStyle);
+    el.setAttribute('fill', style.fill);
+    el.setAttribute('stroke', style.stroke);
+    el.setAttribute('stroke-width', style.strokeWidth);
+
+    if (type === 'line') {
+      el.setAttribute('x1', safeNum(start.x));
+      el.setAttribute('y1', safeNum(start.y));
+      el.setAttribute('x2', safeNum(start.x));
+      el.setAttribute('y2', safeNum(start.y));
+    } else {
+      applyPreviewGeometry(el, type, safeNum(start.x), safeNum(start.y), 0, 0);
+    }
+    return el;
+  }
+
+  function applyPreviewGeometry(el, type, x, y, w, h) {
+    if (type === 'rect') {
+      el.setAttribute('x', x);
+      el.setAttribute('y', y);
+      el.setAttribute('width', Math.max(0, w));
+      el.setAttribute('height', Math.max(0, h));
+    } else if (type === 'ellipse') {
+      el.setAttribute('cx', x + w / 2);
+      el.setAttribute('cy', y + h / 2);
+      el.setAttribute('rx', Math.max(0, w / 2));
+      el.setAttribute('ry', Math.max(0, h / 2));
+    }
+  }
+
+  function updatePreview(preview, type, start, current, shift) {
+    if (!preview) return;
+    const geo = getDrawGeometry(type, start, current, shift);
+
+    if (type === 'line') {
+      preview.setAttribute('x1', safeNum(start.x));
+      preview.setAttribute('y1', safeNum(start.y));
+      preview.setAttribute('x2', geo.x2);
+      preview.setAttribute('y2', geo.y2);
+    } else {
+      applyPreviewGeometry(preview, type, geo.x, geo.y, geo.w, geo.h);
+    }
+  }
+
+  function removePreview() {
+    if (drag && drag.preview && drag.preview.parentNode) {
+      drag.preview.parentNode.removeChild(drag.preview);
+    }
+  }
+
+  function finishDraw(drag) {
+    removePreview();
+    const shape = makeShapeFromPoints(drag.tool, drag.start, drag.current || drag.start, drag.shift);
+    if (shape) {
+      shapes.push(shape);
+      selected = new Set([shape.id]);
+      setTool('select');
+      renderAll();
+      commit('create');
+    } else {
+      renderScene();
+      updatePanel();
+    }
+  }
+
+  function getStateForMove(s) {
+    if (s.type === 'line') {
+      return { x1: safeNum(s.x1), y1: safeNum(s.y1), x2: safeNum(s.x2), y2: safeNum(s.y2) };
+    }
+    return { x: safeNum(s.x), y: safeNum(s.y) };
+  }
+
+  function applyMoveDelta(baseMap, dx, dy) {
+    for (const [id, base] of baseMap.entries()) {
+      const s = getShape(id);
+      if (!s) continue;
+
+      if (s.type === 'line') {
+        s.x1 = safeNum(base.x1 + dx);
+        s.y1 = safeNum(base.y1 + dy);
+        s.x2 = safeNum(base.x2 + dx);
+        s.y2 = safeNum(base.y2 + dy);
+      } else {
+        s.x = safeNum(base.x + dx);
+        s.y = safeNum(base.y + dy);
+      }
+
+      updateShapeElement(s);
+    }
+  }
+
+  function translateShapeDirect(s, dx, dy) {
+    if (!s) return;
+    if (s.type === 'line') {
+      s.x1 = safeNum(s.x1 + dx);
+      s.y1 = safeNum(s.y1 + dy);
+      s.x2 = safeNum(s.x2 + dx);
+      s.y2 = safeNum(s.y2 + dy);
+    } else {
+      s.x = safeNum(s.x + dx);
+      s.y = safeNum(s.y + dy);
+    }
+    updateShapeElement(s);
+  }
+
+  function handleDocCenter(b, handleName) {
+    const frac = HANDLE_FRACTIONS[handleName] || [0.5, 0.5];
+    return {
+      x: b.x + frac[0] * b.w,
+      y: b.y + frac[1] * b.h
+    };
+  }
+
+  function resizeBBox(orig, handleName, dx, dy, shift) {
+    const dir = HANDLE_DIRS[handleName] || [0, 0];
+    const minSize = 1;
+
+    let x = safeNum(orig.x);
+    let y = safeNum(orig.y);
+    let w = safeNum(orig.w);
+    let h = safeNum(orig.h);
+
+    if (dir[0] === 1) {
+      w += dx;
+    } else if (dir[0] === -1) {
+      x += dx;
+      w -= dx;
+    }
+
+    if (dir[1] === 1) {
+      h += dy;
+    } else if (dir[1] === -1) {
+      y += dy;
+      h -= dy;
+    }
+
+    const origW = Math.max(0, safeNum(orig.w));
+    const origH = Math.max(0, safeNum(orig.h));
+
+    if (shift && origW > 0 && origH > 0) {
+      let scale = 1;
+      if (dir[0] !== 0 && dir[1] !== 0) {
+        scale = Math.max(Math.abs(w) / origW, Math.abs(h) / origH);
+      } else if (dir[0] !== 0) {
+        scale = Math.abs(w) / origW;
+      } else if (dir[1] !== 0) {
+        scale = Math.abs(h) / origH;
+      }
+
+      if (!Number.isFinite(scale) || scale < 0) scale = 0;
+
+      w = Math.max(minSize, origW * scale);
+      h = Math.max(minSize, origH * scale);
+
+      if (dir[0] === -1) x = orig.x + orig.w - w;
+      else x = orig.x;
+
+      if (dir[1] === -1) y = orig.y + orig.h - h;
+      else y = orig.y;
+    }
+
+    if (w < minSize) {
+      if (dir[0] === -1) x = orig.x + orig.w - minSize;
+      else x = orig.x;
+      w = minSize;
+    }
+
+    if (h < minSize) {
+      if (dir[1] === -1) y = orig.y + orig.h - minSize;
+      else y = orig.y;
+      h = minSize;
+    }
+
+    return normalizeBBox({ x, y, w, h });
+  }
+
+  function applyBBoxToShape(s, bbox) {
+    if (!s) return;
+    const target = normalizeBBox(bbox);
+
+    if (s.type === 'rect' || s.type === 'ellipse') {
+      s.x = target.x;
+      s.y = target.y;
+      s.w = target.w;
+      s.h = target.h;
+      updateShapeElement(s);
+      return;
+    }
+
+    const old = bboxOf(s);
+    let x1, y1, x2, y2;
+
+    if (old.w > 0) {
+      const tx1 = (safeNum(s.x1) - old.x) / old.w;
+      const tx2 = (safeNum(s.x2) - old.x) / old.w;
+      x1 = target.x + tx1 * target.w;
+      x2 = target.x + tx2 * target.w;
+    } else {
+      if (target.w > 0) {
+        x1 = target.x;
+        x2 = target.x + target.w;
+      } else {
+        x1 = target.x;
+        x2 = target.x;
+      }
+    }
+
+    if (old.h > 0) {
+      const ty1 = (safeNum(s.y1) - old.y) / old.h;
+      const ty2 = (safeNum(s.y2) - old.y) / old.h;
+      y1 = target.y + ty1 * target.h;
+      y2 = target.y + ty2 * target.h;
+    } else {
+      if (target.h > 0) {
+        y1 = target.y;
+        y2 = target.y + target.h;
+      } else {
+        y1 = target.y;
+        y2 = target.y;
+      }
+    }
+
+    s.x1 = safeNum(x1);
+    s.y1 = safeNum(y1);
+    s.x2 = safeNum(x2);
+    s.y2 = safeNum(y2);
+    updateShapeElement(s);
+  }
+
+  function aspectLineChosen(dragData, dx, dy) {
+    const targetX = safeNum(dragData.startChosen.x + dx);
+    const targetY = safeNum(dragData.startChosen.y + dy);
+    const fixed = dragData.fixedPoint;
+    const vx0 = dragData.origVx;
+    const vy0 = dragData.origVy;
+
+    if (Math.abs(vx0) > 1e-6 && Math.abs(vy0) > 1e-6) {
+      const sx = (targetX - fixed.x) / vx0;
+      const sy = (targetY - fixed.y) / vy0;
+      const scale = Math.abs(sx) >= Math.abs(sy) ? sx : sy;
+      if (Number.isFinite(scale)) {
+        return {
+          x: fixed.x + vx0 * scale,
+          y: fixed.y + vy0 * scale
+        };
+      }
+    } else if (Math.abs(vx0) > 1e-6) {
+      const scale = (targetX - fixed.x) / vx0;
+      if (Number.isFinite(scale)) {
+        return {
+          x: fixed.x + vx0 * scale,
+          y: fixed.y
+        };
+      }
+    } else if (Math.abs(vy0) > 1e-6) {
+      const scale = (targetY - fixed.y) / vy0;
+      if (Number.isFinite(scale)) {
+        return {
+          x: fixed.x,
+          y: fixed.y + vy0 * scale
+        };
+      }
+    }
+
+    return { x: targetX, y: targetY };
+  }
+
+  function startShapeInteraction(id, shiftKey, doc) {
+    const shape = getShape(id);
+    if (!shape) return;
+
+    let startMove = false;
+
+    if (shiftKey) {
+      if (selected.has(id)) {
+        selected.delete(id);
+      } else {
+        selected.add(id);
+        startMove = true;
+      }
+    } else {
+      if (!selected.has(id)) {
+        selected.clear();
+        selected.add(id);
+      }
+      startMove = true;
+    }
+
+    updateSelectedAttributes();
+    renderUI();
+    updatePanel();
+
+    if (startMove && selected.size > 0) {
+      drag = {
+        type: 'move',
+        start: doc,
+        changed: false,
+        base: new Map()
+      };
+      for (const selId of selected) {
+        const s = getShape(selId);
+        if (s) drag.base.set(selId, getStateForMove(s));
+      }
+    }
+  }
+
+  function startDraw(e, doc) {
+    removePreview();
+    drag = {
+      type: 'draw',
+      tool,
+      start: doc,
+      current: doc,
+      shift: e.shiftKey,
+      preview: createPreviewElement(tool, doc)
+    };
+    if (drag.preview) scene.appendChild(drag.preview);
+  }
+
+  function startPan(e) {
+    drag = {
+      type: 'pan',
+      startClient: { x: e.clientX, y: e.clientY },
+      startView: { x: viewport.x, y: viewport.y }
+    };
+    document.body.classList.add('panning');
+  }
+
+  function startMarquee(e, local, doc) {
+    drag = {
+      type: 'marquee',
+      startLocal: local,
+      currentLocal: local,
+      startDoc: doc,
+      currentDoc: doc,
+      add: e.shiftKey
+    };
+    renderUI();
+  }
+
+  function startResize(e, handleName, doc) {
+    if (selected.size !== 1) return;
+    const id = selectedIdsArray()[0];
+    const shape = getShape(id);
+    if (!shape) return;
+
+    if (shape.type === 'line') {
+      const pts = [
+        { x: safeNum(shape.x1), y: safeNum(shape.y1) },
+        { x: safeNum(shape.x2), y: safeNum(shape.y2) }
+      ];
+      const center = handleDocCenter(bboxOf(shape), handleName);
+      let chosen = 0;
+      let best = Infinity;
+      for (let i = 0; i < 2; i++) {
+        const d = Math.hypot(pts[i].x - center.x, pts[i].y - center.y);
+        if (d < best) {
+          best = d;
+          chosen = i;
+        }
+      }
+      const fixed = 1 - chosen;
+      drag = {
+        type: 'resizeLine',
+        shape,
+        handle: handleName,
+        start: doc,
+        changed: false,
+        chosen,
+        startChosen: pts[chosen],
+        fixedPoint: pts[fixed],
+        origVx: pts[chosen].x - pts[fixed].x,
+        origVy: pts[chosen].y - pts[fixed].y
+      };
+    } else {
+      drag = {
+        type: 'resizeRect',
+        shape,
+        handle: handleName,
+        start: doc,
+        changed: false,
+        orig: bboxOf(shape)
+      };
+    }
+  }
+
+  function applyLineResize(dragData, doc, shift) {
+    const dx = doc.x - dragData.start.x;
+    const dy = doc.y - dragData.start.y;
+    if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return;
+
+    let chosen;
+    if (shift) {
+      chosen = aspectLineChosen(dragData, dx, dy);
+    } else {
+      chosen = {
+        x: safeNum(dragData.startChosen.x + dx),
+        y: safeNum(dragData.startChosen.y + dy)
+      };
+    }
+
+    const s = dragData.shape;
+    if (dragData.chosen === 0) {
+      s.x1 = chosen.x;
+      s.y1 = chosen.y;
+    } else {
+      s.x2 = chosen.x;
+      s.y2 = chosen.y;
+    }
+
+    updateShapeElement(s);
+    dragData.changed = true;
+  }
+
+  function applyRectResize(dragData, doc, shift) {
+    const dx = doc.x - dragData.start.x;
+    const dy = doc.y - dragData.start.y;
+    if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return;
+
+    const next = resizeBBox(dragData.orig, dragData.handle, dx, dy, shift);
+    applyBBoxToShape(dragData.shape, next);
+    dragData.changed = true;
+  }
+
+  function finishMarquee(dragData) {
+    const start = dragData.startDoc || toDoc(dragData.startLocal);
+    const end = dragData.currentDoc || start;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    if (Math.hypot(dx, dy) < 3) return;
+
+    const minX = Math.min(start.x, end.x);
+    const maxX = Math.max(start.x, end.x);
+    const minY = Math.min(start.y, end.y);
+    const maxY = Math.max(start.y, end.y);
+
+    const next = dragData.add ? new Set(selected) : new Set();
+
+    for (const s of shapes) {
+      if (!s) continue;
+      const b = bboxOf(s);
+      if (b.x > maxX || b.x + b.w < minX || b.y > maxY || b.y + b.h < minY) continue;
+      next.add(s.id);
+    }
+
+    selected = next;
+    updateSelectedAttributes();
+    renderUI();
+    updatePanel();
+  }
+
+  function onPointerDown(e) {
+    if (e.button !== 0 && e.button !== 1) return;
+    e.preventDefault();
+
+    if (spacePressed || e.button === 1) {
+      startPan(e);
+      return;
+    }
+
+    const local = getLocalPoint(e);
+    const doc = toDoc(local);
+
+    if (tool !== 'select') {
+      startDraw(e, doc);
+      return;
+    }
+
+    let handleEl = null;
+    if (e.target && typeof e.target.closest === 'function') {
+      handleEl = e.target.closest('[data-handle]');
+    }
+
+    if (handleEl && selected.size === 1) {
+      const handleName = handleEl.getAttribute('data-handle');
+      startResize(e, handleName, doc);
+      return;
+    }
+
+    let shapeEl = null;
+    if (e.target && typeof e.target.closest === 'function') {
+      shapeEl = e.target.closest('[data-id]');
+    }
+
+    if (shapeEl) {
+      const id = shapeEl.getAttribute('data-id');
+      startShapeInteraction(id, e.shiftKey, doc);
+      return;
+    }
+
+    if (!e.shiftKey) {
+      clearSelection();
+    }
+    startMarquee(e, local, doc);
+  }
+
+  function onPointerMove(e) {
+    if (!drag) return;
+
+    if (drag.type === 'pan') {
+      viewport.x = drag.startView.x + (e.clientX - drag.startClient.x);
+      viewport.y = drag.startView.y + (e.clientY - drag.startClient.y);
+      updateViewport();
+      return;
+    }
+
+    const doc = toDocSafe(e);
+
+    if (drag.type === 'draw') {
+      drag.current = doc;
+      drag.shift = e.shiftKey;
+      updatePreview(drag.preview, drag.tool, drag.start, drag.current, drag.shift);
+    } else if (drag.type === 'move') {
+      let dx = doc.x - drag.start.x;
+      let dy = doc.y - drag.start.y;
+
+      if (e.shiftKey) {
+        if (Math.abs(dx) >= Math.abs(dy)) dy = 0;
+        else dx = 0;
+      }
+
+      if (Math.abs(dx) > 1e-6 || Math.abs(dy) > 1e-6) {
+        applyMoveDelta(drag.base, dx, dy);
+        drag.changed = true;
+        renderUI();
+        updatePanel();
+      }
+    } else if (drag.type === 'resizeRect') {
+      applyRectResize(drag, doc, e.shiftKey);
+      if (drag.changed) {
+        renderUI();
+        updatePanel();
+      }
+    } else if (drag.type === 'resizeLine') {
+      applyLineResize(drag, doc, e.shiftKey);
+      if (drag.changed) {
+        renderUI();
+        updatePanel();
+      }
+    } else if (drag.type === 'marquee') {
+      drag.currentLocal = getLocalPoint(e);
+      drag.currentDoc = doc;
+      renderUI();
+    }
+  }
+
+  function onPointerUp() {
+    if (!drag) return;
+
+    if (drag.type === 'draw') {
+      finishDraw(drag);
+    } else if (drag.type === 'move') {
+      if (drag.changed) commit('move');
+    } else if (drag.type === 'resizeRect') {
+      if (drag.changed) commit('resize');
+    } else if (drag.type === 'resizeLine') {
+      if (drag.changed) commit('resize');
+    } else if (drag.type === 'marquee') {
+      finishMarquee(drag);
+    } else if (drag.type === 'pan') {
+      document.body.classList.remove('panning');
+    }
+
+    drag = null;
+    renderUI();
+  }
+
+  function onPointerCancel() {
+    if (drag && drag.type === 'draw') {
+      removePreview();
+      renderScene();
+    }
+    drag = null;
+  }
+
+  function nudgeSelection(dx, dy) {
+    if (selected.size === 0) return;
+    for (const id of selected) {
+      translateShapeDirect(getShape(id), dx, dy);
+    }
+    renderUI();
+    updatePanel();
+    commit('nudge');
+  }
+
+  function deleteSelection() {
+    if (selected.size === 0) return;
+    shapes = shapes.filter(s => s && !selected.has(s.id));
+    selected.clear();
+    renderAll();
+    commit('delete');
+  }
+
+  function selectAll() {
+    selected = new Set(shapes.map(s => s.id));
+    updateSelectedAttributes();
+    renderUI();
+    updatePanel();
+  }
+
+  function duplicateSelection() {
+    if (selected.size === 0) return;
+    const originals = shapes.filter(s => selected.has(s.id));
+    if (originals.length === 0) return;
+
+    const newIds = [];
+    for (const s of originals) {
+      const clone = JSON.parse(JSON.stringify(s));
+      clone.id = newId();
+      if (clone.type === 'line') {
+        clone.x1 = safeNum(clone.x1 + 10);
+        clone.y1 = safeNum(clone.y1 + 10);
+        clone.x2 = safeNum(clone.x2 + 10);
+        clone.y2 = safeNum(clone.y2 + 10);
+      } else {
+        clone.x = safeNum(clone.x + 10);
+        clone.y = safeNum(clone.y + 10);
+      }
+      shapes.push(clone);
+      newIds.push(clone.id);
+    }
+
+    selected = new Set(newIds);
+    renderAll();
+    commit('duplicate');
+  }
+
+  function bringForward() {
+    if (selected.size === 0) return;
+    let moved = false;
+    for (let i = shapes.length - 1; i >= 0; i--) {
+      if (!selected.has(shapes[i].id)) continue;
+      if (i + 1 < shapes.length && !selected.has(shapes[i + 1].id)) {
+        const tmp = shapes[i];
+        shapes[i] = shapes[i + 1];
+        shapes[i + 1] = tmp;
+        moved = true;
+      }
+    }
+    if (moved) {
+      renderScene();
+      renderUI();
+      commit('z');
+    }
+  }
+
+  function sendBackward() {
+    if (selected.size === 0) return;
+    let moved = false;
+    for (let i = 1; i < shapes.length; i++) {
+      if (!selected.has(shapes[i].id)) continue;
+      if (!selected.has(shapes[i - 1].id)) {
+        const tmp = shapes[i];
+        shapes[i] = shapes[i - 1];
+        shapes[i - 1] = tmp;
+        moved = true;
+      }
+    }
+    if (moved) {
+      renderScene();
+      renderUI();
+      commit('z');
+    }
+  }
+
+  function readStyleInputs() {
+    return sanitizeStyle({
+      fill: fillInput.value,
+      stroke: strokeInput.value,
+      strokeWidth: strokeWidthInput.value
+    });
+  }
+
+  function setStyleInputs(style) {
+    const s = sanitizeStyle(style);
+    fillInput.value = s.fill;
+    strokeInput.value = s.stroke;
+    strokeWidthInput.value = s.strokeWidth;
+  }
+
+  function applyStyleFromInputs(field) {
+    const style = readStyleInputs();
+    currentStyle = style;
+
+    if (selected.size > 0) {
+      for (const id of selected) {
+        const s = getShape(id);
+        if (!s) continue;
+        s.fill = style.fill;
+        s.stroke = style.stroke;
+        s.strokeWidth = style.strokeWidth;
+        updateShapeElement(s);
+      }
+      commit('style', field || 'style');
+    } else {
+      scheduleSave();
+    }
+  }
+
+  function updatePanel(exceptInput) {
+    const count = selected.size;
+
+    if (count === 0) {
+      selectionStatus.textContent = 'No selection';
+      numericInputs.forEach(inp => {
+        if (inp !== exceptInput) {
+          inp.disabled = true;
+          inp.value = '';
+        }
+      });
+      setStyleInputs(currentStyle);
+      return;
+    }
+
+    if (count > 1) {
+      selectionStatus.textContent = count + ' shapes selected';
+      numericInputs.forEach(inp => {
+        if (inp !== exceptInput) {
+          inp.disabled = true;
+          inp.value = '';
+        }
+      });
+      setStyleInputs(currentStyle);
+      return;
+    }
+
+    const id = selectedIdsArray()[0];
+    const shape = getShape(id);
+    if (!shape) {
+      selected.delete(id);
+      renderUI();
+      updatePanel(exceptInput);
+      return;
+    }
+
+    selectionStatus.textContent = '1 shape selected';
+    const b = bboxOf(shape);
+
+    numericInputs.forEach(inp => {
+      inp.disabled = false;
+      if (inp === exceptInput) return;
+      const field = inp.dataset.field;
+      if (field === 'x') inp.value = String(safeNum(b.x));
+      else if (field === 'y') inp.value = String(safeNum(b.y));
+      else if (field === 'w') inp.value = String(safeNum(b.w));
+      else if (field === 'h') inp.value = String(safeNum(b.h));
+    });
+
+    currentStyle = {
+      fill: shape.fill,
+      stroke: shape.stroke,
+      strokeWidth: shape.strokeWidth
+    };
+    setStyleInputs(currentStyle);
+  }
+
+  function applyPropertyFromInput(field, input) {
+    if (selected.size !== 1 || !input || input.disabled) return;
+
+    const value = parseFloat(input.value);
+    if (!Number.isFinite(value)) return;
+
+    if (field === 'w' || field === 'h') {
+      input.value = String(Math.max(0, safeNum(value)));
+    } else {
+      input.value = String(clamp(safeNum(value), -1000000, 1000000));
+    }
+
+    const id = selectedIdsArray()[0];
+    const shape = getShape(id);
+    if (!shape) return;
+
+    const b = bboxOf(shape);
+    if (field === 'x') b.x = clamp(safeNum(value), -1000000, 1000000);
+    else if (field === 'y') b.y = clamp(safeNum(value), -1000000, 1000000);
+    else if (field === 'w') b.w = Math.max(0, safeNum(value));
+    else if (field === 'h') b.h = Math.max(0, safeNum(value));
+
+    applyBBoxToShape(shape, b);
+    renderUI();
+    updatePanel(input);
+    commit('property', field || 'property');
+  }
+
+  function renderAll() {
+    renderScene();
+    updateSelectedAttributes();
+    renderUI();
+    updatePanel();
+    updateHistoryButtons();
+  }
+
+  function isTypingTarget(target) {
+    if (!target) return false;
+    if (target.isContentEditable) return true;
+    const tag = target.tagName;
+    if (tag === 'TEXTAREA') return true;
+    if (tag === 'INPUT') {
+      const t = (target.type || '').toLowerCase();
+      return t === 'text' || t === 'number' || t === 'email' || t === 'search' || t === 'password';
+    }
+    return false;
+  }
+
+  function onKeyDown(e) {
+    if (isTypingTarget(e.target)) return;
+
+    const mod = e.ctrlKey || e.metaKey;
+
+    if (mod && !e.altKey) {
+      const key = (e.key || '').toLowerCase();
+      if (key === 'z') {
+        if (e.shiftKey) redo();
+        else undo();
+        e.preventDefault();
+        return;
+      }
+      if (key === 'y') {
+        redo();
+        e.preventDefault();
+        return;
+      }
+      if (key === 'a') {
+        selectAll();
+        e.preventDefault();
+        return;
+      }
+      if (key === 'd') {
+        duplicateSelection();
+        e.preventDefault();
+        return;
+      }
+    }
+
+    if (e.code === 'Space') {
+      spacePressed = true;
+      document.body.classList.add('space-ready');
+      e.preventDefault();
+      return;
+    }
+
+    const key = e.key || '';
+
+    if (key === 'Escape') {
+      clearSelection();
+      return;
+    }
+
+    if (key === 'Delete' || key === 'Backspace') {
+      e.preventDefault();
+      deleteSelection();
+      return;
+    }
+
+    if (key === 'ArrowUp') { e.preventDefault(); nudgeSelection(0, -1); return; }
+    if (key === 'ArrowDown') { e.preventDefault(); nudgeSelection(0, 1); return; }
+    if (key === 'ArrowLeft') { e.preventDefault(); nudgeSelection(-1, 0); return; }
+    if (key === 'ArrowRight') { e.preventDefault(); nudgeSelection(1, 0); return; }
+
+    if (key === ']') { bringForward(); return; }
+    if (key === '[') { sendBackward(); return; }
+
+    if (key === '+' || key === '=') { zoomCenter(1.1); return; }
+    if (key === '-' || key === '_') { zoomCenter(1 / 1.1); return; }
+    if (key === '0') { resetZoom(); return; }
+
+    const lower = key.toLowerCase();
+    if (lower === 'v') { setTool('select'); return; }
+    if (lower === 'r') { setTool('rect'); return; }
+    if (lower === 'e') { setTool('ellipse'); return; }
+    if (lower === 'l') { setTool('line'); return; }
+  }
+
+  function onKeyUp(e) {
+    if (e.code === 'Space') {
+      spacePressed = false;
+      document.body.classList.remove('space-ready');
+    }
+  }
+
+  function onWheel(e) {
+    if (drag) return;
+    e.preventDefault();
+
+    if (e.ctrlKey || e.metaKey) {
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const local = getLocalPoint(e);
+      zoomAt(local.x, local.y, factor);
+    } else {
+      viewport.x -= e.deltaX || 0;
+      viewport.y -= e.deltaY || 0;
+      updateViewport();
+    }
+  }
+
+  function attrStr(v) {
+    return String(v)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function exportSVG() {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    for (const s of shapes) {
+      if (!s) continue;
+      const b = bboxOf(s);
+      minX = Math.min(minX, b.x);
+      minY = Math.min(minY, b.y);
+      maxX = Math.max(maxX, b.x + b.w);
+      maxY = Math.max(maxY, b.y + b.h);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      minX = 0; minY = 0; maxX = 1; maxY = 1;
+    }
+
+    const pad = 1;
+    minX -= pad;
+    minY -= pad;
+    maxX += pad;
+    maxY += pad;
+
+    const w = Math.max(1, maxX - minX);
+    const h = Math.max(1, maxY - minY);
+
+    let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + safeNum(w) + '" height="' + safeNum(h) +
+      '" viewBox="' + safeNum(minX) + ' ' + safeNum(minY) + ' ' + safeNum(w) + ' ' + safeNum(h) + '">';
+
+    for (const s of shapes) {
+      if (!s) continue;
+      const fill = attrStr(sanitizeColor(s.fill, DEFAULT_STYLE.fill));
+      const stroke = attrStr(sanitizeColor(s.stroke, DEFAULT_STYLE.stroke));
+      const sw = safeNum(clamp(s.strokeWidth, 0, 100));
+
+      if (s.type === 'rect') {
+        const b = bboxOf(s);
+        svg += '<rect data-shape="rect" data-id="' + attrStr(s.id) + '" x="' + safeNum(b.x) + '" y="' + safeNum(b.y) +
+          '" width="' + safeNum(b.w) + '" height="' + safeNum(b.h) + '" fill="' + fill + '" stroke="' + stroke +
+          '" stroke-width="' + sw + '"/>';
+      } else if (s.type === 'ellipse') {
+        const b = bboxOf(s);
+        svg += '<ellipse data-shape="ellipse" data-id="' + attrStr(s.id) + '" cx="' + safeNum(b.x + b.w / 2) +
+          '" cy="' + safeNum(b.y + b.h / 2) + '" rx="' + safeNum(b.w / 2) + '" ry="' + safeNum(b.h / 2) +
+          '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+      } else if (s.type === 'line') {
+        svg += '<line data-shape="line" data-id="' + attrStr(s.id) + '" x1="' + safeNum(s.x1) + '" y1="' + safeNum(s.y1) +
+          '" x2="' + safeNum(s.x2) + '" y2="' + safeNum(s.y2) + '" fill="' + fill + '" stroke="' + stroke +
+          '" stroke-width="' + sw + '"/>';
+      }
+    }
+
+    svg += '</svg>';
+
+    try {
+      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'drawing.svg';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => {
+        try { URL.revokeObjectURL(url); } catch (err) {}
+      }, 1000);
+    } catch (e) {
+      // Ignore download failures in constrained environments.
+    }
+  }
+
+  function wireEvents() {
+    stage.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerCancel);
+    stage.addEventListener('contextmenu', e => e.preventDefault());
+    stage.addEventListener('wheel', onWheel, { passive: false });
+
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
+
+    window.addEventListener('resize', () => renderUI());
+
+    for (const btn of toolButtons) {
+      btn.addEventListener('click', () => setTool(btn.dataset.tool));
+    }
+
+    undoBtn.addEventListener('click', undo);
+    redoBtn.addEventListener('click', redo);
+    exportBtn.addEventListener('click', exportSVG);
+
+    zoomInBtn.addEventListener('click', () => zoomCenter(1.1));
+    zoomOutBtn.addEventListener('click', () => zoomCenter(1 / 1.1));
+    zoomResetBtn.addEventListener('click', resetZoom);
+
+    fillInput.addEventListener('input', () => applyStyleFromInputs('fill'));
+    fillInput.addEventListener('change', () => applyStyleFromInputs('fill'));
+    strokeInput.addEventListener('input', () => applyStyleFromInputs('stroke'));
+    strokeInput.addEventListener('change', () => applyStyleFromInputs('stroke'));
+    strokeWidthInput.addEventListener('input', () => applyStyleFromInputs('strokeWidth'));
+    strokeWidthInput.addEventListener('change', () => applyStyleFromInputs('strokeWidth'));
+
+    numericInputs.forEach(inp => {
+      inp.addEventListener('input', () => applyPropertyFromInput(inp.dataset.field, inp));
+      inp.addEventListener('change', () => applyPropertyFromInput(inp.dataset.field, inp));
+    });
+  }
+
+  function init() {
+    loadSaved();
+    history = [serializeHistory()];
+    hIndex = 0;
+    lastSerialized = history[0];
+    lastMergeKey = '';
+    lastCommitTime = 0;
+
+    setTool('select');
+    renderAll();
+    updateViewport();
+    setStyleInputs(currentStyle);
+    wireEvents();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
+```

@@ -1,0 +1,1815 @@
+```html
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GridCalc</title>
+<style>
+  :root {
+    --border: #d1d5db;
+    --cell-border: #e5e7eb;
+    --bg: #ffffff;
+    --header-bg: #f3f4f6;
+    --header-text: #374151;
+    --selection: #1d4ed8;
+    --selection-bg: #eff6ff;
+    --error: #b91c1c;
+    --error-bg: #fef2f2;
+    --muted: #6b7280;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: #111827;
+  }
+
+  #app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    background: #ffffff;
+    min-height: 48px;
+  }
+
+  #brand {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    font-size: 14px;
+    color: #111827;
+    user-select: none;
+  }
+
+  #address-box {
+    width: 58px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 4px;
+    background: #f9fafb;
+    user-select: none;
+  }
+
+  #fx {
+    font-style: italic;
+    color: var(--muted);
+    user-select: none;
+    font-size: 14px;
+  }
+
+  #formula-bar {
+    flex: 1;
+    min-width: 0;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0 10px;
+    font: inherit;
+    font-size: 13px;
+    color: #111827;
+    background: #ffffff;
+  }
+
+  #formula-bar:focus {
+    outline: 2px solid #2563eb;
+    outline-offset: 1px;
+    border-color: #2563eb;
+  }
+
+  #grid-wrap {
+    flex: 1;
+    overflow: auto;
+    background: #ffffff;
+    position: relative;
+  }
+
+  #grid {
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    font-size: 13px;
+  }
+
+  #grid:focus { outline: none; }
+
+  #grid th, #grid td {
+    border-right: 1px solid var(--cell-border);
+    border-bottom: 1px solid var(--cell-border);
+    vertical-align: middle;
+    white-space: nowrap;
+    padding: 0 8px;
+    background: #ffffff;
+  }
+
+  #grid th {
+    background: var(--header-bg);
+    color: var(--header-text);
+    font-weight: 600;
+    user-select: none;
+  }
+
+  #grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    height: 26px;
+  }
+
+  #grid thead th:first-child {
+    left: 0;
+    z-index: 3;
+  }
+
+  #grid tbody th {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    height: 26px;
+    text-align: right;
+    color: #6b7280;
+    font-weight: 600;
+  }
+
+  #grid td {
+    position: relative;
+    height: 26px;
+    overflow: hidden;
+    text-overflow: clip;
+  }
+
+  #grid td.num { text-align: right; }
+
+  #grid td.error {
+    color: var(--error);
+    background: var(--error-bg);
+    font-weight: 600;
+  }
+
+  #grid td[aria-selected="true"] {
+    outline: 2px solid var(--selection);
+    outline-offset: -2px;
+    background: var(--selection-bg);
+  }
+
+  #grid td.error[aria-selected="true"] {
+    background: #fee2e2;
+  }
+
+  #grid th.active {
+    background: #dbeafe;
+    color: #1e3a8a;
+  }
+
+  #grid thead th .col-resize {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    background: transparent;
+  }
+
+  #grid thead th:hover .col-resize {
+    background: rgba(29, 78, 216, 0.18);
+  }
+
+  #cell-editor {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    border: 2px solid var(--selection);
+    padding: 0 6px;
+    font: inherit;
+    font-size: 13px;
+    background: #ffffff;
+    outline: none;
+    z-index: 6;
+    display: none;
+  }
+
+  #cell-editor.open { display: block; }
+
+  #status {
+    border-top: 1px solid var(--border);
+    padding: 7px 12px;
+    color: var(--muted);
+    font-size: 12px;
+    display: flex;
+    gap: 22px;
+    justify-content: flex-start;
+    overflow: hidden;
+    white-space: nowrap;
+    background: #ffffff;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div id="brand">GridCalc</div>
+    <div id="address-box">A1</div>
+    <div id="fx">fx</div>
+    <input id="formula-bar" type="text" spellcheck="false" autocomplete="off" placeholder="Enter a value or formula...">
+  </header>
+
+  <div id="grid-wrap">
+    <table id="grid" tabindex="0" role="grid" aria-label="Spreadsheet">
+    </table>
+  </div>
+
+  <div id="status">A1 · SUM: 0 · COUNT: 0</div>
+</div>
+
+<input id="cell-editor" type="text" spellcheck="false" autocomplete="off">
+
+<script>
+(function () {
+  const STORAGE_KEY = 'gridcalc-cells-v1';
+  const COLS = 26;
+  const ROWS = 100;
+  const DEFAULT_COL_W = 88;
+  const ROW_HEADER_W = 56;
+  const COL_CAP = 1000000;
+  const REF_COLORS = [
+    '#e11d48', '#2563eb', '#16a34a', '#9333ea', '#d97706',
+    '#0891b2', '#db2777', '#65a30d', '#4f46e5', '#c2410c'
+  ];
+
+  const EMPTY_VAL = { type: 'empty' };
+
+  function err(code) { return { type: 'err', code: code }; }
+  function num(v) { return { type: 'num', v: v }; }
+  function bool(v) { return { type: 'bool', v: !!v }; }
+  function str(v) { return { type: 'str', v: v }; }
+  function isError(v) { return !!v && v.type === 'err'; }
+
+  function colToLetter(c) {
+    if (c <= 0) return 'A';
+    if (c > COL_CAP) c = COL_CAP;
+    let s = '';
+    while (c > 0) {
+      c--;
+      s = String.fromCharCode(65 + (c % 26)) + s;
+      c = Math.floor(c / 26);
+    }
+    return s;
+  }
+
+  function lettersToCol(letters) {
+    let n = 0;
+    for (let i = 0; i < letters.length; i++) {
+      const ch = letters.charCodeAt(i);
+      let v;
+      if (ch >= 65 && ch <= 90) v = ch - 64;
+      else if (ch >= 97 && ch <= 122) v = ch - 96;
+      else return COL_CAP;
+      n = n * 26 + v;
+      if (n > COL_CAP) return COL_CAP;
+    }
+    return n;
+  }
+
+  function makeAddress(col, row) {
+    return colToLetter(col) + row;
+  }
+
+  function parseAddress(addr) {
+    const m = /^([A-Za-z]+)([0-9]+)$/.exec(addr);
+    if (!m) return null;
+    return { col: lettersToCol(m[1]), row: parseInt(m[2], 10) };
+  }
+
+  function inBounds(col, row) {
+    return col >= 1 && col <= COLS && row >= 1 && row <= ROWS;
+  }
+
+  function normalizeRaw(raw) {
+    raw = raw == null ? '' : String(raw);
+    const t = raw.trim();
+    if (t.startsWith('=')) return t;
+    return raw;
+  }
+
+  function formatNumber(n) {
+    if (!Number.isFinite(n)) return '#ERROR!';
+    if (n === 0) return '0';
+    let s = n.toPrecision(10);
+    let sign = '';
+    if (s[0] === '-') {
+      sign = '-';
+      s = s.slice(1);
+    }
+
+    let exp = 0;
+    const ei = s.indexOf('e');
+    if (ei >= 0) {
+      exp = Number(s.slice(ei + 1));
+      s = s.slice(0, ei);
+    }
+
+    const dot = s.indexOf('.');
+    const intLen = dot === -1 ? s.length : dot;
+    const digits = s.replace('.', '');
+    const targetInt = intLen + exp;
+    let result;
+
+    if (targetInt <= 0) {
+      result = '0.' + '0'.repeat(-targetInt) + digits;
+    } else if (targetInt >= digits.length) {
+      result = digits + '0'.repeat(targetInt - digits.length);
+    } else {
+      result = digits.slice(0, targetInt) + '.' + digits.slice(targetInt);
+    }
+
+    if (result.indexOf('.') >= 0) {
+      result = result.replace(/0+$/, '');
+      if (result.endsWith('.')) result = result.slice(0, -1);
+    }
+
+    return sign + result;
+  }
+
+  function displayValue(v) {
+    if (v.type === 'empty') return '';
+    if (v.type === 'err') return v.code;
+    if (v.type === 'bool') return v.v ? 'TRUE' : 'FALSE';
+    if (v.type === 'num') return formatNumber(v.v);
+    return String(v.v);
+  }
+
+  function explainError(code) {
+    return {
+      '#DIV/0!': 'Division by zero',
+      '#VALUE!': 'Text was used where a number was required',
+      '#REF!': 'Reference is outside A1:Z100',
+      '#ERROR!': 'Formula cannot be parsed or uses an unknown function',
+      '#CYCLE!': 'Circular reference detected'
+    }[code] || 'Formula error';
+  }
+
+  /* ---------- Tokenizer ---------- */
+
+  function tokenize(input) {
+    const tokens = [];
+    let i = 0;
+    const n = input.length;
+
+    while (i < n) {
+      if (/\s/.test(input[i])) {
+        i++;
+        continue;
+      }
+
+      const start = i;
+
+      if (input[i] === '"') {
+        let j = i + 1;
+        let value = '';
+        while (j < n) {
+          if (input[j] === '"') {
+            if (input[j + 1] === '"') {
+              value += '"';
+              j += 2;
+            } else {
+              break;
+            }
+          } else {
+            value += input[j];
+            j++;
+          }
+        }
+        if (j >= n) return null;
+        const end = j + 1;
+        tokens.push({ type: 'str', raw: input.slice(start, end), value: value, start: start, end: end });
+        i = end;
+        continue;
+      }
+
+      const two = input.slice(i, i + 2);
+      if (two === '<=' || two === '>=' || two === '<>' || two === '=<') {
+        tokens.push({ type: 'op', raw: two, start: start, end: i + 2 });
+        i += 2;
+        continue;
+      }
+
+      const numMatch = /^(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?/.exec(input.slice(i));
+      if (numMatch) {
+        const end = i + numMatch[0].length;
+        tokens.push({
+          type: 'num',
+          raw: numMatch[0],
+          value: Number(numMatch[0]),
+          start: start,
+          end: end
+        });
+        i = end;
+        continue;
+      }
+
+      const refMatch = /^(\$?)([A-Za-z]+)(\$?)([0-9]+)/.exec(input.slice(i));
+      if (refMatch) {
+        const end = i + refMatch[0].length;
+        const letters = refMatch[2].toUpperCase();
+        const absCol = refMatch[1] === '$';
+        const absRow = refMatch[3] === '$';
+        const row = parseInt(refMatch[4], 10);
+        tokens.push({
+          type: 'ref',
+          raw: refMatch[0],
+          colLetters: letters,
+          colIndex: lettersToCol(letters),
+          absCol: absCol,
+          absRow: absRow,
+          rowNum: row,
+          start: start,
+          end: end
+        });
+        i = end;
+        continue;
+      }
+
+      const idMatch = /^[A-Za-z][A-Za-z0-9._]*/.exec(input.slice(i));
+      if (idMatch) {
+        const end = i + idMatch[0].length;
+        tokens.push({
+          type: 'ident',
+          raw: idMatch[0],
+          value: idMatch[0].toUpperCase(),
+          start: start,
+          end: end
+        });
+        i = end;
+        continue;
+      }
+
+      if ('+-*/^&=<>(),:'.indexOf(input[i]) >= 0) {
+        tokens.push({ type: 'op', raw: input[i], start: start, end: i + 1 });
+        i++;
+        continue;
+      }
+
+      return null;
+    }
+
+    return tokens;
+  }
+
+  /* ---------- Parser ---------- */
+
+  const PARSE_FAIL = new Error('parse');
+
+  function makeRefNode(tok) {
+    const valid = inBounds(tok.colIndex, tok.rowNum);
+    return {
+      type: 'ref',
+      raw: tok.raw,
+      col: tok.colIndex,
+      row: tok.rowNum,
+      colLetters: tok.colLetters,
+      absCol: tok.absCol,
+      absRow: tok.absRow,
+      valid: valid,
+      addr: valid ? makeAddress(tok.colIndex, tok.rowNum) : null
+    };
+  }
+
+  function parseFormula(raw) {
+    if (raw[0] !== '=') return null;
+    const tokens = tokenize(raw.slice(1));
+    if (!tokens) return null;
+
+    let pos = 0;
+
+    function peek() {
+      return pos < tokens.length ? tokens[pos] : null;
+    }
+
+    function normalizeComp(op) {
+      if (op === '=<') return '<=';
+      return op;
+    }
+
+    function parseExpression() {
+      return parseComparison();
+    }
+
+    function parseComparison() {
+      let left = parseConcat();
+      while (peek() && peek().type === 'op' && ['=', '<>', '<', '>', '<=', '>=', '=<'].includes(peek().raw)) {
+        const op = normalizeComp(peek().raw);
+        pos++;
+        const right = parseConcat();
+        left = { type: 'binary', op: op, left: left, right: right };
+      }
+      return left;
+    }
+
+    function parseConcat() {
+      let left = parseAdditive();
+      while (peek() && peek().type === 'op' && peek().raw === '&') {
+        pos++;
+        const right = parseAdditive();
+        left = { type: 'binary', op: '&', left: left, right: right };
+      }
+      return left;
+    }
+
+    function parseAdditive() {
+      let left = parseMultiplicative();
+      while (peek() && peek().type === 'op' && (peek().raw === '+' || peek().raw === '-')) {
+        const op = peek().raw;
+        pos++;
+        const right = parseMultiplicative();
+        left = { type: 'binary', op: op, left: left, right: right };
+      }
+      return left;
+    }
+
+    function parseMultiplicative() {
+      let left = parseUnary();
+      while (peek() && peek().type === 'op' && (peek().raw === '*' || peek().raw === '/')) {
+        const op = peek().raw;
+        pos++;
+        const right = parseUnary();
+        left = { type: 'binary', op: op, left: left, right: right };
+      }
+      return left;
+    }
+
+    function parseUnary() {
+      if (peek() && peek().type === 'op' && (peek().raw === '+' || peek().raw === '-')) {
+        const op = peek().raw;
+        pos++;
+        const expr = parseUnary();
+        return { type: 'unary', op: op, expr: expr };
+      }
+      return parsePower();
+    }
+
+    function parsePower() {
+      const left = parsePrimary();
+      if (peek() && peek().type === 'op' && peek().raw === '^') {
+        pos++;
+        const right = parseUnary();
+        return { type: 'binary', op: '^', left: left, right: right };
+      }
+      return left;
+    }
+
+    function parsePrimary() {
+      const tok = peek();
+      if (!tok) throw PARSE_FAIL;
+
+      if (tok.type === 'num') {
+        pos++;
+        return { type: 'num', value: tok.value };
+      }
+
+      if (tok.type === 'str') {
+        pos++;
+        return { type: 'str', value: tok.value };
+      }
+
+      if (tok.type === 'ref') {
+        pos++;
+        const from = makeRefNode(tok);
+        if (
+          peek() && peek().type === 'op' && peek().raw === ':' &&
+          pos + 1 < tokens.length && tokens[pos + 1].type === 'ref'
+        ) {
+          pos++; // consume ':'
+          const toTok = tokens[pos];
+          pos++;
+          const to = makeRefNode(toTok);
+          return {
+            type: 'range',
+            from: from,
+            to: to,
+            valid: from.valid && to.valid
+          };
+        }
+        return from;
+      }
+
+      if (tok.type === 'op' && tok.raw === '(') {
+        pos++;
+        const expr = parseExpression();
+        if (!(peek() && peek().type === 'op' && peek().raw === ')')) throw PARSE_FAIL;
+        pos++;
+        return expr;
+      }
+
+      if (tok.type === 'ident') {
+        const name = tok.value;
+        if (pos + 1 < tokens.length && tokens[pos + 1].type === 'op' && tokens[pos + 1].raw === '(') {
+          pos += 2;
+          const args = parseArgs();
+          return { type: 'func', name: name, args: args };
+        }
+        pos++;
+        if (name === 'TRUE') return { type: 'bool', value: true };
+        if (name === 'FALSE') return { type: 'bool', value: false };
+        return { type: 'error', code: '#ERROR!' };
+      }
+
+      throw PARSE_FAIL;
+    }
+
+    function parseArgs() {
+      const args = [];
+      while (true) {
+        if (peek() && peek().type === 'op' && peek().raw === ')') break;
+        const arg = parseExpression();
+        args.push(arg);
+        if (peek() && peek().type === 'op' && peek().raw === ',') {
+          pos++;
+          if (peek() && peek().type === 'op' && peek().raw === ')') throw PARSE_FAIL;
+          continue;
+        }
+        if (peek() && peek().type === 'op' && peek().raw === ')') break;
+        throw PARSE_FAIL;
+      }
+      if (peek() && peek().type === 'op' && peek().raw === ')') pos++;
+      else throw PARSE_FAIL;
+      return args;
+    }
+
+    try {
+      const node = parseExpression();
+      if (pos !== tokens.length) return null;
+      return node;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /* ---------- Dependency collection ---------- */
+
+  function collectDeps(ast) {
+    if (!ast) return [];
+    const set = new Set();
+
+    function visit(n) {
+      if (!n) return;
+      if (n.type === 'ref') {
+        if (n.valid) set.add(n.addr);
+        return;
+      }
+      if (n.type === 'range') {
+        if (!n.valid) return;
+        const c1 = Math.min(n.from.col, n.to.col);
+        const c2 = Math.max(n.from.col, n.to.col);
+        const r1 = Math.min(n.from.row, n.to.row);
+        const r2 = Math.max(n.from.row, n.to.row);
+        for (let r = r1; r <= r2; r++) {
+          for (let c = c1; c <= c2; c++) set.add(makeAddress(c, r));
+        }
+        return;
+      }
+      if (n.type === 'binary') {
+        visit(n.left);
+        visit(n.right);
+      } else if (n.type === 'unary') {
+        visit(n.expr);
+      } else if (n.type === 'func') {
+        for (const a of n.args) visit(a);
+      }
+    }
+
+    visit(ast);
+    return Array.from(set);
+  }
+
+  /* ---------- Value conversion and evaluation ---------- */
+
+  function toNumber(v) {
+    if (isError(v)) return v;
+    if (v.type === 'empty') return num(0);
+    if (v.type === 'num') return v;
+    if (v.type === 'bool') return num(v.v ? 1 : 0);
+    return err('#VALUE!');
+  }
+
+  function toText(v) {
+    if (isError(v)) return v.code;
+    if (v.type === 'empty') return '';
+    if (v.type === 'bool') return v.v ? 'TRUE' : 'FALSE';
+    if (v.type === 'num') return formatNumber(v.v);
+    return String(v.v);
+  }
+
+  function compareStrings(a, b) {
+    const x = String(a).toUpperCase();
+    const y = String(b).toUpperCase();
+    if (x < y) return -1;
+    if (x > y) return 1;
+    return 0;
+  }
+
+  function applyUnary(op, v) {
+    if (isError(v)) return v;
+    const n = toNumber(v);
+    if (isError(n)) return n;
+    const res = op === '-' ? -n.v : n.v;
+    if (!Number.isFinite(res)) return err('#ERROR!');
+    return num(res);
+  }
+
+  function applyBinary(op, l, r) {
+    if (isError(l)) return l;
+    if (isError(r)) return r;
+
+    if (op === '&') {
+      return str(toText(l) + toText(r));
+    }
+
+    if (op === '=' || op === '<>' || op === '<' || op === '>' || op === '<=' || op === '>=') {
+      // Text-aware comparisons: empty is text-equivalent to "" when compared to text.
+      const lIsTextish = l.type === 'str' || l.type === 'empty';
+      const rIsTextish = r.type === 'str' || r.type === 'empty';
+
+      if ((l.type === 'str' || r.type === 'str') && (lIsTextish && rIsTextish)) {
+        const lv = l.type === 'empty' ? '' : l.v;
+        const rv = r.type === 'empty' ? '' : r.v;
+        const cmp = compareStrings(lv, rv);
+        if (op === '=') return bool(cmp === 0);
+        if (op === '<>') return bool(cmp !== 0);
+        if (op === '<') return bool(cmp < 0);
+        if (op === '>') return bool(cmp > 0);
+        if (op === '<=') return bool(cmp <= 0);
+        if (op === '>=') return bool(cmp >= 0);
+      }
+
+      // A real string mixed with a number/bool is treated as not comparable.
+      if (l.type === 'str' || r.type === 'str') {
+        if (op === '=') return bool(false);
+        if (op === '<>') return bool(true);
+        return bool(false);
+      }
+
+      const a = toNumber(l);
+      const b = toNumber(r);
+      if (isError(a)) return a;
+      if (isError(b)) return b;
+
+      if (op === '=') return bool(a.v === b.v);
+      if (op === '<>') return bool(a.v !== b.v);
+      if (op === '<') return bool(a.v < b.v);
+      if (op === '>') return bool(a.v > b.v);
+      if (op === '<=') return bool(a.v <= b.v);
+      if (op === '>=') return bool(a.v >= b.v);
+    }
+
+    const a = toNumber(l);
+    const b = toNumber(r);
+    if (isError(a)) return a;
+    if (isError(b)) return b;
+
+    let v = NaN;
+    if (op === '+') v = a.v + b.v;
+    else if (op === '-') v = a.v - b.v;
+    else if (op === '*') v = a.v * b.v;
+    else if (op === '/') {
+      if (b.v === 0) return err('#DIV/0!');
+      v = a.v / b.v;
+    } else if (op === '^') v = Math.pow(a.v, b.v);
+    else return err('#ERROR!');
+
+    if (!Number.isFinite(v)) return err('#ERROR!');
+    return num(v);
+  }
+
+  function expandRange(node) {
+    if (!node.valid) return { error: '#REF!' };
+    const c1 = Math.min(node.from.col, node.to.col);
+    const c2 = Math.max(node.from.col, node.to.col);
+    const r1 = Math.min(node.from.row, node.to.row);
+    const r2 = Math.max(node.from.row, node.to.row);
+    const values = [];
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        const cell = cells.get(makeAddress(c, r));
+        const v = cell ? cell.value : EMPTY_VAL;
+        if (isError(v)) return { error: v.code };
+        values.push(v);
+      }
+    }
+    return { values: values };
+  }
+
+  function flattenValues(node) {
+    if (node.type === 'range') {
+      return expandRange(node);
+    }
+    const v = evalNode(node);
+    if (isError(v)) return { error: v.code };
+    return { values: [v] };
+  }
+
+  function scalarValue(node) {
+    if (node.type === 'range') {
+      const r = expandRange(node);
+      if (r.error) return err(r.error);
+      if (r.values.length === 1) return r.values[0];
+      return err('#VALUE!');
+    }
+    return evalNode(node);
+  }
+
+  function toBoolean(v) {
+    if (isError(v)) return v;
+    if (v.type === 'bool') return bool(v.v);
+    if (v.type === 'num') return bool(v.v !== 0);
+    if (v.type === 'empty') return bool(false);
+    if (v.type === 'str') return bool(v.v.length > 0);
+    return bool(false);
+  }
+
+  const KNOWN_FUNCTIONS = new Set(['SUM', 'AVERAGE', 'MIN', 'MAX', 'COUNT', 'IF', 'ABS', 'ROUND']);
+
+  function aggregate(values, kind) {
+    let sum = 0;
+    let count = 0;
+    let min = null;
+    let max = null;
+
+    for (const v of values) {
+      if (isError(v)) return err(v.code);
+
+      if (kind === 'COUNT') {
+        if (v.type === 'num') count++;
+        continue;
+      }
+
+      let number = null;
+      if (v.type === 'num') number = v.v;
+      else if (v.type === 'bool') number = v.v ? 1 : 0;
+
+      if (number !== null) {
+        if (kind === 'SUM') sum += number;
+        else if (kind === 'AVERAGE') { sum += number; count++; }
+        else {
+          if (min === null || number < min) min = number;
+          if (max === null || number > max) max = number;
+          count++;
+        }
+      }
+    }
+
+    if (kind === 'SUM') {
+      if (!Number.isFinite(sum)) return err('#ERROR!');
+      return num(sum);
+    }
+    if (kind === 'COUNT') return num(count);
+    if (kind === 'AVERAGE') {
+      if (count === 0) return err('#DIV/0!');
+      const v = sum / count;
+      if (!Number.isFinite(v)) return err('#ERROR!');
+      return num(v);
+    }
+    if (kind === 'MIN') return num(min === null ? 0 : min);
+    if (kind === 'MAX') return num(max === null ? 0 : max);
+    return err('#ERROR!');
+  }
+
+  function evalFunc(node) {
+    const name = node.name;
+    if (!KNOWN_FUNCTIONS.has(name)) return err('#ERROR!');
+
+    if (name === 'IF') {
+      if (node.args.length === 0) return err('#ERROR!');
+      const cond = evalNode(node.args[0]);
+      if (isError(cond)) return cond;
+      const cb = toBoolean(cond);
+      if (isError(cb)) return cb;
+
+      const chosen = cb.v ? node.args[1] : node.args[2];
+      if (!chosen) return EMPTY_VAL;
+      return evalNode(chosen);
+    }
+
+    const values = [];
+    for (const arg of node.args) {
+      const flat = flattenValues(arg);
+      if (flat.error) return err(flat.error);
+      for (const v of flat.values) values.push(v);
+    }
+
+    if (name === 'SUM' || name === 'AVERAGE' || name === 'MIN' || name === 'MAX' || name === 'COUNT') {
+      return aggregate(values, name);
+    }
+
+    if (name === 'ABS') {
+      if (values.length !== 1) return err('#VALUE!');
+      const x = values[0];
+      const n = toNumber(x);
+      if (isError(n)) return n;
+      const r = Math.abs(n.v);
+      if (!Number.isFinite(r)) return err('#ERROR!');
+      return num(r);
+    }
+
+    if (name === 'ROUND') {
+      if (values.length < 1) return err('#VALUE!');
+      const x = values[0];
+      const nx = toNumber(x);
+      if (isError(nx)) return nx;
+
+      const nd = values.length >= 2 ? toNumber(values[1]) : num(0);
+      if (isError(nd)) return nd;
+
+      let digits = Math.trunc(nd.v);
+      if (!Number.isFinite(digits)) return err('#ERROR!');
+      if (digits > 1000) digits = 1000;
+      if (digits < -1000) digits = -1000;
+
+      const factor = Math.pow(10, digits);
+      if (!Number.isFinite(factor) || factor === 0) return err('#ERROR!');
+
+      const signed = nx.v;
+      const abs = Math.abs(signed);
+      const r = (signed < 0 ? -1 : 1) * Math.round(abs * factor) / factor;
+      if (!Number.isFinite(r)) return err('#ERROR!');
+      return num(r);
+    }
+
+    return err('#ERROR!');
+  }
+
+  function evalNode(node) {
+    try {
+      if (!node) return err('#ERROR!');
+      if (node.type === 'num') return Number.isFinite(node.value) ? num(node.value) : err('#ERROR!');
+      if (node.type === 'str') return str(node.value);
+      if (node.type === 'bool') return bool(node.value);
+
+      if (node.type === 'ref') {
+        if (!node.valid) return err('#REF!');
+        const cell = cells.get(node.addr);
+        return cell ? cell.value : EMPTY_VAL;
+      }
+
+      if (node.type === 'range') {
+        return node.valid ? err('#VALUE!') : err('#REF!');
+      }
+
+      if (node.type === 'unary') {
+        return applyUnary(node.op, evalNode(node.expr));
+      }
+
+      if (node.type === 'binary') {
+        return applyBinary(node.op, evalNode(node.left), evalNode(node.right));
+      }
+
+      if (node.type === 'func') {
+        return evalFunc(node);
+      }
+
+      if (node.type === 'error') {
+        return err(node.code || '#ERROR!');
+      }
+
+      return err('#ERROR!');
+    } catch (e) {
+      return err('#ERROR!');
+    }
+  }
+
+  /* ---------- Model and graph ---------- */
+
+  const cells = new Map();
+  const dependents = new Map();
+  const cellEls = new Map();
+  const rowHeaders = new Map();
+  const colHeaders = new Map();
+
+  const grid = document.getElementById('grid');
+  const gridWrap = document.getElementById('grid-wrap');
+  const formulaBar = document.getElementById('formula-bar');
+  const addressBox = document.getElementById('address-box');
+  const statusEl = document.getElementById('status');
+  const editorEl = document.getElementById('cell-editor');
+
+  const colgroup = document.createElement('colgroup');
+  const rowHeaderCol = document.createElement('col');
+  rowHeaderCol.style.width = ROW_HEADER_W + 'px';
+  colgroup.appendChild(rowHeaderCol);
+
+  const dataCols = [];
+  for (let c = 1; c <= COLS; c++) {
+    const col = document.createElement('col');
+    col.style.width = DEFAULT_COL_W + 'px';
+    colgroup.appendChild(col);
+    dataCols.push(col);
+  }
+  grid.appendChild(colgroup);
+
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  const corner = document.createElement('th');
+  corner.textContent = '';
+  corner.id = 'corner';
+  headRow.appendChild(corner);
+
+  for (let c = 1; c <= COLS; c++) {
+    const th = document.createElement('th');
+    const letter = colToLetter(c);
+    th.textContent = letter;
+    const handle = document.createElement('span');
+    handle.className = 'col-resize';
+    handle.title = 'Resize ' + letter;
+    th.appendChild(handle);
+    th.dataset.col = letter;
+    th.dataset.colIndex = String(c);
+    colHeaders.set(letter, th);
+    headRow.appendChild(th);
+
+    th.addEventListener('mousedown', function (e) {
+      if (e.target.classList.contains('col-resize')) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const idx = c - 1;
+        const startX = e.clientX;
+        const startW = parseFloat(dataCols[idx].style.width) || DEFAULT_COL_W;
+
+        function move(ev) {
+          let w = startW + (ev.clientX - startX);
+          w = Math.max(42, Math.min(500, w));
+          dataCols[idx].style.width = w + 'px';
+          updateTableWidth();
+        }
+
+        function up() {
+          window.removeEventListener('mousemove', move);
+          window.removeEventListener('mouseup', up);
+        }
+
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
+      }
+    });
+  }
+
+  thead.appendChild(headRow);
+  grid.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+
+  for (let r = 1; r <= ROWS; r++) {
+    const tr = document.createElement('tr');
+    const rh = document.createElement('th');
+    rh.textContent = String(r);
+    rh.dataset.row = String(r);
+    rowHeaders.set(r, rh);
+    tr.appendChild(rh);
+
+    for (let c = 1; c <= COLS; c++) {
+      const td = document.createElement('td');
+      const addr = makeAddress(c, r);
+      td.dataset.cell = addr;
+      td.className = 'cell';
+      td.textContent = '';
+      td.setAttribute('role', 'gridcell');
+      cellEls.set(addr, td);
+      cells.set(addr, {
+        addr: addr,
+        raw: '',
+        formula: false,
+        ast: null,
+        deps: [],
+        value: EMPTY_VAL
+      });
+      dependents.set(addr, new Set());
+      tr.appendChild(td);
+    }
+
+    tbody.appendChild(tr);
+  }
+
+  grid.appendChild(tbody);
+
+  function updateTableWidth() {
+    let total = parseFloat(rowHeaderCol.style.width) || ROW_HEADER_W;
+    for (let i = 0; i < dataCols.length; i++) {
+      total += parseFloat(dataCols[i].style.width) || DEFAULT_COL_W;
+    }
+    grid.style.width = total + 'px';
+  }
+  updateTableWidth();
+
+  let selectedAddress = null;
+  let selectedColHeader = null;
+  let selectedRowHeader = null;
+
+  let editing = false;
+  let editingAddress = null;
+  let formulaBarProgrammaticBlur = false;
+  let clipboard = null;
+  let saveTimer = null;
+  const highlightedCells = [];
+
+  function parseLiteral(raw) {
+    if (raw === '') return EMPTY_VAL;
+    const m = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/.exec(raw);
+    if (m) {
+      const v = Number(raw);
+      if (Number.isFinite(v)) return num(v);
+    }
+    const up = raw.toUpperCase();
+    if (up === 'TRUE') return bool(true);
+    if (up === 'FALSE') return bool(false);
+    return str(raw);
+  }
+
+  function updateCellDisplay(cell) {
+    const el = cellEls.get(cell.addr);
+    if (!el) return;
+    const v = cell.value;
+    el.textContent = displayValue(v);
+    el.classList.toggle('num', v.type === 'num');
+    el.classList.toggle('error', v.type === 'err');
+    if (v.type === 'err') el.title = explainError(v.code);
+    else el.removeAttribute('title');
+  }
+
+  function clearReferenceHighlights() {
+    for (const el of highlightedCells) {
+      if (el) el.style.boxShadow = '';
+    }
+    highlightedCells.length = 0;
+  }
+
+  function addHighlight(el, color) {
+    if (!el) return;
+    el.style.boxShadow = 'inset 0 0 0 1px ' + color;
+    highlightedCells.push(el);
+  }
+
+  function updateHighlightForRaw(raw) {
+    clearReferenceHighlights();
+    if (!raw || !raw.trim().startsWith('=')) return;
+    const ast = parseFormula(raw);
+    if (!ast) return;
+
+    let colorIdx = 0;
+    function nextColor() {
+      const c = REF_COLORS[colorIdx % REF_COLORS.length];
+      colorIdx++;
+      return c;
+    }
+
+    function addRange(node) {
+      const color = nextColor();
+      const c1 = Math.min(node.from.col, node.to.col);
+      const c2 = Math.max(node.from.col, node.to.col);
+      const r1 = Math.min(node.from.row, node.to.row);
+      const r2 = Math.max(node.from.row, node.to.row);
+      for (let r = r1; r <= r2; r++) {
+        for (let c = c1; c <= c2; c++) {
+          const addr = makeAddress(c, r);
+          addHighlight(cellEls.get(addr), color);
+        }
+      }
+    }
+
+    function visit(n) {
+      if (!n) return;
+      if (n.type === 'ref') {
+        if (n.valid) {
+          const color = nextColor();
+          addHighlight(cellEls.get(n.addr), color);
+        }
+        return;
+      }
+      if (n.type === 'range') {
+        if (n.valid) addRange(n);
+        return;
+      }
+      if (n.type === 'binary') {
+        visit(n.left);
+        visit(n.right);
+      } else if (n.type === 'unary') {
+        visit(n.expr);
+      } else if (n.type === 'func') {
+        for (const a of n.args) visit(a);
+      }
+    }
+
+    visit(ast);
+  }
+
+  function ensureVisible(el) {
+    const cr = gridWrap.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const header = grid.tHead;
+    const headerH = header ? header.offsetHeight : 0;
+    const leftW = parseFloat(rowHeaderCol.style.width) || ROW_HEADER_W;
+
+    if (r.top < cr.top + headerH) gridWrap.scrollTop += r.top - (cr.top + headerH);
+    if (r.bottom > cr.bottom) gridWrap.scrollTop += r.bottom - cr.bottom;
+    if (r.left < cr.left + leftW) gridWrap.scrollLeft += r.left - (cr.left + leftW);
+    if (r.right > cr.right) gridWrap.scrollLeft += r.right - cr.right;
+  }
+
+  function updateStatus() {
+    if (!selectedAddress) {
+      statusEl.textContent = 'No cell selected';
+      return;
+    }
+    const cell = cells.get(selectedAddress);
+    const v = cell.value;
+
+    let sumText = '0';
+    let countText = '0';
+
+    if (v.type === 'num') {
+      sumText = formatNumber(v.v);
+      countText = '1';
+    } else if (v.type === 'bool') {
+      sumText = v.v ? '1' : '0';
+      countText = '0';
+    } else if (v.type === 'empty') {
+      sumText = '0';
+      countText = '0';
+    } else if (v.type === 'err') {
+      sumText = v.code;
+      countText = '0';
+    } else {
+      sumText = '0';
+      countText = '0';
+    }
+
+    statusEl.textContent = selectedAddress + ' · SUM: ' + sumText + ' · COUNT: ' + countText;
+  }
+
+  function selectCell(addr) {
+    const cell = cells.get(addr);
+    if (!cell) return;
+
+    if (selectedAddress && selectedAddress !== addr) {
+      const old = cellEls.get(selectedAddress);
+      if (old) old.removeAttribute('aria-selected');
+    }
+
+    if (selectedColHeader) selectedColHeader.classList.remove('active');
+    if (selectedRowHeader) selectedRowHeader.classList.remove('active');
+
+    selectedAddress = addr;
+    const el = cellEls.get(addr);
+    el.setAttribute('aria-selected', 'true');
+
+    const p = parseAddress(addr);
+    selectedColHeader = colHeaders.get(colToLetter(p.col));
+    selectedRowHeader = rowHeaders.get(p.row);
+    if (selectedColHeader) selectedColHeader.classList.add('active');
+    if (selectedRowHeader) selectedRowHeader.classList.add('active');
+
+    addressBox.textContent = addr;
+    formulaBar.value = cell.raw;
+
+    ensureVisible(el);
+    grid.focus({ preventScroll: true });
+
+    updateHighlightForRaw(cell.raw);
+    updateStatus();
+  }
+
+  function moveSelection(dr, dc) {
+    if (!selectedAddress) return;
+    const p = parseAddress(selectedAddress);
+    if (!p) return;
+
+    let c = p.col + dc;
+    let r = p.row + dr;
+    if (c < 1) c = 1;
+    if (c > COLS) c = COLS;
+    if (r < 1) r = 1;
+    if (r > ROWS) r = ROWS;
+
+    selectCell(makeAddress(c, r));
+  }
+
+  function setCell(addr, raw) {
+    const cell = cells.get(addr);
+    if (!cell) return;
+
+    raw = normalizeRaw(raw);
+    if (cell.raw === raw) return;
+
+    for (const dep of cell.deps) {
+      const set = dependents.get(dep);
+      if (set) set.delete(addr);
+    }
+
+    cell.raw = raw;
+    cell.deps = [];
+    cell.ast = null;
+    cell.formula = false;
+
+    if (raw === '') {
+      cell.value = EMPTY_VAL;
+    } else if (raw[0] === '=') {
+      cell.formula = true;
+      cell.ast = parseFormula(raw);
+      cell.value = err('#ERROR!');
+      cell.deps = collectDeps(cell.ast);
+      for (const dep of cell.deps) {
+        const set = dependents.get(dep);
+        if (set) set.add(addr);
+      }
+    } else {
+      cell.value = parseLiteral(raw);
+    }
+
+    updateCellDisplay(cell);
+    scheduleRecalc(addr);
+
+    if (selectedAddress === addr) {
+      updateHighlightForRaw(cell.raw);
+      formulaBar.value = cell.raw;
+      updateStatus();
+    }
+
+    scheduleSave();
+  }
+
+  function scheduleRecalc(startAddr) {
+    const dirty = new Set([startAddr]);
+    const stack = [startAddr];
+
+    while (stack.length) {
+      const a = stack.pop();
+      const set = dependents.get(a);
+      if (!set) continue;
+      for (const d of set) {
+        if (!dirty.has(d)) {
+          dirty.add(d);
+          stack.push(d);
+        }
+      }
+    }
+
+    recalcDirty(dirty);
+  }
+
+  function recalcDirty(dirty) {
+    const indeg = new Map();
+    const queue = [];
+    let formulaCount = 0;
+
+    for (const addr of dirty) {
+      const cell = cells.get(addr);
+      if (cell.formula) {
+        let ind = 0;
+        for (const dep of cell.deps) {
+          if (dirty.has(dep)) {
+            const dcell = cells.get(dep);
+            if (dcell && dcell.formula) ind++;
+          }
+        }
+        indeg.set(addr, ind);
+        if (ind === 0) queue.push(addr);
+        formulaCount++;
+      } else {
+        updateCellDisplay(cell);
+      }
+    }
+
+    let processed = 0;
+    for (let qi = 0; qi < queue.length; qi++) {
+      const addr = queue[qi];
+      const cell = cells.get(addr);
+      if (!cell || !cell.formula) continue;
+
+      cell.value = cell.ast ? evalNode(cell.ast) : err('#ERROR!');
+      updateCellDisplay(cell);
+      processed++;
+
+      const set = dependents.get(addr);
+      if (!set) continue;
+      for (const d of set) {
+        if (!dirty.has(d)) continue;
+        const dcell = cells.get(d);
+        if (!dcell || !dcell.formula) continue;
+        const cur = indeg.get(d);
+        if (cur > 0) {
+          indeg.set(d, cur - 1);
+          if (cur - 1 === 0) queue.push(d);
+        }
+      }
+    }
+
+    if (processed < formulaCount) {
+      for (const entry of indeg.entries()) {
+        if (entry[1] > 0) {
+          const cell = cells.get(entry[0]);
+          cell.value = err('#CYCLE!');
+          updateCellDisplay(cell);
+        }
+      }
+    }
+  }
+
+  function recalcAll() {
+    const dirty = new Set();
+    for (const cell of cells.values()) {
+      if (cell.formula) dirty.add(cell.addr);
+    }
+    recalcDirty(dirty);
+  }
+
+  function setRawNoRecalc(addr, raw) {
+    const cell = cells.get(addr);
+    if (!cell) return;
+    raw = normalizeRaw(raw);
+    cell.raw = raw;
+    cell.deps = [];
+    cell.ast = null;
+    cell.formula = false;
+
+    if (raw === '') {
+      cell.value = EMPTY_VAL;
+    } else if (raw[0] === '=') {
+      cell.formula = true;
+      cell.ast = parseFormula(raw);
+      cell.value = err('#ERROR!');
+      cell.deps = collectDeps(cell.ast);
+      for (const dep of cell.deps) {
+        const set = dependents.get(dep);
+        if (set) set.add(addr);
+      }
+    } else {
+      cell.value = parseLiteral(raw);
+    }
+  }
+
+  function loadState() {
+    let obj = {};
+    try {
+      obj = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    } catch (e) {
+      obj = {};
+    }
+
+    for (const key in obj) {
+      if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+      const addr = String(key).toUpperCase();
+      if (cells.has(addr)) setRawNoRecalc(addr, obj[key]);
+    }
+
+    for (const cell of cells.values()) {
+      if (!cell.formula) updateCellDisplay(cell);
+    }
+  }
+
+  function saveState() {
+    try {
+      const obj = {};
+      for (const cell of cells.values()) {
+        if (cell.raw !== '') obj[cell.addr] = cell.raw;
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+    } catch (e) {
+      // Storage may be unavailable; ignore.
+    }
+  }
+
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveState, 80);
+  }
+
+  window.addEventListener('beforeunload', function () {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      saveState();
+    }
+  });
+
+  /* ---------- Copy/paste and reference shifting ---------- */
+
+  function shiftRefToken(tok, dx, dy) {
+    let c = tok.colIndex;
+    let r = tok.rowNum;
+
+    if (!tok.absCol) c += dx;
+    if (!tok.absRow) r += dy;
+
+    if (!Number.isFinite(c)) c = 0;
+    if (!Number.isFinite(r)) r = 0;
+
+    if (c > COL_CAP) c = COL_CAP;
+    if (r > COL_CAP) r = COL_CAP;
+
+    if (c <= 0 || r < 1) {
+      const letters = c <= 0 ? 'A' : colToLetter(c);
+      return (tok.absCol ? '$' : '') + letters + (tok.absRow ? '$' : '') + '0';
+    }
+
+    const letters = colToLetter(c);
+    return (tok.absCol ? '$' : '') + letters + (tok.absRow ? '$' : '') + r;
+  }
+
+  function shiftRaw(raw, dx, dy) {
+    if (raw === '' || (dx === 0 && dy === 0)) return raw;
+    if (raw[0] !== '=') return raw;
+
+    const expr = raw.slice(1);
+    const tokens = tokenize(expr);
+    if (!tokens) return raw;
+
+    let out = '=';
+    let last = 0;
+
+    for (const tok of tokens) {
+      if (tok.type === 'ref') {
+        out += expr.slice(last, tok.start) + shiftRefToken(tok, dx, dy);
+        last = tok.end;
+      }
+    }
+
+    out += expr.slice(last);
+    return out;
+  }
+
+  function copySelected() {
+    if (!selectedAddress) return;
+    const cell = cells.get(selectedAddress);
+    clipboard = { raw: cell.raw, source: selectedAddress };
+  }
+
+  function pasteToSelected() {
+    if (!clipboard || !selectedAddress) return;
+    const src = parseAddress(clipboard.source);
+    const dst = parseAddress(selectedAddress);
+    if (!src || !dst) return;
+    const dx = dst.col - src.col;
+    const dy = dst.row - src.row;
+    const raw = shiftRaw(clipboard.raw, dx, dy);
+    setCell(selectedAddress, raw);
+  }
+
+  /* ---------- Cell editing ---------- */
+
+  function closeEditorElement() {
+    editorEl.classList.remove('open');
+    if (editorEl.parentNode) editorEl.parentNode.removeChild(editorEl);
+  }
+
+  function beginEdit(addr, raw) {
+    if (editing) return;
+    const cell = cells.get(addr);
+    if (!cell) return;
+
+    editingAddress = addr;
+    editing = true;
+
+    const el = cellEls.get(addr);
+    if (!el) {
+      editing = false;
+      editingAddress = null;
+      return;
+    }
+
+    editorEl.value = raw;
+    editorEl.classList.add('open');
+    el.appendChild(editorEl);
+
+    editorEl.focus();
+    const len = editorEl.value.length;
+    try { editorEl.setSelectionRange(len, len); } catch (e) {}
+
+    updateHighlightForRaw(raw);
+  }
+
+  function commitEditor(dr, dc, focusGrid) {
+    if (!editing) return;
+
+    const addr = editingAddress;
+    const raw = editorEl.value;
+
+    editing = false;
+    editingAddress = null;
+
+    closeEditorElement();
+    clearReferenceHighlights();
+
+    setCell(addr, raw);
+
+    if (dr || dc) {
+      moveSelection(dr, dc);
+    } else if (focusGrid) {
+      selectCell(addr);
+    } else {
+      if (selectedAddress === addr) {
+        const cell = cells.get(addr);
+        updateHighlightForRaw(cell.raw);
+        formulaBar.value = cell.raw;
+        updateStatus();
+      }
+    }
+  }
+
+  function cancelEditor() {
+    if (!editing) return;
+    const addr = editingAddress;
+
+    editing = false;
+    editingAddress = null;
+
+    closeEditorElement();
+    clearReferenceHighlights();
+
+    const cell = cells.get(addr);
+    if (cell) {
+      formulaBar.value = cell.raw;
+      updateStatus();
+    }
+    if (addr) selectCell(addr);
+  }
+
+  editorEl.addEventListener('input', function () {
+    if (editing) updateHighlightForRaw(editorEl.value);
+  });
+
+  editorEl.addEventListener('blur', function () {
+    if (editing) commitEditor(0, 0, false);
+  });
+
+  editorEl.addEventListener('keydown', function (e) {
+    const key = e.key || '';
+    if (key === 'Enter') {
+      e.preventDefault();
+      commitEditor(e.shiftKey ? -1 : 1, 0, true);
+    } else if (key === 'Tab') {
+      e.preventDefault();
+      commitEditor(0, e.shiftKey ? -1 : 1, true);
+    } else if (key === 'Escape') {
+      e.preventDefault();
+      cancelEditor();
+    }
+  });
+
+  /* ---------- Formula bar ---------- */
+
+  function commitFormulaBar() {
+    if (!selectedAddress) return;
+    setCell(selectedAddress, formulaBar.value);
+  }
+
+  formulaBar.addEventListener('input', function () {
+    updateHighlightForRaw(formulaBar.value);
+  });
+
+  formulaBar.addEventListener('blur', function () {
+    if (formulaBarProgrammaticBlur) {
+      formulaBarProgrammaticBlur = false;
+      return;
+    }
+    if (selectedAddress && formulaBar.value !== cells.get(selectedAddress).raw) {
+      setCell(selectedAddress, formulaBar.value);
+    }
+  });
+
+  formulaBar.addEventListener('keydown', function (e) {
+    const key = e.key || '';
+    if (key === 'Enter') {
+      e.preventDefault();
+      commitFormulaBar();
+      if (document.activeElement === formulaBar) {
+        formulaBarProgrammaticBlur = true;
+        formulaBar.blur();
+      }
+      grid.focus({ preventScroll: true });
+    } else if (key === 'Escape') {
+      e.preventDefault();
+      if (selectedAddress) {
+        formulaBar.value = cells.get(selectedAddress).raw;
+        if (document.activeElement === formulaBar) {
+          formulaBarProgrammaticBlur = true;
+          formulaBar.blur();
+        }
+        grid.focus({ preventScroll: true });
+      }
+    }
+  });
+
+  /* ---------- Mouse selection ---------- */
+
+  tbody.addEventListener('click', function (e) {
+    if (editing && e.target === editorEl) return;
+    const td = e.target.closest('td[data-cell]');
+    if (td) selectCell(td.dataset.cell);
+  });
+
+  tbody.addEventListener('dblclick', function (e) {
+    if (editing && e.target === editorEl) return;
+    const td = e.target.closest('td[data-cell]');
+    if (td) {
+      const addr = td.dataset.cell;
+      selectCell(addr);
+      beginEdit(addr, cells.get(addr).raw);
+    }
+  });
+
+  /* ---------- Keyboard ---------- */
+
+  function isPrintable(key) {
+    return !!key && key.length === 1 && key.charCodeAt(0) >= 32;
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (document.activeElement === formulaBar || document.activeElement === editorEl) return;
+    if (editing) return;
+
+    const key = e.key || '';
+    const ctrl = e.ctrlKey || e.metaKey;
+
+    if (ctrl && !e.altKey) {
+      const lower = key.toLowerCase();
+      if (lower === 'c') {
+        e.preventDefault();
+        copySelected();
+        return;
+      }
+      if (lower === 'v') {
+        e.preventDefault();
+        pasteToSelected();
+        return;
+      }
+      return;
+    }
+
+    if (key === 'ArrowUp') { e.preventDefault(); moveSelection(-1, 0); return; }
+    if (key === 'ArrowDown') { e.preventDefault(); moveSelection(1, 0); return; }
+    if (key === 'ArrowLeft') { e.preventDefault(); moveSelection(0, -1); return; }
+    if (key === 'ArrowRight') { e.preventDefault(); moveSelection(0, 1); return; }
+
+    if (key === 'Enter') {
+      e.preventDefault();
+      moveSelection(e.shiftKey ? -1 : 1, 0);
+      return;
+    }
+
+    if (key === 'Tab') {
+      e.preventDefault();
+      moveSelection(0, e.shiftKey ? -1 : 1);
+      return;
+    }
+
+    if (key === 'F2') {
+      e.preventDefault();
+      if (selectedAddress) {
+        beginEdit(selectedAddress, cells.get(selectedAddress).raw);
+      }
+      return;
+    }
+
+    if (key === 'Delete' || key === 'Backspace') {
+      if (selectedAddress) {
+        e.preventDefault();
+        setCell(selectedAddress, '');
+      }
+      return;
+    }
+
+    if (isPrintable(key)) {
+      if (selectedAddress) {
+        e.preventDefault();
+        beginEdit(selectedAddress, key);
+      }
+      return;
+    }
+  });
+
+  /* ---------- Startup ---------- */
+
+  loadState();
+  recalcAll();
+  selectCell('A1');
+})();
+</script>
+</body>
+</html>
+```

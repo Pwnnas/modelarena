@@ -132,13 +132,21 @@ export const checks = [
     async run(t) {
       await t.sleep(3000);
       const c0 = (await stats(t)).centroid;
+      const before = await t.screenshot();
       const release = await walk(t, c0, { x: c0.x + 220, y: c0.y + 40 });
       await t.sleep(600);
       const c1 = (await stats(t)).centroid;
+      const during = await t.screenshot();
       await release();
+      // The centroid averages every particle, so a fine cloth barely moves it
+      // even when the grab works; a visibly deformed cloth counts as well.
       await t.part('dragging pulls the cloth toward the cursor', () => {
         const dx = c1.x - c0.x;
-        return { score: dx >= 12 ? 1 : dx >= 5 ? 0.5 : 0, note: `centroid moved ${dx.toFixed(1)} px right while dragging 220 px` };
+        const px = t.image.diff(before, during);
+        return {
+          score: dx >= 3 || px >= 0.02 ? 1 : dx >= 1 ? 0.5 : 0,
+          note: `centroid moved ${dx.toFixed(1)} px right, ${(px * 100).toFixed(1)}% of pixels changed while dragging 220 px`,
+        };
       }, 2);
       await t.sleep(3500);
       const pts = await samples(t, 6, 100);

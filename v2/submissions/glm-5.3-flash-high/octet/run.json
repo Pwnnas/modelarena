@@ -1,0 +1,26 @@
+{
+  "source": "arena run",
+  "endpoint": "openrouter.ai",
+  "apiModel": "z-ai/glm-5.3-flash",
+  "servedModel": "z-ai/glm-5.3-flash",
+  "provider": "Relace",
+  "params": {
+    "thinking": "high"
+  },
+  "startedAt": "2026-10-30T03:42:45.965Z",
+  "wallMs": 909291,
+  "ttftMs": 1177,
+  "thinkingMs": 821388,
+  "promptTokens": 3151,
+  "completionTokens": 106639,
+  "reasoningTokens": 69047,
+  "tokensEstimated": false,
+  "genTokensPerSec": 117.4,
+  "promptTokensPerSec": null,
+  "finishReason": "stop",
+  "replyChars": 46512,
+  "reasoningChars": 263956,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 46523
+}

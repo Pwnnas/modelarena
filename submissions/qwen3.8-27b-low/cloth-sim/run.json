@@ -1,0 +1,26 @@
+{
+  "source": "arena run",
+  "endpoint": "openrouter.ai",
+  "apiModel": "qwen/qwen3.8-27b",
+  "servedModel": "qwen/qwen3.8-27b",
+  "provider": "ModelRun",
+  "params": {
+    "thinking": "low"
+  },
+  "startedAt": "2026-10-28T13:11:52.371Z",
+  "wallMs": 126356,
+  "ttftMs": 424,
+  "thinkingMs": 98791,
+  "promptTokens": 1105,
+  "completionTokens": 21535,
+  "reasoningTokens": 15078,
+  "tokensEstimated": false,
+  "genTokensPerSec": 171,
+  "promptTokensPerSec": null,
+  "finishReason": "stop",
+  "replyChars": 18468,
+  "reasoningChars": 53004,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 18457
+}

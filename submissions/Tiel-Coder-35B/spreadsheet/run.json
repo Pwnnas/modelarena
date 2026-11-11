@@ -1,0 +1,22 @@
+{
+  "source": "arena run",
+  "endpoint": "192.168.1.172:8080",
+  "apiModel": "Tiel-Coder-35B",
+  "servedModel": "Tiel-Coder-35B",
+  "params": {},
+  "startedAt": "2026-10-28T03:34:34.545Z",
+  "wallMs": 971056,
+  "ttftMs": 1899,
+  "thinkingMs": 788572,
+  "promptTokens": 1975,
+  "completionTokens": 112061,
+  "reasoningTokens": 91398,
+  "tokensEstimated": false,
+  "genTokensPerSec": 115.6,
+  "promptTokensPerSec": 1073.6,
+  "finishReason": "stop",
+  "replyChars": 60992,
+  "reasoningChars": 330727,
+  "extracted": "fenced",
+  "htmlBytes": 37956
+}

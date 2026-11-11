@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="color-scheme" content="dark">
+<title>Latch — synchronous logic bench</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:#0a0e13;color:#c9d7ea;overflow:hidden;
+    font:13px/1.45 ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;
+    display:flex;flex-direction:column;user-select:none;-webkit-user-select:none;
+  }
+  /* ---------- toolbar ---------- */
+  #bar{display:flex;align-items:center;gap:8px;padding:7px 12px;flex:0 0 auto;
+    background:linear-gradient(180deg,#131c29,#0d141d);border-bottom:1px solid #22314a}
+  #brand{font-weight:800;letter-spacing:.2em;color:#ffb454;font-size:14px;line-height:1;margin-right:4px}
+  #brand small{display:block;font-size:7.5px;letter-spacing:.3em;color:#5c718c;font-weight:400;margin-top:3px}
+  .grp{display:flex;gap:4px;align-items:center;padding:0 10px;border-left:1px solid #22314a;align-self:stretch}
+  button{appearance:none;background:#151f2e;border:1px solid #2c3e5c;color:#c9d7ea;border-radius:5px;
+    padding:5px 9px;font:11px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em;cursor:pointer;
+    transition:background .12s,border-color .12s,color .12s,box-shadow .12s}
+  button:hover{border-color:#4a668f;background:#1a2739}
+  button:active{transform:translateY(1px)}
+  button.tool.armed{background:#ffb454;border-color:#ffc65e;color:#241503;font-weight:700;
+    box-shadow:0 0 10px rgba(255,180,84,.45)}
+  #run.on{background:#0f2f22;border-color:#2f9e6b;color:#5be3a0;font-weight:700;box-shadow:0 0 10px rgba(91,227,160,.35)}
+  #readout{display:flex;align-items:center;gap:8px;padding:0 4px 0 12px;border-left:1px solid #22314a;align-self:stretch}
+  .rlab{color:#5c718c;font-size:11px}
+  #ticks{background:#060b12;border:1px solid #2c3e5c;border-radius:4px;padding:4px 9px;min-width:48px;
+    text-align:center;color:#ffb454;font-weight:700;font-size:13px;text-shadow:0 0 8px rgba(255,180,84,.4)}
+  #stabLed{width:9px;height:9px;border-radius:50%;background:#38d88f;box-shadow:0 0 7px #38d88f;display:inline-block}
+  #stabLed.busy{background:#ffb454;box-shadow:0 0 7px #ffb454;animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  /* ---------- board ---------- */
+  #board{position:relative;flex:1 1 auto;overflow:hidden;outline:none;
+    background-color:#0a0f16;
+    background-image:radial-gradient(circle,#1c2839 1px,transparent 1.4px);
+    background-size:24px 24px}
+  #board.placing{cursor:crosshair}
+  #board.running::after{content:'';position:absolute;top:0;bottom:0;width:70px;left:-80px;z-index:0;
+    background:linear-gradient(90deg,transparent,rgba(89,210,255,.07),transparent);
+    animation:scan 3.6s linear infinite;pointer-events:none}
+  @keyframes scan{to{left:100%}}
+  #wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+  #hint{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:7px;text-align:center;color:#3d5270;pointer-events:none;z-index:0}
+  #hint b{font-size:24px;letter-spacing:.55em;color:#2c3f59;font-weight:800}
+  #hint .sub{font-size:11px;letter-spacing:.14em;color:#33486a}
+  #hint .keys{font-size:10px;color:#2e4260}
+  /* ---------- gates ---------- */
+  .gate{position:absolute;z-index:2;cursor:pointer}
+  .gate svg{position:absolute;left:0;top:0;overflow:visible}
+  .body{fill:#141d2b;stroke:#44597b;stroke-width:1.5;transition:stroke .15s,fill .15s}
+  .stub{stroke:#44597b;stroke-width:1.5;fill:none}
+  .mini{font-size:7px;fill:#5c718c;letter-spacing:.12em}
+  .gate.sel .body{stroke:#ffb454;fill:#1c2939}
+  .gate.sel .stub{stroke:#ffb454}
+  .gate.sel::after{content:'';position:absolute;inset:-6px;border:1px dashed rgba(255,180,84,.6);
+    border-radius:9px;pointer-events:none;box-shadow:0 0 12px rgba(255,180,84,.18) inset}
+  .gname{position:absolute;left:50%;top:100%;transform:translate(-50%,4px);font-size:9px;color:#51648a;
+    white-space:nowrap;pointer-events:none;z-index:1}
+  .plab{position:absolute;transform:translate(-50%,-50%);font-size:8.5px;color:#6c84a4;pointer-events:none;z-index:1;letter-spacing:.05em}
+  .pin{position:absolute;width:14px;height:14px;border-radius:50%;background:#0c1322;border:2px solid #4a608a;
+    cursor:crosshair;z-index:5;transition:background .12s,border-color .12s,box-shadow .12s}
+  .pin.in{border-radius:3px}
+  .pin:hover{border-color:#59d2ff;box-shadow:0 0 6px rgba(89,210,255,.5)}
+  .pin.hi{background:#ffc65e;border-color:#ffc65e;box-shadow:0 0 8px rgba(255,198,94,.9)}
+  .gval{position:absolute;display:flex;align-items:center;justify-content:center;pointer-events:none;
+    font-size:14px;font-weight:700;color:#4a608a;transition:color .12s,text-shadow .12s}
+  .t-in .gval{left:4px;right:8px;top:17px;height:19px}
+  .t-out .gval{left:10px;right:4px;top:17px;height:19px}
+  .t-clk .gval{left:4px;right:8px;top:17px;height:19px}
+  .t-dff .gval{left:47px;top:27px;width:26px;height:19px;font-size:12px}
+  .gate.on .gval{color:#ffc65e;text-shadow:0 0 9px rgba(255,198,94,.65)}
+  .t-in.on .body,.t-out.on .body{stroke:#ffb454}
+  .t-in.on .body{box-shadow:0 0 8px rgba(255,180,84,.4)}
+  /* ---------- wires ---------- */
+  .wire{fill:none;stroke:#3c4f6e;stroke-width:2.25;transition:stroke .12s}
+  .wire.hi{stroke:#ffc65e;filter:drop-shadow(0 0 3px rgba(255,198,94,.75))}
+  .wire.temp{stroke:#59d2ff;stroke-dasharray:5 4;stroke-width:2;filter:none}
+  /* ---------- footer ---------- */
+  #deck{display:flex;gap:12px;align-items:stretch;padding:7px 12px 9px;flex:0 0 auto;height:66px;
+    background:#0d141d;border-top:1px solid #22314a}
+  #strip{flex:1 1 auto;height:100%;background:#070c13;border:1px solid #1d2b42;border-radius:4px}
+  #status{flex:0 0 265px;font-size:10px;color:#5c718c;display:flex;flex-direction:column;justify-content:center;gap:3px;line-height:1.3}
+  #status .l1{color:#7f96b5}
+</style>
+</head>
+<body>
+<header id="bar">
+  <div id="brand">LATCH<small>SYNC · 1T</small></div>
+  <div class="grp" id="tools">
+    <button id="tool-select" class="tool" title="Select / interact (Esc)">SEL</button>
+    <button id="tool-in" class="tool" title="Place input switch">IN</button>
+    <button id="tool-out" class="tool" title="Place output probe">OUT</button>
+    <button id="tool-not" class="tool" title="Place NOT">NOT</button>
+    <button id="tool-and" class="tool" title="Place AND">AND</button>
+    <button id="tool-or" class="tool" title="Place OR">OR</button>
+    <button id="tool-xor" class="tool" title="Place XOR">XOR</button>
+    <button id="tool-nand" class="tool" title="Place NAND">NAND</button>
+    <button id="tool-nor" class="tool" title="Place NOR">NOR</button>
+    <button id="tool-dff" class="tool" title="Place D flip-flop">DFF</button>
+    <button id="tool-clk" class="tool" title="Place clock">CLK</button>
+  </div>
+  <div class="grp">
+    <button id="tick" title="Advance one delay-step (T)">STEP</button>
+    <button id="run" aria-pressed="false" title="Free-run / pause (Space)">RUN</button>
+    <button id="reset" title="Clear circuit, rewind to t=0">RESET</button>
+    <button id="undo" title="Undo last edit (Ctrl+Z)">UNDO</button>
+  </div>
+  <div id="readout">
+    <span class="rlab">t=</span><span id="ticks">0</span>
+    <span id="stabLed" title="stable indicator"></span>
+  </div>
+</header>
+<main id="board">
+  <svg id="wires" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div id="hint">
+    <b>LATCH</b>
+    <div class="sub">SYNCHRONOUS LOGIC WORKBENCH — EVERY GATE DELAYS ONE TICK</div>
+    <div class="keys">pick a tool · click board to place · drag pin → pin to wire<br>
+    click an IN gate to toggle · SPACE runs · DELETE removes · ESC selects</div>
+  </div>
+</main>
+<footer id="deck">
+  <canvas id="strip"></canvas>
+  <div id="status"><div class="l1" id="st1"></div><div id="st2"></div></div>
+</footer>
+<script>
+'use strict';
+/* ================= constants & state ================= */
+var SVGNS='http://www.w3.org/2000/svg';
+var GEO={in:{w:64,h:44},out:{w:64,h:44},clk:{w:64,h:44},not:{w:64,h:48},
+  and:{w:78,h:56},nand:{w:78,h:56},or:{w:78,h:56},nor:{w:78,h:56},xor:{w:82,h:56},dff:{w:86,h:72}};
+var PINDEF={
+  in:{out:{Y:[64,22]}}, out:{inp:{A:[0,22]}}, clk:{out:{Y:[64,22]}},
+  not:{inp:{A:[0,24]},out:{Y:[64,24]}},
+  and:{inp:{A:[0,14],B:[0,42]},out:{Y:[78,28]}},
+  nand:{inp:{A:[0,14],B:[0,42]},out:{Y:[78,28]}},
+  or:{inp:{A:[0,14],B:[0,42]},out:{Y:[78,28]}},
+  nor:{inp:{A:[0,14],B:[0,42]},out:{Y:[78,28]}},
+  xor:{inp:{A:[0,14],B:[0,42]},out:{Y:[82,28]}},
+  dff:{inp:{D:[0,16],CLK:[0,36],RST:[0,56]},out:{Q:[86,36]}}
+};
+var LAB={
+  not:{A:[22,24],Y:[74,24]},
+  and:{A:[22,14],B:[22,42],Y:[88,28]}, nand:{A:[22,14],B:[22,42],Y:[88,28]},
+  or:{A:[22,14],B:[22,42],Y:[88,28]}, nor:{A:[22,14],B:[22,42],Y:[88,28]},
+  xor:{A:[26,14],B:[26,42],Y:[92,28]},
+  dff:{D:[24,16],CLK:[32,36],RST:[27,56],Q:[97,36]}
+};
+var comps=new Map(), order=[], wiresMap=new Map(), els=new Map(), wels=new Map();
+var history=[];            /* undo history */
+var time=0, lastChanged=true;
+var curTool='select', selectedId=null;
+var running=false, runTimer=null;
+var drag=null, suppressClick=false;
+/* ================= dom refs ================= */
+var board=document.getElementById('board');
+var wireSvg=document.getElementById('wires');
+var hintEl=document.getElementById('hint');
+var ticksEl=document.getElementById('ticks');
+var stabLed=document.getElementById('stabLed');
+var runBtn=document.getElementById('run');
+var stripEl=document.getElementById('strip');
+var st1=document.getElementById('st1'), st2=document.getElementById('st2');
+var tempEl=document.createElementNS(SVGNS,'path');
+tempEl.setAttribute('class','wire temp');
+tempEl.style.display='none';
+wireSvg.appendChild(tempEl);
+/* ================= helpers ================= */
+function esc(s){return String(s).replace(/[&<>"']/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+function clkVal(p,k){return ((k%p)>=(p/2))?1:0;}
+function inVal(c,pin){
+  var w=c.inputs[pin]; if(!w) return 0;
+  var s=comps.get(w.s); if(!s) return 0;
+  var v=s.val[w.sp]; return v===undefined?0:v;
+}
+function primaryVal(c){
+  if(c.type==='out') return inVal(c,'A');
+  var v=(c.val.Y!==undefined)?c.val.Y:c.val.Q;
+  return v===undefined?0:v;
+}
+function displayVal(c){
+  if(c.type==='out') return inVal(c,'A');
+  return primaryVal(c);
+}
+function isOutPin(id,pin){
+  var c=comps.get(id);
+  return !!(c && PINDEF[c.type].out && PINDEF[c.type].out[pin]);
+}
+function pinPos(id,pin){
+  var c=comps.get(id); if(!c) return [0,0];
+  var d=PINDEF[c.type];
+  var pt=(d.out&&d.out[pin])||(d.inp&&d.inp[pin]);
+  return pt?[c.x+pt[0],c.y+pt[1]]:[c.x,c.y];
+}
+function route(x1,y1,x2,y2){
+  if(Math.abs(y1-y2)<2 && x2>=x1) return 'M'+x1+' '+y1+' L'+x2+' '+y2;
+  var mx=(x2>=x1+24)?Math.round((x1+x2)/2):(x1+24);
+  if(x2<x1-24) mx=x1+24;
+  return 'M'+x1+' '+y1+' L'+mx+' '+y1+' L'+mx+' '+y2+' L'+x2+' '+y2;
+}
+function makeComp(type,id,x,y){
+  var c={id:id,type:type,x:x,y:y,inputs:{},val:{},trace:[],prevClk:0,pendClk:0,period:8};
+  if(type==='in'){c.val.Y=0;}
+  else if(type==='clk'){c.val.Y=clkVal(8,time);}
+  else if(type==='dff'){c.val.Q=0;}
+  else if(type!=='out'){c.val.Y=0;}
+  return c;
+}
+function snapComp(c){
+  var o={id:c.id,type:c.type,x:c.x,y:c.y};
+  if(c.type==='clk') o.period=c.period;
+  if(c.type==='in') o.Y=c.val.Y;
+  if(c.type==='dff'){o.Q=c.val.Q;o.pc=c.prevClk;}
+  if(c.type!=='in'&&c.type!=='clk'&&c.type!=='out'&&c.type!=='dff') o.Y=c.val.Y;
+  return o;
+}
+function freeSpot(){
+  var occ=[];comps.forEach(function(c){occ.push(c);});
+  for(var i=0;i<600;i++){
+    var x=16+(i%13)*96, y=16+Math.floor(i/13)*96;
+    var hit=false;
+    for(var j=0;j<occ.length;j++){if(Math.abs(occ[j].x-x)<84&&Math.abs(occ[j].y-y)<84){hit=true;break;}}
+    if(!hit) return {x:x,y:y};
+  }
+  return {x:16,y:16};
+}
+function autoId(type){
+  var base=type,n=1;
+  while(comps.has(base+n)) n++;
+  return base+n;
+}
+/* ================= simulation core ================= */
+function step(){
+  var k=time+1, changed=false, i, c;
+  /* 1-2: clocks are stimuli — update from waveform at time k */
+  for(i=0;i<order.length;i++){
+    c=comps.get(order[i]);
+    if(c.type==='clk'){
+      var v=clkVal(c.period,k);
+      if(v!==c.val.Y){c.val.Y=v;changed=true;}
+    }
+  }
+  /* 3-4: sample inputs (pre-commit values), compute next outputs */
+  var commits=[];
+  for(i=0;i<order.length;i++){
+    c=comps.get(order[i]);
+    switch(c.type){
+      case 'in': case 'clk': case 'out': break;
+      case 'not': commits.push([c,'Y',inVal(c,'A')?0:1]); break;
+      case 'and':{var a1=inVal(c,'A'),b1=inVal(c,'B');commits.push([c,'Y',(a1===1&&b1===1)?1:0]);break;}
+      case 'or':{var a2=inVal(c,'A'),b2=inVal(c,'B');commits.push([c,'Y',(a2===1||b2===1)?1:0]);break;}
+      case 'xor':{var a3=inVal(c,'A'),b3=inVal(c,'B');commits.push([c,'Y',(a3^b3)?1:0]);break;}
+      case 'nand':{var a4=inVal(c,'A'),b4=inVal(c,'B');commits.push([c,'Y',(a4===1&&b4===1)?0:1]);break;}
+      case 'nor':{var a5=inVal(c,'A'),b5=inVal(c,'B');commits.push([c,'Y',(a5===1||b5===1)?0:1]);break;}
+      case 'dff':{
+        var D=inVal(c,'D'),CK=inVal(c,'CLK'),R=inVal(c,'RST'),q;
+        if(R===1) q=0;
+        else if(CK===1&&c.prevClk===0) q=D;
+        else q=c.val.Q;
+        commits.push([c,'Q',q]);
+        c.pendClk=CK;
+        break;
+      }
+    }
+  }
+  /* 5: commit all outputs together */
+  for(i=0;i<commits.length;i++){
+    var cm=commits[i];
+    if(cm[0].val[cm[1]]!==cm[2]){cm[0].val[cm[1]]=cm[2];changed=true;}
+  }
+  /* latch this step's CLK sample as previous for the next step */
+  for(i=0;i<order.length;i++){
+    c=comps.get(order[i]);
+    if(c.type==='dff') c.prevClk=c.pendClk?1:0;
+  }
+  time=k;
+  lastChanged=changed;
+  /* timing traces for the strip */
+  for(i=0;i<order.length;i++){
+    c=comps.get(order[i]);
+    c.trace.push(displayVal(c));
+    if(c.trace.length>480) c.trace.shift();
+  }
+}
+function tick(n){
+  if(n===undefined||n===null) n=1;
+  n=Number(n);
+  if(!isFinite(n)||n<0) return;
+  n=Math.floor(n);
+  if(n>1000000) n=1000000;
+  for(var i=0;i<n;i++) step();
+  ticksEl.textContent=String(time);
+  updateValues(); drawStrip(); updateStable(); persist();
+}
+/* ================= editing operations ================= */
+function doAdd(type,id,x,y){
+  if(typeof type!=='string'||typeof id!=='string'||!id) return null;
+  type=type.toLowerCase();
+  if(!GEO[type]||comps.has(id)) return null;
+  if(x===undefined||y===undefined){var s=freeSpot();x=s.x;y=s.y;}
+  x=Math.max(0,Math.round(x)); y=Math.max(0,Math.round(y));
+  var c=makeComp(type,id,x,y);
+  comps.set(id,c); order.push(id);
+  history.push({t:'add',id:id});
+  if(history.length>500) history.shift();
+  buildGateEl(c); updateValues(); updateHint(); persist();
+  return id;
+}
+function doConnect(s,sp,d,dp){
+  var a=comps.get(s), b=comps.get(d);
+  if(!a||!b) return;
+  if(!(PINDEF[a.type].out&&PINDEF[a.type].out[sp])) return;
+  if(!(PINDEF[b.type].inp&&PINDEF[b.type].inp[dp])) return;
+  var key=d+'.'+dp;
+  var prev=wiresMap.get(key)||null;
+  if(prev&&prev.s===s&&prev.sp===sp) return;
+  var w={s:s,sp:sp,d:d,dp:dp};
+  wiresMap.set(key,w); b.inputs[dp]=w;
+  if(prev) removeWireEl(key);
+  buildWireEl(w);
+  history.push({t:'connect',w:w,prev:prev});
+  if(history.length>500) history.shift();
+  updateValues(); persist();
+}
+function doDisconnect(d,dp){
+  var key=d+'.'+dp;
+  var w=wiresMap.get(key);
+  if(!w) return;
+  wiresMap.delete(key);
+  var b=comps.get(d); if(b) delete b.inputs[dp];
+  removeWireEl(key);
+  history.push({t:'disconnect',w:w});
+  if(history.length>500) history.shift();
+  updateValues(); persist();
+}
+function doRemove(id){
+  var c=comps.get(id);
+  if(!c) return;
+  var touching=[];
+  wiresMap.forEach(function(w){if(w.s===id||w.d===id) touching.push(w);});
+  for(var i=0;i<touching.length;i++){
+    var w=touching[i];
+    wiresMap.delete(w.d+'.'+w.dp);
+    var b=comps.get(w.d); if(b) delete b.inputs[w.dp];
+    removeWireEl(w.d+'.'+w.dp);
+  }
+  comps.delete(id);
+  order=order.filter(function(x){return x!==id;});
+  var el=els.get(id);
+  if(el){el.remove();els.delete(id);}
+  history.push({t:'remove',comp:snapComp(c),wires:touching});
+  if(history.length>500) history.shift();
+  if(selectedId===id) select(null);
+  updateHint(); persist();
+}
+function doSet(id,v){
+  var c=comps.get(id);
+  if(!c||c.type!=='in') return;
+  var nv=(v===1||v===true||v==='1')?1:0;
+  history.push({t:'set',id:id,prev:c.val.Y});
+  if(history.length>500) history.shift();
+  c.val.Y=nv;
+  updateValues(); drawStrip(); persist();
+}
+function setClock(id,period){
+  var c=comps.get(id);
+  if(!c||c.type!=='clk') return;
+  var p=Number(period);
+  if(!isFinite(p)||!isFinite(p)||p<2||p%2!==0||Math.floor(p)!==p) return;
+  history.push({t:'setClock',id:id,prev:c.period});
+  if(history.length>500) history.shift();
+  c.period=p;
+  c.val.Y=clkVal(p,time);
+  updateValues(); drawStrip(); persist();
+}
+function reInitSim(){
+  time=0; lastChanged=true;
+  comps.forEach(function(c){
+    c.trace.length=0; c.pendClk=0;
+    if(c.type==='in') return;
+    if(c.type==='clk'){c.val.Y=0;return;}
+    if(c.type==='out') return;
+    if(c.type==='dff'){c.val.Q=0;c.prevClk=0;return;}
+    c.val.Y=0;
+  });
+  ticksEl.textContent='0';
+}
+function reset(){
+  stopRun();
+  comps.clear(); wiresMap.clear(); order=[]; history=[];
+  els.forEach(function(el){el.remove();}); els.clear();
+  wireSvg.innerHTML=''; wels.clear(); wireSvg.appendChild(tempEl);
+  select(null);
+  reInitSim(); updateValues(); updateHint(); drawStrip(); updateStable(); persist();
+}
+function restoreComp(o){
+  if(!o||!GEO[o.type]||comps.has(o.id)) return;
+  var c=makeComp(o.type,o.id,o.x||0,o.y||0);
+  if(o.type==='clk'&&Number.isInteger(o.period)&&o.period>=2&&o.period%2===0) c.period=o.period;
+  if(o.type==='in') c.val.Y=o.Y?1:0;
+  if(o.type==='dff'){c.val.Q=o.Q?1:0;c.prevClk=o.pc?1:0;}
+  if(o.type!=='in'&&o.type!=='clk'&&o.type!=='out'&&o.type!=='dff') c.val.Y=o.Y?1:0;
+  comps.set(o.id,c); order.push(o.id);
+  buildGateEl(c);
+}
+function addWireObj(w){
+  if(!w||!comps.get(w.s)||!comps.get(w.d)) return;
+  var b=comps.get(w.d);
+  if(!(PINDEF[b.type].inp&&PINDEF[b.type].inp[w.dp])) return;
+  var key=w.d+'.'+w.dp;
+  wiresMap.set(key,w); b.inputs[w.dp]=w;
+  buildWireEl(w);
+}
+function undo(){
+  var h=history.pop();
+  if(!h) return;
+  stopRun();
+  var i;
+  switch(h.t){
+    case 'add':
+      doRemoveSilent(h.id); break;
+    case 'connect':{
+      var key=h.w.d+'.'+h.w.dp;
+      if(wiresMap.get(key)===h.w){
+        wiresMap.delete(key);
+        var b=comps.get(h.w.d); if(b) delete b.inputs[h.w.dp];
+        removeWireEl(key);
+      }
+      if(h.prev&&comps.get(h.prev.s)&&comps.get(h.prev.d)) addWireObj(h.prev);
+      break;}
+    case 'disconnect':
+      addWireObj(h.w); break;
+    case 'remove':
+      restoreComp(h.comp);
+      if(h.wires) for(i=0;i<h.wires.length;i++) addWireObj(h.wires[i]);
+      break;
+    case 'set':{
+      var c=comps.get(h.id); if(c&&c.type==='in') c.val.Y=h.prev?1:0;
+      break;}
+    case 'setClock':{
+      var ck=comps.get(h.id);
+      if(ck&&ck.type==='clk'&&Number.isInteger(h.prev)) ck.period=h.prev;
+      break;}
+  }
+  reInitSim(); renderAll(); updateStable(); persist();
+}
+function doRemoveSilent(id){
+  var c=comps.get(id);
+  if(!c) return;
+  var touching=[];
+  wiresMap.forEach(function(w){if(w.s===id||w.d===id) touching.push(w);});
+  for(var i=0;i<touching.length;i++){
+    var w=touching[i];
+    wiresMap.delete(w.d+'.'+w.dp);
+    var b=comps.get(w.d); if(b) delete b.inputs[w.dp];
+    removeWireEl(w.d+'.'+w.dp);
+  }
+  comps.delete(id);
+  order=order.filter(function(x){return x!==id;});
+  var el=els.get(id);
+  if(el){el.remove();els.delete(id);}
+  if(selectedId===id) select(null);
+}
+/* ================= run control ================= */
+function startRun(){
+  if(running) return;
+  running=true;
+  runBtn.setAttribute('aria-pressed','true');
+  runBtn.classList.add('on');
+  runBtn.textContent='PAUSE';
+  board.classList.add('running');
+  runTimer=setInterval(function(){try{tick(1);}catch(e){}},100);
+  updateStatus();
+}
+function stopRun(){
+  if(running){running=false;if(runTimer){clearInterval(runTimer);runTimer=null;}}
+  runBtn.setAttribute('aria-pressed','false');
+  runBtn.classList.remove('on');
+  runBtn.textContent='RUN';
+  board.classList.remove('running');
+  updateStatus();
+}
+function run(on){
+  if(on===undefined) on=!running;
+  on=!!on;
+  if(on) startRun(); else stopRun();
+}
+/* ================= rendering ================= */
+function sym(t){
+  switch(t){
+    case 'in': return '<svg viewBox="0 0 64 44" width="64" height="44"><rect class="body" x="4" y="8" width="50" height="28" rx="8"/><text class="mini" x="9" y="17">IN</text></svg>';
+    case 'out': return '<svg viewBox="0 0 64 44" width="64" height="44"><rect class="body" x="10" y="8" width="50" height="28" rx="14"/><text class="mini" x="15" y="17">OUT</text></svg>';
+    case 'clk': return '<svg viewBox="0 0 64 44" width="64" height="44"><rect class="body" x="4" y="8" width="50" height="28" rx="6"/><path class="stub" d="M10 30 H16 V15 H25 V30 H34 V15 H43 V30 H49"/></svg>';
+    case 'not': return '<svg viewBox="0 0 64 48" width="64" height="48"><path class="body" d="M16 10 L16 38 L43 24 Z"/><circle class="body" cx="48" cy="24" r="4.5"/><line class="stub" x1="52.5" y1="24" x2="58" y2="24"/></svg>';
+    case 'and': return '<svg viewBox="0 0 78 56" width="78" height="56"><path class="body" d="M14 8 H38 A20 20 0 0 1 38 48 H14 Z"/><line class="stub" x1="58" y1="28" x2="70" y2="28"/></svg>';
+    case 'nand': return '<svg viewBox="0 0 78 56" width="78" height="56"><path class="body" d="M14 8 H38 A20 20 0 0 1 38 48 H14 Z"/><line class="stub" x1="58" y1="28" x2="64" y2="28"/><circle class="body" cx="69" cy="28" r="5"/></svg>';
+    case 'or': return '<svg viewBox="0 0 78 56" width="78" height="56"><path class="body" d="M12 8 Q46 8 60 28 Q46 48 12 48 Q22 28 12 8 Z"/><line class="stub" x1="60" y1="28" x2="70" y2="28"/></svg>';
+    case 'nor': return '<svg viewBox="0 0 78 56" width="78" height="56"><path class="body" d="M12 8 Q46 8 60 28 Q46 48 12 48 Q22 28 12 8 Z"/><line class="stub" x1="60" y1="28" x2="64" y2="28"/><circle class="body" cx="69" cy="28" r="5"/></svg>';
+    case 'xor': return '<svg viewBox="0 0 82 56" width="82" height="56"><path class="stub" d="M13 8 Q25 28 13 48"/><path class="body" d="M20 8 Q52 8 64 28 Q52 48 20 48 Q30 28 20 8 Z"/><line class="stub" x1="64" y1="28" x2="74" y2="28"/></svg>';
+    case 'dff': return '<svg viewBox="0 0 86 72" width="86" height="72"><rect class="body" x="12" y="4" width="62" height="64" rx="6"/><path class="stub" d="M12 30 L21 36 L12 42"/></svg>';
+  }
+  return '';
+}
+function hasVT(t){return t==='in'||t==='out'||t==='clk'||t==='dff';}
+function buildGateEl(c){
+  var g=GEO[c.type];
+  var el=document.createElement('div');
+  el.className='gate t-'+c.type;
+  el.dataset.gate=c.id;
+  el.dataset.type=c.type;
+  el.style.width=g.w+'px'; el.style.height=g.h+'px';
+  el.style.left=c.x+'px'; el.style.top=c.y+'px';
+  var html=sym(c.type);
+  var pd=PINDEF[c.type], lab=LAB[c.type], pn;
+  if(pd.inp) for(pn in pd.inp){
+    var ip=pd.inp[pn];
+    html+='<span class="pin in" data-pin="'+pn+'" style="left:'+(ip[0]-7)+'px;top:'+(ip[1]-7)+'px"></span>';
+    if(lab&&lab[pn]) html+='<span class="plab" style="left:'+lab[pn][0]+'px;top:'+lab[pn][1]+'px">'+pn+'</span>';
+  }
+  if(pd.out) for(pn in pd.out){
+    var op=pd.out[pn];
+    html+='<span class="pin out" data-pin="'+pn+'" style="left:'+(op[0]-7)+'px;top:'+(op[1]-7)+'px"></span>';
+    if(lab&&lab[pn]) html+='<span class="plab" style="left:'+lab[pn][0]+'px;top:'+lab[pn][1]+'px">'+pn+'</span>';
+  }
+  if(hasVT(c.type)) html+='<span class="gval" data-vt>0</span>';
+  html+='<span class="gname">'+esc(c.id)+'</span>';
+  el.innerHTML=html;
+  if(selectedId===c.id){el.classList.add('sel');el.setAttribute('aria-selected','true');}
+  board.appendChild(el);
+  els.set(c.id,el);
+}
+function buildWireEl(w){
+  var s=comps.get(w.s), d=comps.get(w.d);
+  if(!s||!d) return;
+  var key=w.d+'.'+w.dp;
+  var el=wels.get(key);
+  if(!el){
+    el=document.createElementNS(SVGNS,'path');
+    el.setAttribute('data-wire',key);
+    el.setAttribute('class','wire');
+    wireSvg.appendChild(el);
+    wels.set(key,el);
+  }
+  var p1=pinPos(w.s,w.sp), p2=pinPos(w.d,w.dp);
+  el.setAttribute('d',route(p1[0],p1[1],p2[0],p2[1]));
+}
+function removeWireEl(key){
+  var el=wels.get(key);
+  if(el){el.remove();wels.delete(key);}
+}
+function rerouteWiresOf(id){
+  wiresMap.forEach(function(w,key){
+    if(w.s===id||w.d===id){
+      var el=wels.get(key);
+      if(el){
+        var p1=pinPos(w.s,w.sp), p2=pinPos(w.d,w.dp);
+        el.setAttribute('d',route(p1[0],p1[1],p2[0],p2[1]));
+      }
+    }
+  });
+}
+function renderAll(){
+  els.forEach(function(el){el.remove();}); els.clear();
+  wireSvg.innerHTML=''; wels.clear();
+  wireSvg.appendChild(tempEl);
+  for(var i=0;i<order.length;i++){
+    var c=comps.get(order[i]);
+    if(c) buildGateEl(c);
+  }
+  wiresMap.forEach(function(w){buildWireEl(w);});
+  updateValues(); updateHint(); updateStatus(); drawStrip();
+}
+function updateValues(){
+  comps.forEach(function(c){
+    var el=els.get(c.id); if(!el) return;
+    var pins=el.querySelectorAll('[data-pin]');
+    for(var i=0;i<pins.length;i++){
+      var pn=pins[i].dataset.pin, v;
+      if(PINDEF[c.type].out&&PINDEF[c.type].out[pn]) v=(c.val[pn]!==undefined)?c.val[pn]:0;
+      else v=inVal(c,pn);
+      pins[i].classList.toggle('hi',v===1);
+    }
+    var vt=el.querySelector('[data-vt]');
+    var pv=primaryVal(c);
+    if(vt) vt.textContent=String(pv);
+    el.classList.toggle('on',pv===1);
+  });
+  wiresMap.forEach(function(w,key){
+    var el=wels.get(key); if(!el) return;
+    var s=comps.get(w.s);
+    var v=s?((s.val[w.sp]!==undefined)?s.val[w.sp]:0):0;
+    el.classList.toggle('hi',v===1);
+  });
+}
+function updateHint(){hintEl.style.display=order.length?'none':'flex';}
+function updateStable(){stabLed.classList.toggle('busy',!lastChanged);}
+function updateStatus(){
+  var c=selectedId?comps.get(selectedId):null;
+  st1.textContent='tool '+curTool.toUpperCase()+'  ·  '+(running?'RUNNING':'PAUSED')+'  ·  '+(lastChanged?'stable':'changing');
+  st2.textContent=c?('sel '+c.id+' ('+c.type+')  ·  Delete removes'):'no selection  ·  click a gate to inspect';
+}
+function select(id){
+  if(selectedId&&els.get(selectedId)){
+    var p=els.get(selectedId);
+    p.classList.remove('sel'); p.removeAttribute('aria-selected');
+  }
+  selectedId=(id&&comps.has(id))?id:null;
+  if(selectedId&&els.get(selectedId)){
+    var el=els.get(selectedId);
+    el.classList.add('sel'); el.setAttribute('aria-selected','true');
+  }
+  updateStatus(); drawStrip();
+}
+function setTool(t){
+  curTool=t;
+  var ids=['select','in','out','not','and','or','xor','nand','nor','dff','clk'];
+  for(var i=0;i<ids.length;i++){
+    var b=document.getElementById('tool-'+ids[i]);
+    if(b) b.classList.toggle('armed',ids[i]===t);
+  }
+  board.classList.toggle('placing',t!=='select');
+  updateStatus();
+}
+/* ================= timing strip ================= */
+function drawStrip(){
+  var dpr=window.devicePixelRatio||1;
+  var r=stripEl.getBoundingClientRect();
+  var W=Math.max(60,Math.round(r.width*dpr)), H=Math.max(24,Math.round(r.height*dpr));
+  if(stripEl.width!==W||stripEl.height!==H){stripEl.width=W;stripEl.height=H;}
+  var ctx=stripEl.getContext('2d');
+  ctx.fillStyle='#070c13'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(90,120,170,.10)'; ctx.lineWidth=1;
+  for(var x=0;x<W;x+=24*dpr){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  var mid=H/2;
+  ctx.strokeStyle='rgba(90,120,170,.22)';
+  ctx.beginPath();ctx.moveTo(0,mid);ctx.lineTo(W,mid);ctx.stroke();
+  ctx.font=(10*dpr)+'px ui-monospace,Menlo,monospace';
+  var c=selectedId?comps.get(selectedId):null;
+  ctx.fillStyle='#54688a';
+  ctx.fillText(c?('probe: '+c.id+' ('+c.type+')'):'timing strip — click a gate to probe it',8*dpr,13*dpr);
+  if(c&&c.trace.length>1){
+    var n=c.trace.length, cell=W/480, hi=H*0.24, lo=H*0.76;
+    ctx.strokeStyle='#ffb454'; ctx.lineWidth=1.6*dpr;
+    ctx.shadowColor='rgba(255,180,84,.6)'; ctx.shadowBlur=6*dpr;
+    ctx.beginPath();
+    for(var i=0;i<n;i++){
+      var px=W-(n-1-i)*cell, py=c.trace[i]?hi:lo;
+      if(i===0) ctx.moveTo(px,py);
+      else{
+        var pyv=c.trace[i-1]?hi:lo;
+        ctx.lineTo(px,pyv); ctx.lineTo(px,py);
+      }
+    }
+    ctx.stroke();
+    ctx.shadowBlur=0;
+  }
+}
+/* ================= persistence ================= */
+var LSKEY='latch.bench.v1';
+function persist(){
+  try{
+    var arr=[];
+    for(var i=0;i<order.length;i++){
+      var c=comps.get(order[i]);
+      var o={id:c.id,type:c.type,x:c.x,y:c.y};
+      if(c.type==='clk') o.period=c.period;
+      if(c.val.Y!==undefined) o.Y=c.val.Y;
+      if(c.val.Q!==undefined) o.Q=c.val.Q;
+      if(c.type==='dff') o.pc=c.prevClk;
+      arr.push(o);
+    }
+    var ws=[]; wiresMap.forEach(function(w){ws.push(w);});
+    localStorage.setItem(LSKEY,JSON.stringify({v:1,t:time,comps:arr,wires:ws,hist:history}));
+  }catch(e){}
+}
+function load(){
+  try{
+    var raw=localStorage.getItem(LSKEY);
+    if(!raw) return false;
+    var d=JSON.parse(raw);
+    if(!d||!Array.isArray(d.comps)) return false;
+    time=(typeof d.t==='number'&&isFinite(d.t)&&d.t>=0)?Math.floor(d.t):0;
+    for(var i=0;i<d.comps.length;i++){
+      var o=d.comps[i];
+      if(!o||typeof o.id!=='string'||!o.id||!GEO[o.type]||comps.has(o.id)) continue;
+      var c=makeComp(o.type,o.id,Math.max(0,Math.round(o.x||0)),Math.max(0,Math.round(o.y||0)));
+      if(o.type==='clk'&&Number.isInteger(o.period)&&o.period>=2&&o.period%2===0){
+        c.period=o.period; c.val.Y=clkVal(c.period,time);
+      }
+      if(o.type==='in') c.val.Y=o.Y?1:0;
+      if(o.type==='dff'){c.val.Q=o.Q?1:0;c.prevClk=o.pc?1:0;}
+      if(o.type!=='in'&&o.type!=='clk'&&o.type!=='out'&&o.type!=='dff') c.val.Y=o.Y?1:0;
+      comps.set(o.id,c); order.push(o.id);
+    }
+    if(Array.isArray(d.wires)){
+      for(var j=0;j<d.wires.length;j++){
+        var w=d.wires[j];
+        if(!w||!comps.get(w.s)||!comps.get(w.d)) continue;
+        var dst=comps.get(w.d);
+        if(!(PINDEF[dst.type].inp&&PINDEF[dst.type].inp[w.dp])) continue;
+        if(!(PINDEF[comps.get(w.s).type].out&&PINDEF[comps.get(w.s).type].out[w.sp])) continue;
+        var key=w.d+'.'+w.dp;
+        wiresMap.set(key,w); dst.inputs[w.dp]=w;
+      }
+    }
+    history=Array.isArray(d.hist)?d.hist:[];
+    lastChanged=true;
+    return true;
+  }catch(e){return false;}
+}
+/* ================= pointer interaction ================= */
+board.addEventListener('mousedown',function(e){
+  suppressClick=false;
+  if(e.button!==0) return;
+  var pinEl=e.target.closest?e.target.closest('[data-pin]'):null;
+  if(pinEl){
+    e.preventDefault();
+    var g=pinEl.closest('[data-gate]');
+    if(g){
+      drag={kind:'wire',gate:g.dataset.gate,pin:pinEl.dataset.pin};
+    }
+    return;
+  }
+  var gEl=e.target.closest?e.target.closest('[data-gate]'):null;
+  if(gEl&&curTool==='select'){
+    var c=comps.get(gEl.dataset.gate);
+    if(c){
+      e.preventDefault();
+      drag={kind:'gate',id:c.id,sx:e.clientX,sy:e.clientY,ox:c.x,oy:c.y,moved:false};
+    }
+  }
+});
+document.addEventListener('mousemove',function(e){
+  if(!drag) return;
+  try{
+    if(drag.kind==='wire'){
+      var p1=pinPos(drag.gate,drag.pin);
+      var r=board.getBoundingClientRect();
+      tempEl.setAttribute('d',route(p1[0],p1[1],e.clientX-r.left,e.clientY-r.top));
+      tempEl.style.display='block';
+    }else if(drag.kind==='gate'){
+      var dx=e.clientX-drag.sx, dy=e.clientY-drag.sy;
+      if(!drag.moved&&Math.abs(dx)+Math.abs(dy)>4) drag.moved=true;
+      if(drag.moved){
+        var c=comps.get(drag.id);
+        if(c){
+          var nx=Math.max(0,Math.round((drag.ox+dx)/8)*8);
+          var ny=Math.max(0,Math.round((drag.oy+dy)/8)*8);
+          c.x=nx; c.y=ny;
+          var el=els.get(c.id);
+          if(el){el.style.left=nx+'px';el.style.top=ny+'px';}
+          rerouteWiresOf(c.id);
+        }
+      }
+    }
+  }catch(err){}
+});
+document.addEventListener('mouseup',function(e){
+  if(!drag) return;
+  var d=drag; drag=null;
+  try{
+    if(d.kind==='wire'){
+      tempEl.style.display='none';
+      suppressClick=true;
+      var t=document.elementFromPoint(e.clientX,e.clientY);
+      var pin2=(t&&t.closest)?t.closest('[data-pin]'):null;
+      if(pin2){
+        var g2=pin2.closest('[data-gate]');
+        if(g2){
+          var ao=isOutPin(d.gate,d.pin), bo=isOutPin(g2.dataset.gate,pin2.dataset.pin);
+          if(ao&&!bo) doConnect(d.gate,d.pin,g2.dataset.gate,pin2.dataset.pin);
+          else if(!ao&&bo) doConnect(g2.dataset.gate,pin2.dataset.pin,d.gate,d.pin);
+        }
+      }
+    }else if(d.kind==='gate'){
+      if(d.moved){suppressClick=true;persist();}
+    }
+  }catch(err){}
+});
+board.addEventListener('click',function(e){
+  if(suppressClick){suppressClick=false;return;}
+  var pinEl=e.target.closest?e.target.closest('[data-pin]'):null;
+  if(pinEl) return;
+  var gEl=e.target.closest?e.target.closest('[data-gate]'):null;
+  if(gEl){
+    if(curTool==='select'){
+      var id=gEl.dataset.gate;
+      select(id);
+      var c=comps.get(id);
+      if(c&&c.type==='in') doSet(id,c.val.Y?0:1);
+    }
+    return; /* a click on a gate must not also place */
+  }
+  if(curTool!=='select'){
+    var r=board.getBoundingClientRect();
+    var x=e.clientX-r.left, y=e.clientY-r.top;
+    var g=GEO[curTool];
+    doAdd(curTool,autoId(curTool),Math.round(x-g.w/2),Math.round(y-g.h/2));
+  }else{
+    select(null);
+  }
+});
+/* ================= keyboard ================= */
+document.addEventListener('keydown',function(e){
+  var t=e.target;
+  if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable)) return;
+  if(e.key===' '||e.code==='Space'){
+    e.preventDefault(); run();
+  }else if(e.key==='Delete'||e.key==='Backspace'){
+    e.preventDefault();
+    if(selectedId) doRemove(selectedId);
+  }else if(e.key==='Escape'){
+    setTool('select');
+  }else if(e.key==='t'||e.key==='T'){
+    e.preventDefault(); tick(1);
+  }else if((e.ctrlKey||e.metaKey)&&(e.key==='z'||e.key==='Z')){
+    e.preventDefault(); undo();
+  }
+});
+/* keep Space from re-triggering a focused button */
+document.addEventListener('click',function(e){
+  var b=e.target.closest?e.target.closest('button'):null;
+  if(b) b.blur();
+});
+/* ================= toolbar wiring ================= */
+(function(){
+  var types=['select','in','out','not','and','or','xor','nand','nor','dff','clk'];
+  for(var i=0;i<types.length;i++){
+    (function(t){
+      var b=document.getElementById('tool-'+t);
+      if(b) b.addEventListener('click',function(){setTool(t);});
+    })(types[i]);
+  }
+})();
+document.getElementById('tick').addEventListener('click',function(){tick(1);});
+runBtn.addEventListener('click',function(){run();});
+document.getElementById('reset').addEventListener('click',function(){reset();});
+document.getElementById('undo').addEventListener('click',function(){undo();});
+window.addEventListener('resize',function(){drawStrip();});
+/* ================= grader API ================= */
+window.__arena={
+  reset:function(){reset();},
+  add:function(type,id){return doAdd(type,id);},
+  connect:function(s,sp,d,dp){doConnect(s,sp,d,dp);},
+  disconnect:function(d,dp){doDisconnect(d,dp);},
+  remove:function(id){doRemove(id);},
+  set:function(id,v){doSet(id,v);},
+  get:function(id,pin){return getVal(id,pin);},
+  setClock:function(id,p){setClock(id,p);},
+  tick:function(n){tick(n);},
+  time:function(){return time;},
+  run:function(on){run(on);},
+  stable:function(){return lastChanged===true;},
+  undo:function(){undo();},
+  list:function(){
+    var out=[];
+    for(var i=0;i<order.length;i++){
+      var c=comps.get(order[i]);
+      if(c) out.push({id:c.id,type:c.type});
+    }
+    return out;
+  }
+};
+function getVal(id,pin){
+  var c=comps.get(id);
+  if(!c) return 0;
+  if(pin===undefined||pin===null){
+    if(c.type==='out') return inVal(c,'A');
+    return primaryVal(c);
+  }
+  pin=String(pin);
+  var d=PINDEF[c.type];
+  if(d.inp&&d.inp[pin]) return inVal(c,pin);
+  if(c.val[pin]!==undefined) return c.val[pin];
+  return 0;
+}
+/* ================= boot ================= */
+(function(){
+  load();
+  renderAll();
+  ticksEl.textContent=String(time);
+  setTool('select');
+  updateStable();
+  drawStrip();
+})();
+</script>
+</body>
+</html>

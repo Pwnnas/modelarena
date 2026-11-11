@@ -1,0 +1,2052 @@
+```html
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gridcalc — Spreadsheet</title>
+<style>
+  :root {
+    --header-bg: #f1f3f4;
+    --header-border: #dadce0;
+    --grid-border: #e8eaed;
+    --text: #202124;
+    --muted: #5f6368;
+    --accent: #1a73e8;
+    --accent-dark: #1765cc;
+    --selection-bg: rgba(25, 103, 210, 0.14);
+    --error-bg: #fce8e6;
+    --error-text: #d93025;
+    --font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #fff;
+    color: var(--text);
+    font: var(--font);
+  }
+
+  body { overflow: hidden; }
+
+  #app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  #toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: #fbfcfd;
+    border-bottom: 1px solid var(--header-border);
+    flex: 0 0 auto;
+  }
+
+  .fx {
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    color: #4a5568;
+    font-style: italic;
+    font-weight: 700;
+    background: #fff;
+    border: 1px solid var(--header-border);
+    border-radius: 6px;
+    flex: 0 0 auto;
+  }
+
+  #name-box {
+    min-width: 64px;
+    max-width: 92px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    padding: 0 8px;
+    border: 1px solid var(--header-border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text);
+    font: 600 13px/1 var(--mono);
+    letter-spacing: 0.02em;
+    flex: 0 0 auto;
+    user-select: none;
+  }
+
+  #formula-bar {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--header-border);
+    border-radius: 6px;
+    outline: none;
+    background: #fff;
+    color: var(--text);
+    font: 13px/1.3 var(--mono);
+  }
+
+  #formula-bar:focus {
+    border-color: #7fb1f3;
+    box-shadow: 0 0 0 2px rgba(25, 103, 210, 0.12);
+  }
+
+  #toolbar .hint {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  #grid-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    overflow: auto;
+    background: #fff;
+    position: relative;
+    scrollbar-color: #c2c7cc #f7f8f9;
+  }
+
+  #grid {
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    width: max-content;
+    font: var(--font);
+    color: var(--text);
+  }
+
+  th, td {
+    font: inherit;
+    color: inherit;
+  }
+
+  th {
+    font-weight: 500;
+    background: var(--header-bg);
+    color: var(--muted);
+    border-right: 1px solid var(--header-border);
+    border-bottom: 1px solid var(--header-border);
+    padding: 0 6px;
+    height: 26px;
+    line-height: 26px;
+    text-align: center;
+    user-select: none;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+  }
+
+  tbody th.rowhead {
+    position: sticky;
+    left: 0;
+    top: auto;
+    z-index: 2;
+  }
+
+  th.corner {
+    position: sticky;
+    left: 0;
+    top: 0;
+    z-index: 4;
+    background: #e9edf2;
+    border-right-color: #cfd4da;
+    border-bottom-color: #cfd4da;
+    color: #7a818a;
+    font-weight: 700;
+    font-size: 11px;
+  }
+
+  th.colhead {
+    position: relative;
+    cursor: default;
+    color: #5f6368;
+    font-variant-numeric: tabular-nums;
+  }
+
+  th.colhead .resize {
+    position: absolute;
+    right: -3px;
+    top: 0;
+    width: 7px;
+    height: 100%;
+    cursor: col-resize;
+    background: linear-gradient(90deg, transparent 4px, rgba(95,99,104,0.18) 4px, rgba(95,99,104,0.18) 5px, transparent 5px);
+    border-radius: 2px;
+    z-index: 1;
+  }
+
+  th.colhead:hover { background: #e8eaed; }
+  th.rowhead:hover { background: #e8eaed; }
+  th.active { background: #cfe8ff !important; color: #0b57d0; }
+
+  tbody td {
+    position: relative;
+    height: 24px;
+    padding: 0 6px;
+    border-right: 1px solid var(--grid-border);
+    border-bottom: 1px solid var(--grid-border);
+    background: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
+    min-width: 0;
+  }
+
+  tbody tr:nth-child(even) td { background: #fcfdfe; }
+
+  td.val-number, td.val-bool { text-align: right; }
+  td.val-text { text-align: left; }
+  td.val-empty { }
+
+  td.val-error {
+    text-align: center;
+    color: var(--error-text);
+    background: var(--error-bg) !important;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  td.selected {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    background-color: var(--selection-bg) !important;
+    z-index: 1;
+  }
+
+  td.editing {
+    padding: 0 !important;
+    overflow: visible;
+    z-index: 8;
+    background: #fff !important;
+    outline: none;
+  }
+
+  td.editing input.cell-editor {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    background: #fff;
+    color: var(--text);
+    font: var(--font);
+    padding: 0 6px;
+    text-align: left;
+    user-select: text;
+  }
+
+  td.editing input.cell-editor::selection { background: #cfe8ff; }
+
+  td.hl-0 { box-shadow: inset 0 0 0 2px rgba(16, 163, 16, 0.72); }
+  td.hl-1 { box-shadow: inset 0 0 0 2px rgba(251, 188, 4, 0.78); }
+  td.hl-2 { box-shadow: inset 0 0 0 2px rgba(232, 127, 244, 0.72); }
+  td.hl-3 { box-shadow: inset 0 0 0 2px rgba(0, 168, 255, 0.72); }
+  td.hl-4 { box-shadow: inset 0 0 0 2px rgba(255, 88, 88, 0.70); }
+  td.hl-5 { box-shadow: inset 0 0 0 2px rgba(126, 87, 194, 0.72); }
+
+  #status-bar {
+    flex: 0 0 auto;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 10px;
+    background: #fbfcfd;
+    border-top: 1px solid var(--header-border);
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+    user-select: none;
+    overflow: hidden;
+  }
+
+  .status-item { color: var(--text); font-weight: 600; }
+  .status-label { color: var(--muted); font-weight: 600; }
+  .status-sep { color: #d0d4d8; }
+  #status-hint {
+    margin-left: auto;
+    color: #7a818a;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
+
+  body.resizing { cursor: col-resize; }
+  body.resizing td, body.resizing th { user-select: none; }
+
+  /* Subtle focus ring for keyboard-driven grid */
+  td:focus-visible { outline: 2px solid var(--accent-dark); outline-offset: -2px; }
+</style>
+</head>
+<body>
+  <div id="app">
+    <div id="toolbar">
+      <div class="fx">fx</div>
+      <div id="name-box" aria-label="Selected cell address">A1</div>
+      <input id="formula-bar" type="text" autocomplete="off" spellcheck="false" aria-label="Formula bar">
+      <div class="hint">Enter: navigate · F2/double-click: edit · Delete: clear</div>
+    </div>
+
+    <div id="grid-wrap">
+      <table id="grid" role="grid">
+        <!-- colgroup, thead, tbody are built in script -->
+      </table>
+    </div>
+
+    <div id="status-bar" role="status">
+      <span id="status-addr" class="status-item">A1</span>
+      <span class="status-sep">|</span>
+      <span id="status-value" class="status-item"></span>
+      <span class="status-sep">|</span>
+      <span class="status-label">SUM</span>
+      <span id="status-sum">0</span>
+      <span class="status-sep">|</span>
+      <span class="status-label">COUNT</span>
+      <span id="status-count">0</span>
+      <span id="status-hint">Gridcalc: tokenizer → parser → dependency graph → incremental recalc</span>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  const COLS = 26;
+  const ROWS = 100;
+  const STORE_KEY = "gridcalc.cells.v1";
+
+  function colToLetters0(idx) {
+    let n = idx + 1;
+    let s = "";
+    while (n > 0) {
+      const rem = (n - 1) % 26;
+      s = String.fromCharCode(65 + rem) + s;
+      n = Math.floor((n - 1) / 26);
+    }
+    return s;
+  }
+
+  function lettersToCol0(s) {
+    let n = 0;
+    s = s.toUpperCase();
+    for (let i = 0; i < s.length; i++) {
+      n = n * 26 + (s.charCodeAt(i) - 64);
+    }
+    return n - 1;
+  }
+
+  const COL_NAMES = [];
+  for (let c = 0; c < COLS; c++) COL_NAMES.push(colToLetters0(c));
+
+  function addrFromColRow(col, row) {
+    return colToLetters0(col) + String(row + 1);
+  }
+
+  function addrToColRow(addr) {
+    const m = /^([A-Z]+)(\d+)$/.exec(String(addr || "").toUpperCase());
+    if (!m) return { col: -1, row: -1 };
+    return { col: lettersToCol0(m[1]), row: parseInt(m[2], 10) - 1 };
+  }
+
+  function isValidAddr(addr) {
+    const p = addrToColRow(addr);
+    return p.col >= 0 && p.col < COLS && p.row >= 0 && p.row < ROWS;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Build DOM grid                                                      */
+  /* ------------------------------------------------------------------ */
+
+  const gridWrap = document.getElementById("grid-wrap");
+  const grid = document.getElementById("grid");
+  const formulaBar = document.getElementById("formula-bar");
+  const nameBox = document.getElementById("name-box");
+  const statusAddr = document.getElementById("status-addr");
+  const statusValue = document.getElementById("status-value");
+  const statusSum = document.getElementById("status-sum");
+  const statusCount = document.getElementById("status-count");
+
+  const colgroup = document.createElement("colgroup");
+  const rowCol = document.createElement("col");
+  rowCol.style.width = "54px";
+  colgroup.appendChild(rowCol);
+
+  const colEls = [];
+  for (let c = 0; c < COLS; c++) {
+    const col = document.createElement("col");
+    col.style.width = "96px";
+    colEls.push(col);
+    colgroup.appendChild(col);
+  }
+  grid.appendChild(colgroup);
+
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+
+  const corner = document.createElement("th");
+  corner.className = "corner";
+  corner.textContent = "▾";
+  corner.title = "Grid header";
+  headerRow.appendChild(corner);
+
+  const colHeaderEls = [];
+  for (let c = 0; c < COLS; c++) {
+    const th = document.createElement("th");
+    th.className = "colhead";
+    th.dataset.col = String(c);
+    th.textContent = COL_NAMES[c];
+
+    const handle = document.createElement("span");
+    handle.className = "resize";
+    handle.dataset.resizeCol = String(c);
+    th.appendChild(handle);
+
+    colHeaderEls.push(th);
+    headerRow.appendChild(th);
+  }
+  thead.appendChild(headerRow);
+  grid.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  grid.appendChild(tbody);
+
+  const cellEls = new Map();
+  const rowHeaderEls = [];
+
+  for (let r = 0; r < ROWS; r++) {
+    const tr = document.createElement("tr");
+
+    const rh = document.createElement("th");
+    rh.className = "rowhead";
+    rh.dataset.row = String(r);
+    rh.textContent = String(r + 1);
+    rowHeaderEls.push(rh);
+    tr.appendChild(rh);
+
+    for (let c = 0; c < COLS; c++) {
+      const addr = addrFromColRow(c, r);
+      const td = document.createElement("td");
+      td.dataset.cell = addr;
+      td.className = "cell val-empty";
+      td.setAttribute("role", "gridcell");
+      cellEls.set(addr, td);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Engine state                                                        */
+  /* ------------------------------------------------------------------ */
+
+  const EMPTY_VALUE = { type: "empty" };
+  const TRUE_VALUE = { type: "boolean", value: true };
+  const FALSE_VALUE = { type: "boolean", value: false };
+
+  const FUNC_NAMES = new Set([
+    "SUM", "AVERAGE", "MIN", "MAX", "COUNT", "IF", "ABS", "ROUND"
+  ]);
+
+  const ERROR_TITLES = {
+    "#DIV/0!": "#DIV/0! — Division by zero",
+    "#VALUE!": "#VALUE! — Text used where a number is expected",
+    "#REF!": "#REF! — Reference outside A1:Z100",
+    "#ERROR!": "#ERROR! — Formula cannot be parsed or uses an unknown function",
+    "#CYCLE!": "#CYCLE! — Circular reference"
+  };
+
+  const HL_CLASSES = ["hl-0", "hl-1", "hl-2", "hl-3", "hl-4", "hl-5"];
+
+  const cells = new Map();
+  const dependents = new Map();
+  let rawState = {};
+
+  let selectedAddr = null;
+  let editingAddr = null;
+  let editor = null;
+  let prevEditRaw = "";
+  let clipboard = null;
+
+  let highlightedCells = [];
+  let hlTimer = null;
+  let resizing = null;
+
+  function getCell(addr) {
+    let c = cells.get(addr);
+    if (!c) {
+      c = {
+        addr: addr,
+        raw: "",
+        type: "empty",
+        value: EMPTY_VALUE,
+        ast: null,
+        refs: []
+      };
+      cells.set(addr, c);
+    }
+    return c;
+  }
+
+  function addEdge(refAddr, dependentAddr) {
+    if (!isValidAddr(refAddr) || !isValidAddr(dependentAddr)) return;
+    let s = dependents.get(refAddr);
+    if (!s) {
+      s = new Set();
+      dependents.set(refAddr, s);
+    }
+    s.add(dependentAddr);
+  }
+
+  function removeEdge(refAddr, dependentAddr) {
+    const s = dependents.get(refAddr);
+    if (!s) return;
+    s.delete(dependentAddr);
+    if (s.size === 0) dependents.delete(refAddr);
+  }
+
+  function collectDirty(startAddr) {
+    const set = new Set();
+    const stack = [startAddr];
+    while (stack.length) {
+      const a = stack.pop();
+      if (set.has(a)) continue;
+      set.add(a);
+      const deps = dependents.get(a);
+      if (deps) {
+        for (const d of deps) {
+          if (!set.has(d)) stack.push(d);
+        }
+      }
+    }
+    return set;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Value helpers                                                       */
+  /* ------------------------------------------------------------------ */
+
+  function makeNumber(n) {
+    if (typeof n !== "number" || Number.isNaN(n) || !Number.isFinite(n)) {
+      return { type: "error", code: "#VALUE!" };
+    }
+    return { type: "number", value: n };
+  }
+
+  function numberValue(n) {
+    return { type: "number", value: n };
+  }
+
+  function boolValue(b) {
+    return { type: "boolean", value: !!b };
+  }
+
+  function errValue(code) {
+    return { type: "error", code: code };
+  }
+
+  function cellValueRaw(addr) {
+    const c = getCell(addr);
+    return c.value || EMPTY_VALUE;
+  }
+
+  function toNumberForArithmetic(v) {
+    if (!v || v.type === "error") return v || errValue("#VALUE!");
+    if (v.type === "number") {
+      if (Number.isNaN(v.value) || !Number.isFinite(v.value)) return errValue("#VALUE!");
+      return v;
+    }
+    if (v.type === "boolean") return numberValue(v.value ? 1 : 0);
+    if (v.type === "empty") return numberValue(0);
+    return errValue("#VALUE!");
+  }
+
+  function normalizeForComparison(v) {
+    if (v.type === "empty") return numberValue(0);
+    if (v.type === "boolean") return numberValue(v.value ? 1 : 0);
+    if (v.type === "number") return v;
+    return v; // text
+  }
+
+  function compareOrder(a, b) {
+    const x = normalizeForComparison(a);
+    const y = normalizeForComparison(b);
+
+    if (x.type === "number" && y.type === "number") {
+      if (x.value === y.value) return 0;
+      if (formatNumber(x.value) === formatNumber(y.value)) return 0;
+      return x.value < y.value ? -1 : 1;
+    }
+
+    if (x.type === "text" && y.type === "text") {
+      const sx = String(x.value).toLowerCase();
+      const sy = String(y.value).toLowerCase();
+      if (sx === sy) return 0;
+      return sx < sy ? -1 : 1;
+    }
+
+    if (x.type === "number" && y.type === "text") return -1;
+    if (x.type === "text" && y.type === "number") return 1;
+
+    return 0;
+  }
+
+  function toBooleanValue(v) {
+    if (!v || v.type === "error") return v || errValue("#VALUE!");
+    if (v.type === "boolean") return v;
+    if (v.type === "number") return boolValue(v.value !== 0);
+    if (v.type === "empty") return FALSE_VALUE;
+    if (v.type === "text") {
+      const s = String(v.value).trim().toLowerCase();
+      if (s === "true") return TRUE_VALUE;
+      if (s === "false" || s === "") return FALSE_VALUE;
+      return errValue("#VALUE!");
+    }
+    return errValue("#VALUE!");
+  }
+
+  function valToText(v) {
+    if (!v || v.type === "error") return "";
+    if (v.type === "number") return formatNumber(v.value);
+    if (v.type === "boolean") return v.value ? "TRUE" : "FALSE";
+    if (v.type === "text") return String(v.value);
+    if (v.type === "empty") return "";
+    return "";
+  }
+
+  function formatNumber(n) {
+    if (typeof n !== "number" || Number.isNaN(n)) return "#VALUE!";
+    if (n === 0) return "0";
+    if (!Number.isFinite(n)) return "#VALUE!";
+
+    let s = n.toPrecision(10);
+    const m = /^(-?)(\d+)(?:\.(\d*))?(?:[eE]([+-]\d+))?$/.exec(s);
+    if (!m) {
+      if (s.indexOf(".") >= 0 && s.indexOf("e") < 0) {
+        s = s.replace(/0+$/, "").replace(/\.$/, "");
+      }
+      return s;
+    }
+
+    const sign = m[1] || "";
+    const int = m[2] || "0";
+    const frac = m[3] || "";
+    const exp = m[4] ? parseInt(m[4], 10) : 0;
+
+    const digits = int + frac;
+    const point = int.length + exp;
+
+    let out;
+    if (point <= 0) {
+      out = "0." + "0".repeat(-point) + digits;
+    } else if (point >= digits.length) {
+      const zeros = point - digits.length;
+      // Avoid enormous strings for extreme exponents; keep a readable numeric form.
+      if (zeros > 60) {
+        let mantissa = int + (frac ? "." + frac : "");
+        mantissa = mantissa.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+        return sign + mantissa + "e" + (exp >= 0 ? "+" : "") + exp;
+      }
+      out = digits + "0".repeat(zeros);
+    } else {
+      out = digits.slice(0, point) + "." + digits.slice(point);
+    }
+
+    if (out.indexOf(".") >= 0) {
+      out = out.replace(/0+$/, "").replace(/\.$/, "");
+    }
+    if (out === "" || out === "-") out = "0";
+    return sign + out;
+  }
+
+  function displayValue(v) {
+    if (!v) return "";
+    switch (v.type) {
+      case "empty": return "";
+      case "number": return formatNumber(v.value);
+      case "boolean": return v.value ? "TRUE" : "FALSE";
+      case "text": return String(v.value);
+      case "error": return v.code;
+      default: return "";
+    }
+  }
+
+  function displayClass(v) {
+    if (!v) return "val-empty";
+    switch (v.type) {
+      case "number": return "val-number";
+      case "boolean": return "val-bool";
+      case "text": return "val-text";
+      case "error": return "val-error";
+      default: return "val-empty";
+    }
+  }
+
+  function setDisplayClasses(el, v) {
+    el.classList.remove("val-number", "val-text", "val-bool", "val-error", "val-empty");
+    el.classList.add(displayClass(v));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Formula lexing / parsing                                            */
+  /* ------------------------------------------------------------------ */
+
+  function tokenize(src) {
+    const tokens = [];
+    let i = 0;
+    const n = src.length;
+
+    const reNum = /^(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/;
+    const reRef = /^(\$?)([A-Za-z]+)(\$?)(\d+)/;
+    const reId = /^[A-Za-z]+/;
+
+    while (i < n) {
+      const ch = src[i];
+
+      if (/\s/.test(ch)) { i++; continue; }
+
+      if (ch === '"') {
+        let j = i + 1;
+        let s = "";
+        let closed = false;
+        while (j < n) {
+          if (src[j] === '"') {
+            if (src[j + 1] === '"') {
+              s += '"';
+              j += 2;
+              continue;
+            }
+            j++;
+            closed = true;
+            break;
+          }
+          s += src[j++];
+        }
+        if (!closed) throw new Error("Unterminated string");
+        tokens.push({ t: "str", value: s });
+        i = j;
+        continue;
+      }
+
+      if (/[0-9]/.test(ch) || (ch === "." && i + 1 < n && /[0-9]/.test(src[i + 1]))) {
+        const slice = src.slice(i);
+        const m = reNum.exec(slice);
+        if (!m) throw new Error("Bad number");
+        tokens.push({ t: "num", value: parseFloat(m[0]) });
+        i += m[0].length;
+        continue;
+      }
+
+      if (ch === "$" || /[A-Za-z]/.test(ch)) {
+        const slice = src.slice(i);
+        const rm = reRef.exec(slice);
+        if (rm) {
+          const letters = rm[2].toUpperCase();
+          const col = lettersToCol0(letters);
+          const row = parseInt(rm[4], 10) - 1;
+          tokens.push({
+            t: "ref",
+            letters: letters,
+            col: col,
+            row: row,
+            absCol: rm[1] === "$",
+            absRow: rm[3] === "$"
+          });
+          i += rm[0].length;
+          continue;
+        }
+
+        const im = reId.exec(src.slice(i));
+        if (im) {
+          tokens.push({ t: "id", value: im[0].toUpperCase() });
+          i += im[0].length;
+          continue;
+        }
+      }
+
+      if (ch === "<" || ch === ">" || ch === "=") {
+        const two = src.slice(i, i + 2);
+        if (two === "<=" || two === ">=" || two === "<>") {
+          tokens.push({ t: "op", v: two });
+          i += 2;
+          continue;
+        }
+        tokens.push({ t: "op", v: ch });
+        i++;
+        continue;
+      }
+
+      if ("+-*/^&(),:".indexOf(ch) >= 0) {
+        tokens.push({ t: "op", v: ch });
+        i++;
+        continue;
+      }
+
+      throw new Error("Unknown character");
+    }
+
+    return tokens;
+  }
+
+  function parseFormula(src) {
+    const tokens = tokenize(src);
+    let pos = 0;
+
+    function peek() { return tokens[pos]; }
+    function nextTok() { return tokens[pos++]; }
+    function op() {
+      const t = peek();
+      return t && t.t === "op" ? t.v : null;
+    }
+    function expectOp(v) {
+      const t = nextTok();
+      if (!t || t.t !== "op" || t.v !== v) throw new Error("Expected " + v);
+    }
+
+    function parseCompare() {
+      let left = parseConcat();
+      while (true) {
+        const o = op();
+        if (o === "=" || o === "<>" || o === "<" || o === ">" || o === "<=" || o === ">=") {
+          nextTok();
+          const right = parseConcat();
+          left = { type: "binary", op: o, l: left, r: right };
+        } else break;
+      }
+      return left;
+    }
+
+    function parseConcat() {
+      let left = parseAdd();
+      while (op() === "&") {
+        nextTok();
+        const right = parseAdd();
+        left = { type: "binary", op: "&", l: left, r: right };
+      }
+      return left;
+    }
+
+    function parseAdd() {
+      let left = parseMul();
+      while (true) {
+        const o = op();
+        if (o === "+" || o === "-") {
+          nextTok();
+          const right = parseMul();
+          left = { type: "binary", op: o, l: left, r: right };
+        } else break;
+      }
+      return left;
+    }
+
+    function parseMul() {
+      let left = parseNeg();
+      while (true) {
+        const o = op();
+        if (o === "*" || o === "/") {
+          nextTok();
+          const right = parseNeg();
+          left = { type: "binary", op: o, l: left, r: right };
+        } else break;
+      }
+      return left;
+    }
+
+    function parseNeg() {
+      const t = peek();
+      if (t && t.t === "op" && (t.v === "-" || t.v === "+")) {
+        nextTok();
+        const arg = parseNeg();
+        return { type: "unary", op: t.v, arg: arg };
+      }
+      return parsePower();
+    }
+
+    function parsePower() {
+      const left = parsePrimary();
+      if (op() === "^") {
+        nextTok();
+        const right = parseNeg();
+        return { type: "binary", op: "^", l: left, r: right };
+      }
+      return left;
+    }
+
+    function parseArgs() {
+      const args = [];
+      if (op() === ")") return args;
+      while (true) {
+        args.push(parseCompare());
+        if (op() === ",") {
+          nextTok();
+          continue;
+        }
+        break;
+      }
+      return args;
+    }
+
+    function parsePrimary() {
+      const t = nextTok();
+      if (!t) throw new Error("Unexpected end");
+
+      if (t.t === "num") return { type: "num", value: t.value };
+      if (t.t === "str") return { type: "str", value: t.value };
+      if (t.t === "bool") return { type: "bool", value: t.value };
+
+      if (t.t === "ref") {
+        if (op() === ":") {
+          nextTok();
+          const b = nextTok();
+          if (!b || b.t !== "ref") throw new Error("Bad range");
+          return { type: "range", a: t, b: b };
+        }
+        return t;
+      }
+
+      if (t.t === "id") {
+        if (op() === "(") {
+          nextTok();
+          if (!FUNC_NAMES.has(t.v)) throw new Error("Unknown function");
+          const args = parseArgs();
+          expectOp(")");
+          return { type: "func", name: t.v, args: args };
+        }
+        if (t.v === "TRUE") return { type: "bool", value: true };
+        if (t.v === "FALSE") return { type: "bool", value: false };
+        throw new Error("Unexpected identifier");
+      }
+
+      if (t.t === "op" && t.v === "(") {
+        const e = parseCompare();
+        expectOp(")");
+        return e;
+      }
+
+      throw new Error("Unexpected token");
+    }
+
+    const ast = parseCompare();
+    if (pos !== tokens.length) throw new Error("Trailing input");
+    return ast;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Dependency collection                                               */
+  /* ------------------------------------------------------------------ */
+
+  function refAddr(node) {
+    if (!node || node.col < 0 || node.col >= COLS || node.row < 0 || node.row >= ROWS) return null;
+    return addrFromColRow(node.col, node.row);
+  }
+
+  function addRefToSet(set, node) {
+    const a = refAddr(node);
+    if (a) set.add(a);
+  }
+
+  function addRangeToSet(set, node) {
+    if (!node || !node.a || !node.b) return;
+    const a = refAddr(node.a);
+    const b = refAddr(node.b);
+    if (!a || !b) return;
+
+    const c1 = Math.min(node.a.col, node.b.col);
+    const c2 = Math.max(node.a.col, node.b.col);
+    const r1 = Math.min(node.a.row, node.b.row);
+    const r2 = Math.max(node.a.row, node.b.row);
+
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        set.add(addrFromColRow(c, r));
+      }
+    }
+  }
+
+  function collectRefs(ast) {
+    const set = new Set();
+    function visit(n) {
+      if (!n) return;
+      if (n.type === "ref") {
+        addRefToSet(set, n);
+      } else if (n.type === "range") {
+        addRangeToSet(set, n);
+      } else if (n.type === "unary") {
+        visit(n.arg);
+      } else if (n.type === "binary") {
+        visit(n.l);
+        visit(n.r);
+      } else if (n.type === "func") {
+        if (n.args) n.args.forEach(visit);
+      }
+    }
+    visit(ast);
+    return Array.from(set);
+  }
+
+  function collectRefNodes(ast, out) {
+    if (!ast) return out;
+    if (ast.type === "ref" || ast.type === "range") {
+      out.push(ast);
+    } else if (ast.type === "unary") {
+      collectRefNodes(ast.arg, out);
+    } else if (ast.type === "binary") {
+      collectRefNodes(ast.l, out);
+      collectRefNodes(ast.r, out);
+    } else if (ast.type === "func" && ast.args) {
+      ast.args.forEach(a => collectRefNodes(a, out));
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Raw parsing                                                         */
+  /* ------------------------------------------------------------------ */
+
+  function parseNonFormula(raw) {
+    const t = raw.trim();
+    if (t === "") return EMPTY_VALUE;
+    if (/^true$/i.test(t)) return TRUE_VALUE;
+    if (/^false$/i.test(t)) return FALSE_VALUE;
+
+    const numRe = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
+    if (numRe.test(t)) {
+      const n = parseFloat(t);
+      if (Number.isFinite(n)) return { type: "number", value: n };
+    }
+
+    return { type: "text", value: raw };
+  }
+
+  function prepareRaw(addr, raw) {
+    const cell = getCell(addr);
+
+    for (const ref of cell.refs) removeEdge(ref, addr);
+    cell.refs = [];
+    cell.raw = raw;
+    cell.ast = null;
+
+    const trimmed = String(raw || "").trim();
+
+    if (trimmed === "") {
+      cell.type = "empty";
+      cell.value = EMPTY_VALUE;
+      return;
+    }
+
+    if (trimmed.startsWith("=")) {
+      cell.type = "formula";
+      let ast;
+      try {
+        ast = parseFormula(trimmed.slice(1));
+      } catch (e) {
+        ast = { type: "error", code: "#ERROR!" };
+      }
+      cell.ast = ast;
+      const refs = collectRefs(ast);
+      cell.refs = refs;
+      for (const ref of refs) addEdge(ref, addr);
+      return;
+    }
+
+    cell.type = "value";
+    cell.value = parseNonFormula(raw);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Evaluator                                                           */
+  /* ------------------------------------------------------------------ */
+
+  function evaluateAST(ast) {
+    try {
+      return evalNode(ast);
+    } catch (e) {
+      return errValue("#ERROR!");
+    }
+  }
+
+  function evalNode(node) {
+    if (!node) return EMPTY_VALUE;
+
+    switch (node.type) {
+      case "empty":
+        return EMPTY_VALUE;
+
+      case "num":
+        return makeNumber(node.value);
+
+      case "str":
+        return { type: "text", value: node.value };
+
+      case "bool":
+        return { type: "boolean", value: node.value };
+
+      case "error":
+        return errValue(node.code || "#ERROR!");
+
+      case "ref": {
+        const a = refAddr(node);
+        if (!a) return errValue("#REF!");
+        const v = cellValueRaw(a);
+        if (v.type === "empty") return numberValue(0);
+        return v;
+      }
+
+      case "range": {
+        const rv = rangeValues(node);
+        if (rv && rv.type === "error") return rv;
+        return errValue("#VALUE!");
+      }
+
+      case "unary": {
+        const v = evalNode(node.arg);
+        if (v.type === "error") return v;
+        const n = toNumberForArithmetic(v);
+        if (n.type === "error") return n;
+        if (node.op === "-") return makeNumber(-n.value);
+        return makeNumber(n.value);
+      }
+
+      case "binary":
+        return evalBinary(node);
+
+      case "func":
+        return evalFunc(node);
+
+      default:
+        return errValue("#VALUE!");
+    }
+  }
+
+  function evalBinary(node) {
+    const op = node.op;
+
+    const l = evalNode(node.l);
+    if (l.type === "error") return l;
+    const r = evalNode(node.r);
+    if (r.type === "error") return r;
+
+    if (op === "&") {
+      return { type: "text", value: valToText(l) + valToText(r) };
+    }
+
+    if (op === "=" || op === "<>" || op === "<" || op === ">" || op === "<=" || op === ">=") {
+      const cmp = compareOrder(l, r);
+      if (op === "=") return boolValue(cmp === 0);
+      if (op === "<>") return boolValue(cmp !== 0);
+      if (op === "<") return boolValue(cmp < 0);
+      if (op === ">") return boolValue(cmp > 0);
+      if (op === "<=") return boolValue(cmp <= 0);
+      if (op === ">=") return boolValue(cmp >= 0);
+      return errValue("#VALUE!");
+    }
+
+    const a = toNumberForArithmetic(l);
+    if (a.type === "error") return a;
+    const b = toNumberForArithmetic(r);
+    if (b.type === "error") return b;
+
+    const x = a.value;
+    const y = b.value;
+
+    if (op === "+") return makeNumber(x + y);
+    if (op === "-") return makeNumber(x - y);
+    if (op === "*") return makeNumber(x * y);
+    if (op === "/") {
+      if (y === 0) return errValue("#DIV/0!");
+      return makeNumber(x / y);
+    }
+    if (op === "^") {
+      if (x === 0 && y < 0) return errValue("#DIV/0!");
+      return makeNumber(Math.pow(x, y));
+    }
+
+    return errValue("#VALUE!");
+  }
+
+  function rangeValues(node) {
+    if (!node || !node.a || !node.b) return errValue("#VALUE!");
+    const a = refAddr(node.a);
+    const b = refAddr(node.b);
+    if (!a || !b) return errValue("#REF!");
+
+    const c1 = Math.min(node.a.col, node.b.col);
+    const c2 = Math.max(node.a.col, node.b.col);
+    const r1 = Math.min(node.a.row, node.b.row);
+    const r2 = Math.max(node.a.row, node.b.row);
+
+    const arr = [];
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        arr.push(cellValueRaw(addrFromColRow(c, r)));
+      }
+    }
+    return arr;
+  }
+
+  function numericValuesFromArgs(args) {
+    const nums = [];
+
+    for (const arg of args) {
+      if (!arg) continue;
+
+      if (arg.type === "range") {
+        const rv = rangeValues(arg);
+        if (rv && rv.type === "error") return rv;
+        for (const v of rv) {
+          if (v.type === "error") return v;
+          if (v.type === "number") nums.push(v.value);
+          else if (v.type === "boolean") nums.push(v.value ? 1 : 0);
+        }
+        continue;
+      }
+
+      if (arg.type === "ref") {
+        const a = refAddr(arg);
+        if (!a) return errValue("#REF!");
+        const v = cellValueRaw(a);
+        if (v.type === "error") return v;
+        if (v.type === "number") nums.push(v.value);
+        else if (v.type === "boolean") nums.push(v.value ? 1 : 0);
+        continue;
+      }
+
+      const v = evalNode(arg);
+      if (v.type === "error") return v;
+      if (v.type === "number") nums.push(v.value);
+      else if (v.type === "boolean") nums.push(v.value ? 1 : 0);
+    }
+
+    return nums;
+  }
+
+  function checkArgCount(name, args, min, max) {
+    if (args.length < min) return errValue("#ERROR!");
+    if (max !== null && args.length > max) return errValue("#ERROR!");
+    return null;
+  }
+
+  function evalFunc(node) {
+    if (!FUNC_NAMES.has(node.name)) return errValue("#ERROR!");
+    const args = node.args || [];
+
+    if (node.name === "SUM" || node.name === "AVERAGE" || node.name === "MIN" || node.name === "MAX" || node.name === "COUNT") {
+      const nums = numericValuesFromArgs(args);
+      if (nums && nums.type === "error") return nums;
+
+      if (node.name === "COUNT") return numberValue(nums.length);
+
+      if (node.name === "SUM") {
+        let s = 0;
+        for (const n of nums) s += n;
+        return makeNumber(s);
+      }
+
+      if (node.name === "AVERAGE") {
+        if (nums.length === 0) return errValue("#DIV/0!");
+        let s = 0;
+        for (const n of nums) s += n;
+        return makeNumber(s / nums.length);
+      }
+
+      if (node.name === "MIN") {
+        if (nums.length === 0) return numberValue(0);
+        let m = nums[0];
+        for (let i = 1; i < nums.length; i++) if (nums[i] < m) m = nums[i];
+        return numberValue(m);
+      }
+
+      if (node.name === "MAX") {
+        if (nums.length === 0) return numberValue(0);
+        let m = nums[0];
+        for (let i = 1; i < nums.length; i++) if (nums[i] > m) m = nums[i];
+        return numberValue(m);
+      }
+    }
+
+    if (node.name === "IF") {
+      const bad = checkArgCount("IF", args, 2, 3);
+      if (bad) return bad;
+      const c = evalNode(args[0]);
+      if (c.type === "error") return c;
+      const cb = toBooleanValue(c);
+      if (cb.type === "error") return cb;
+      return cb.value ? evalNode(args[1]) : (args.length > 2 ? evalNode(args[2]) : FALSE_VALUE);
+    }
+
+    if (node.name === "ABS") {
+      const bad = checkArgCount("ABS", args, 1, 1);
+      if (bad) return bad;
+      const v = evalNode(args[0]);
+      if (v.type === "error") return v;
+      const n = toNumberForArithmetic(v);
+      if (n.type === "error") return n;
+      return makeNumber(Math.abs(n.value));
+    }
+
+    if (node.name === "ROUND") {
+      const bad = checkArgCount("ROUND", args, 1, 2);
+      if (bad) return bad;
+      const v = evalNode(args[0]);
+      if (v.type === "error") return v;
+      const n = toNumberForArithmetic(v);
+      if (n.type === "error") return n;
+
+      let dV = { type: "number", value: 0 };
+      if (args.length >= 2) {
+        dV = evalNode(args[1]);
+        if (dV.type === "error") return dV;
+        dV = toNumberForArithmetic(dV);
+        if (dV.type === "error") return dV;
+      }
+      return makeNumber(roundNumber(n.value, dV.value));
+    }
+
+    return errValue("#ERROR!");
+  }
+
+  function roundNumber(x, d) {
+    if (!Number.isFinite(d)) d = 0;
+    d = Math.floor(d);
+
+    if (d >= 0) {
+      const m = Math.pow(10, d);
+      const r = Math.round(Math.abs(x) * m + Number.EPSILON) / m;
+      return x < 0 ? -r : r;
+    }
+
+    const factor = Math.pow(10, -d);
+    const r = Math.round(Math.abs(x) / factor + Number.EPSILON) * factor;
+    return x < 0 ? -r : r;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Recalculation                                                       */
+  /* ------------------------------------------------------------------ */
+
+  function recalc(dirty) {
+    if (!dirty || dirty.size === 0) return;
+
+    const indeg = new Map();
+    for (const a of dirty) indeg.set(a, 0);
+
+    for (const a of dirty) {
+      const cell = getCell(a);
+      for (const ref of cell.refs) {
+        if (dirty.has(ref)) indeg.set(a, indeg.get(a) + 1);
+      }
+    }
+
+    const queue = [];
+    for (const a of dirty) {
+      if (indeg.get(a) === 0) queue.push(a);
+    }
+
+    const computed = new Set();
+
+    for (let head = 0; head < queue.length; head++) {
+      const a = queue[head];
+      if (computed.has(a)) continue;
+      computed.add(a);
+
+      const cell = getCell(a);
+      let v;
+      if (cell.type === "formula") {
+        v = evaluateAST(cell.ast);
+      } else {
+        v = cell.value || EMPTY_VALUE;
+      }
+      cell.value = v;
+
+      const deps = dependents.get(a);
+      if (deps) {
+        for (const d of deps) {
+          if (!dirty.has(d)) continue;
+          const cur = indeg.get(d);
+          if (cur > 0) {
+            const nx = cur - 1;
+            indeg.set(d, nx);
+            if (nx === 0) queue.push(d);
+          }
+        }
+      }
+    }
+
+    for (const a of dirty) {
+      if (!computed.has(a)) {
+        const cell = getCell(a);
+        cell.value = { type: "error", code: "#CYCLE!" };
+      }
+    }
+  }
+
+  function updateCellDom(addr) {
+    const el = cellEls.get(addr);
+    if (!el) return;
+    if (addr === editingAddr) return;
+
+    const cell = getCell(addr);
+    const v = cell.value || EMPTY_VALUE;
+
+    el.textContent = displayValue(v);
+    setDisplayClasses(el, v);
+
+    if (v.type === "error") {
+      el.setAttribute("title", ERROR_TITLES[v.code] || v.code);
+    } else {
+      el.removeAttribute("title");
+    }
+  }
+
+  function setCellRaw(addr, raw) {
+    raw = String(raw == null ? "" : raw);
+    const cell = getCell(addr);
+
+    if (cell.raw === raw) {
+      updateCellDom(addr);
+      if (selectedAddr === addr && !editingAddr) {
+        formulaBar.value = cell.raw;
+        updateStatus();
+      }
+      return;
+    }
+
+    prepareRaw(addr, raw);
+
+    if (raw.trim() === "") delete rawState[addr];
+    else rawState[addr] = raw;
+
+    const dirty = collectDirty(addr);
+    recalc(dirty);
+    for (const a of dirty) updateCellDom(a);
+
+    if (selectedAddr === addr && !editingAddr) {
+      formulaBar.value = cell.raw;
+    }
+
+    updateStatus();
+    saveState();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Storage                                                             */
+  /* ------------------------------------------------------------------ */
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(rawState));
+    } catch (e) {
+      // Ignore quota / unavailable storage.
+    }
+  }
+
+  function loadState() {
+    try {
+      const s = localStorage.getItem(STORE_KEY);
+      if (!s) return {};
+      const o = JSON.parse(s);
+      return (o && typeof o === "object") ? o : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  window.addEventListener("pagehide", saveState);
+
+  /* ------------------------------------------------------------------ */
+  /* Selection, editing, clipboard                                       */
+  /* ------------------------------------------------------------------ */
+
+  function ensureVisible(el) {
+    if (!el) return;
+    const wrapRect = gridWrap.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const headerH = corner.offsetHeight || 26;
+    const headerW = corner.offsetWidth || 54;
+
+    if (elRect.top < wrapRect.top + headerH) {
+      gridWrap.scrollTop += elRect.top - (wrapRect.top + headerH);
+    } else if (elRect.bottom > wrapRect.bottom) {
+      gridWrap.scrollTop += elRect.bottom - wrapRect.bottom;
+    }
+
+    if (elRect.left < wrapRect.left + headerW) {
+      gridWrap.scrollLeft += elRect.left - (wrapRect.left + headerW);
+    } else if (elRect.right > wrapRect.right) {
+      gridWrap.scrollLeft += elRect.right - wrapRect.right;
+    }
+  }
+
+  function selectCell(addr) {
+    if (!isValidAddr(addr)) return;
+
+    if (editingAddr === addr) {
+      if (editor) {
+        editor.focus();
+        const len = editor.value.length;
+        editor.setSelectionRange(len, len);
+      }
+      return;
+    }
+
+    if (editingAddr) finishEdit(true);
+
+    const old = selectedAddr;
+    if (old === addr) {
+      const el = cellEls.get(addr);
+      ensureVisible(el);
+      formulaBar.value = getCell(addr).raw;
+      nameBox.textContent = addr;
+      updateStatus();
+      return;
+    }
+
+    if (old) {
+      const oldEl = cellEls.get(old);
+      if (oldEl) {
+        oldEl.classList.remove("selected");
+        oldEl.removeAttribute("aria-selected");
+      }
+      const oldPos = addrToColRow(old);
+      if (rowHeaderEls[oldPos.row]) rowHeaderEls[oldPos.row].classList.remove("active");
+      if (colHeaderEls[oldPos.col]) colHeaderEls[oldPos.col].classList.remove("active");
+    }
+
+    selectedAddr = addr;
+    const el = cellEls.get(addr);
+    if (el) {
+      el.classList.add("selected");
+      el.setAttribute("aria-selected", "true");
+    }
+
+    const pos = addrToColRow(addr);
+    if (rowHeaderEls[pos.row]) rowHeaderEls[pos.row].classList.add("active");
+    if (colHeaderEls[pos.col]) colHeaderEls[pos.col].classList.add("active");
+
+    nameBox.textContent = addr;
+    formulaBar.value = getCell(addr).raw;
+    updateStatus();
+    ensureVisible(el);
+  }
+
+  function moveSelection(dc, dr) {
+    if (!selectedAddr) return;
+    const pos = addrToColRow(selectedAddr);
+    const nc = pos.col + dc;
+    const nr = pos.row + dr;
+    if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) return;
+    selectCell(addrFromColRow(nc, nr));
+  }
+
+  function beginEdit(addr, replaceChar, editExisting) {
+    if (!isValidAddr(addr)) return;
+
+    if (selectedAddr !== addr) selectCell(addr);
+    if (editingAddr === addr) {
+      editor.focus();
+      const len = editor.value.length;
+      editor.setSelectionRange(len, len);
+      return;
+    }
+    if (editingAddr) finishEdit(true);
+
+    const cell = getCell(addr);
+    const td = cellEls.get(addr);
+    if (!td) return;
+
+    const newVal = (replaceChar !== undefined && !editExisting) ? String(replaceChar) : cell.raw;
+
+    td.classList.add("editing");
+    td.textContent = "";
+
+    const input = document.createElement("input");
+    input.className = "cell-editor";
+    input.type = "text";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.value = newVal;
+
+    td.appendChild(input);
+
+    editor = input;
+    editingAddr = addr;
+    prevEditRaw = cell.raw;
+
+    if (replaceChar !== undefined && !editExisting) formulaBar.value = newVal;
+
+    input.addEventListener("input", function () {
+      formulaBar.value = input.value;
+      scheduleHighlights();
+    });
+
+    input.addEventListener("keydown", onEditorKeyDown);
+
+    input.addEventListener("blur", function () {
+      if (editingAddr === addr && editor === input) finishEdit(true);
+    });
+
+    input.focus();
+    try {
+      const len = input.value.length;
+      input.setSelectionRange(len, len);
+    } catch (e) {}
+
+    scheduleHighlights();
+  }
+
+  function onEditorKeyDown(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      const up = !!e.shiftKey;
+      const addr = editingAddr;
+      finishEdit(true);
+      if (selectedAddr === addr) moveSelection(0, up ? -1 : 1);
+    } else if (e.key === "Tab") {
+      e.preventDefault();
+      e.stopPropagation();
+      const left = !!e.shiftKey;
+      const addr = editingAddr;
+      finishEdit(true);
+      if (selectedAddr === addr) moveSelection(left ? -1 : 1, 0);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      finishEdit(false);
+    }
+  }
+
+  function finishEdit(save) {
+    if (!editingAddr) return;
+
+    const addr = editingAddr;
+    const input = editor;
+    const val = input ? input.value : "";
+
+    editingAddr = null;
+    editor = null;
+    clearHighlights();
+
+    const td = cellEls.get(addr);
+    if (td) {
+      td.classList.remove("editing");
+      if (input) input.remove();
+    }
+
+    if (save) {
+      if (val !== getCell(addr).raw) {
+        setCellRaw(addr, val);
+      } else {
+        updateCellDom(addr);
+        if (selectedAddr === addr) {
+          formulaBar.value = getCell(addr).raw;
+          updateStatus();
+        }
+      }
+    } else {
+      updateCellDom(addr);
+      if (selectedAddr === addr) {
+        formulaBar.value = getCell(addr).raw;
+        updateStatus();
+      }
+    }
+  }
+
+  function copySelection() {
+    if (!selectedAddr) return;
+    clipboard = {
+      addr: selectedAddr,
+      raw: getCell(selectedAddr).raw
+    };
+  }
+
+  function pasteClipboard() {
+    if (!clipboard || !selectedAddr) return;
+
+    let raw = clipboard.raw;
+    if (raw.trim().startsWith("=") && clipboard.addr !== selectedAddr) {
+      raw = shiftRaw(raw, clipboard.addr, selectedAddr);
+    }
+
+    setCellRaw(selectedAddr, raw);
+  }
+
+  function shiftRaw(raw, sourceAddr, destAddr) {
+    if (!raw.trim().startsWith("=")) return raw;
+
+    const s = addrToColRow(sourceAddr);
+    const d = addrToColRow(destAddr);
+    const dCol = d.col - s.col;
+    const dRow = d.row - s.row;
+    if (dCol === 0 && dRow === 0) return raw;
+
+    let out = "";
+    let i = 0;
+    const n = raw.length;
+    const re = /^(\$?)([A-Za-z]+)(\$?)(\d+)/;
+
+    while (i < n) {
+      const ch = raw[i];
+
+      if (ch === '"') {
+        out += ch;
+        i++;
+        while (i < n) {
+          if (raw[i] === '"') {
+            if (raw[i + 1] === '"') {
+              out += '""';
+              i += 2;
+              continue;
+            }
+            out += '"';
+            i++;
+            break;
+          }
+          out += raw[i++];
+        }
+        continue;
+      }
+
+      const prev = i > 0 ? raw[i - 1] : "";
+      if (!/[A-Za-z0-9_.]/.test(prev)) {
+        const m = re.exec(raw.slice(i));
+        if (m) {
+          const absCol = m[1] === "$";
+          const absRow = m[3] === "$";
+          const letters = m[2].toUpperCase();
+          let col = lettersToCol0(letters);
+          let row = parseInt(m[4], 10) - 1;
+
+          if (!absCol) {
+            col += dCol;
+            if (col < 0) col = 0;
+          }
+          if (!absRow) {
+            row += dRow;
+            if (row < 0) row = 0;
+          }
+
+          out += (absCol ? "$" : "") + colToLetters0(col) + (absRow ? "$" : "") + (row + 1);
+          i += m[0].length;
+          continue;
+        }
+      }
+
+      out += ch;
+      i++;
+    }
+
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Reference highlighting while editing                                */
+  /* ------------------------------------------------------------------ */
+
+  function clearHighlights() {
+    if (hlTimer) {
+      clearTimeout(hlTimer);
+      hlTimer = null;
+    }
+    for (const el of highlightedCells) {
+      for (const cls of HL_CLASSES) el.classList.remove(cls);
+    }
+    highlightedCells = [];
+  }
+
+  function scheduleHighlights() {
+    if (hlTimer) clearTimeout(hlTimer);
+    hlTimer = setTimeout(updateFormulaHighlights, 35);
+  }
+
+  function updateFormulaHighlights() {
+    clearHighlights();
+
+    if (!editingAddr || !editor) return;
+
+    const raw = editor.value.trim();
+    if (!raw.startsWith("=")) return;
+
+    let nodes;
+    try {
+      const ast = parseFormula(raw.slice(1));
+      nodes = collectRefNodes(ast, []);
+    } catch (e) {
+      return;
+    }
+
+    const seen = new Set();
+    let colorIdx = 0;
+
+    function addCell(addr, color) {
+      if (!addr || seen.has(addr)) return;
+      seen.add(addr);
+      const el = cellEls.get(addr);
+      if (!el) return;
+      el.classList.add(HL_CLASSES[color]);
+      highlightedCells.push(el);
+    }
+
+    for (const node of nodes) {
+      const color = colorIdx % HL_CLASSES.length;
+      colorIdx++;
+
+      if (node.type === "ref") {
+        addCell(refAddr(node), color);
+      } else if (node.type === "range") {
+        const a = refAddr(node.a);
+        const b = refAddr(node.b);
+        if (!a || !b) continue;
+
+        const c1 = Math.min(node.a.col, node.b.col);
+        const c2 = Math.max(node.a.col, node.b.col);
+        const r1 = Math.min(node.a.row, node.b.row);
+        const r2 = Math.max(node.a.row, node.b.row);
+
+        for (let r = r1; r <= r2; r++) {
+          for (let c = c1; c <= c2; c++) {
+            addCell(addrFromColRow(c, r), color);
+          }
+        }
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Status                                                              */
+  /* ------------------------------------------------------------------ */
+
+  function updateStatus() {
+    if (!selectedAddr) return;
+    const cell = getCell(selectedAddr);
+    const v = cell.value || EMPTY_VALUE;
+
+    statusAddr.textContent = selectedAddr;
+    const disp = displayValue(v);
+    statusValue.textContent = disp === "" ? "—" : disp;
+
+    let sum = "—";
+    let count = "0";
+
+    if (v.type === "number") {
+      sum = displayValue(v);
+      count = "1";
+    } else if (v.type === "boolean") {
+      sum = v.value ? "1" : "0";
+      count = "0";
+    }
+
+    statusSum.textContent = sum;
+    statusCount.textContent = count;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Event wiring                                                        */
+  /* ------------------------------------------------------------------ */
+
+  document.addEventListener("mousedown", function (e) {
+    if (!editingAddr) return;
+    if (e.button !== 0) return;
+
+    const inEditor = !!editor && (e.target === editor || editor.contains(e.target));
+    if (!inEditor) {
+      finishEdit(true);
+    }
+  }, true);
+
+  grid.addEventListener("click", function (e) {
+    if (e.target && e.target.closest && e.target.closest("input")) return;
+
+    const td = e.target.closest ? e.target.closest("td[data-cell]") : null;
+    if (td && td.dataset.cell) {
+      selectCell(td.dataset.cell);
+    }
+  });
+
+  grid.addEventListener("dblclick", function (e) {
+    if (e.target && e.target.closest && e.target.closest("input")) return;
+
+    const td = e.target.closest ? e.target.closest("td[data-cell]") : null;
+    if (!td || !td.dataset.cell) return;
+
+    const addr = td.dataset.cell;
+    selectCell(addr);
+    beginEdit(addr, undefined, true);
+  });
+
+  gridWrap.addEventListener("mousedown", function (e) {
+    const handle = e.target.closest ? e.target.closest(".resize") : null;
+    if (!handle) return;
+
+    // Global mousedown already committed any cell editor.
+    const c = parseInt(handle.dataset.resizeCol || "0", 10);
+    if (isNaN(c) || !colEls[c]) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startW = parseFloat(colEls[c].style.width) || 96;
+    resizing = {
+      col: c,
+      startX: e.clientX,
+      startWidth: startW
+    };
+    document.body.classList.add("resizing");
+  });
+
+  window.addEventListener("mousemove", function (e) {
+    if (!resizing) return;
+    const w = resizing.startWidth + (e.clientX - resizing.startX);
+    const clamped = Math.max(36, Math.min(500, w));
+    const col = colEls[resizing.col];
+    if (col) col.style.width = clamped + "px";
+  });
+
+  window.addEventListener("mouseup", function () {
+    if (!resizing) return;
+    resizing = null;
+    document.body.classList.remove("resizing");
+  });
+
+  formulaBar.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (selectedAddr) setCellRaw(selectedAddr, formulaBar.value);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (selectedAddr) formulaBar.value = getCell(selectedAddr).raw;
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    // Never hijack native text editing in the formula bar or the cell editor.
+    if (e.target && e.target.tagName === "INPUT") return;
+    if (editingAddr) return;
+
+    if (!selectedAddr) return;
+
+    const key = e.key;
+    const ctrl = e.ctrlKey || e.metaKey;
+
+    if (ctrl && !e.altKey) {
+      const k = String(key || "").toLowerCase();
+      if (k === "c") {
+        e.preventDefault();
+        copySelection();
+        return;
+      }
+      if (k === "v") {
+        e.preventDefault();
+        pasteClipboard();
+        return;
+      }
+      // Other Ctrl/Cmd combos: let the browser handle them.
+      return;
+    }
+
+    if (e.altKey) return;
+
+    switch (key) {
+      case "ArrowLeft":
+        e.preventDefault();
+        moveSelection(-1, 0);
+        return;
+
+      case "ArrowRight":
+        e.preventDefault();
+        moveSelection(1, 0);
+        return;
+
+      case "ArrowUp":
+        e.preventDefault();
+        moveSelection(0, -1);
+        return;
+
+      case "ArrowDown":
+        e.preventDefault();
+        moveSelection(0, 1);
+        return;
+
+      case "Enter":
+        e.preventDefault();
+        moveSelection(0, e.shiftKey ? -1 : 1);
+        return;
+
+      case "Tab":
+        e.preventDefault();
+        moveSelection(e.shiftKey ? -1 : 1, 0);
+        return;
+
+      case "F2":
+        e.preventDefault();
+        beginEdit(selectedAddr, undefined, true);
+        return;
+
+      case "Delete":
+      case "Backspace":
+        e.preventDefault();
+        setCellRaw(selectedAddr, "");
+        return;
+
+      default:
+        if (typeof key === "string" && key.length === 1 && !ctrl && !e.altKey) {
+          e.preventDefault();
+          beginEdit(selectedAddr, key, false);
+        }
+        return;
+    }
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Initialization                                                      */
+  /* ------------------------------------------------------------------ */
+
+  function initialLoad() {
+    const data = loadState();
+    rawState = {};
+
+    for (const key in data) {
+      if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
+      const raw = String(data[key] == null ? "" : data[key]);
+      if (!isValidAddr(key)) continue;
+      if (raw.trim() === "") continue;
+      rawState[key] = raw;
+    }
+
+    const dirty = new Set();
+    for (const addr in rawState) {
+      if (!Object.prototype.hasOwnProperty.call(rawState, addr)) continue;
+      prepareRaw(addr, rawState[addr]);
+      dirty.add(addr);
+    }
+
+    recalc(dirty);
+    for (const addr of dirty) updateCellDom(addr);
+
+    selectCell("A1");
+  }
+
+  initialLoad();
+
+})();
+</script>
+</body>
+</html>
+```

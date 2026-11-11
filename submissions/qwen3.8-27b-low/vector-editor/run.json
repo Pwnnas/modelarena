@@ -1,0 +1,26 @@
+{
+  "source": "arena run",
+  "endpoint": "openrouter.ai",
+  "apiModel": "qwen/qwen3.8-27b",
+  "servedModel": "qwen/qwen3.8-27b",
+  "provider": "DeepInfra",
+  "params": {
+    "thinking": "low"
+  },
+  "startedAt": "2026-10-28T12:51:15.880Z",
+  "wallMs": 831535,
+  "ttftMs": 1021,
+  "thinkingMs": 290430,
+  "promptTokens": 1623,
+  "completionTokens": 17228,
+  "reasoningTokens": 4672,
+  "tokensEstimated": false,
+  "genTokensPerSec": 20.7,
+  "promptTokensPerSec": null,
+  "finishReason": "stop",
+  "replyChars": 38007,
+  "reasoningChars": 18274,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 38000
+}

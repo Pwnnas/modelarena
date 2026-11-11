@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Harbor — Settings</title>
+<style>
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg-primary: #1a2332;
+  --bg-secondary: #222f42;
+  --bg-card: #1e2d3d;
+  --accent: #2d8b8b;
+  --accent-dark: #256b6b;
+  --accent-light: #a8dadc;
+  --text-primary: #f1faee;
+  --text-secondary: #a8dadc;
+  --error: #e76f51;
+  --success: #7bc47f;
+  --border: #2d8b8b;
+  --focus-ring: #a8dadc;
+  --font-stack: "DejaVu Sans", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-stack);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-stack);
+  font-weight: 700;
+}
+
+button {
+  font-family: var(--font-stack);
+  cursor: pointer;
+}
+
+input {
+  font-family: var(--font-stack);
+}
+
+/* Layout */
+.app {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 260px;
+  min-width: 260px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--accent);
+  padding: 32px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  padding: 0 24px 32px;
+}
+
+.sidebar-header h1 {
+  font-size: 1.75rem;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.sidebar-header p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+.sidebar nav ul {
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar nav button {
+  display: block;
+  width: 100%;
+  padding: 14px 24px;
+  min-height: 48px;
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  text-align: left;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.sidebar nav button:hover {
+  background: rgba(45, 139, 139, 0.15);
+  color: var(--text-primary);
+}
+
+.sidebar nav button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.sidebar nav button[aria-current="page"] {
+  background: rgba(45, 139, 139, 0.2);
+  border-left-color: var(--accent);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+/* Main content */
+.main {
+  flex: 1;
+  padding: 40px 48px;
+  max-width: 720px;
+  overflow-y: auto;
+}
+
+.panel {
+  display: none;
+}
+
+.panel.active {
+  display: block;
+}
+
+.panel h2 {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.panel .panel-desc {
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  font-size: 0.95rem;
+}
+
+/* Form elements */
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px 16px;
+  min-height: 48px;
+  background: var(--bg-primary);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition: border-color 0.15s;
+}
+
+.form-group input:focus {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+  border-color: var(--focus-ring);
+}
+
+.form-group input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  min-height: 48px;
+  min-width: 48px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  background: var(--accent-dark);
+  color: var(--text-primary);
+}
+
+.btn-primary:hover {
+  background: var(--accent);
+}
+
+.btn-danger {
+  background: #8b3a3a;
+  color: var(--text-primary);
+}
+
+.btn-danger:hover {
+  background: var(--error);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--text-secondary);
+}
+
+.btn-secondary:hover {
+  background: rgba(168, 218, 220, 0.1);
+}
+
+/* Messages */
+.message {
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-top: 16px;
+  font-size: 0.9rem;
+  display: none;
+}
+
+.message.error {
+  background: rgba(231, 111, 81, 0.15);
+  border: 1px solid var(--error);
+  color: var(--error);
+}
+
+.message.success {
+  background: rgba(123, 196, 127, 0.15);
+  border: 1px solid var(--success);
+  color: var(--success);
+}
+
+.message.visible {
+  display: block;
+}
+
+/* Switches */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(45, 139, 139, 0.3);
+}
+
+.switch-row:last-of-type {
+  border-bottom: none;
+}
+
+.switch-label {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.switch-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.switch {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  min-width: 52px;
+  min-height: 28px;
+  padding: 0;
+  background: var(--bg-primary);
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: var(--text-secondary);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.switch[aria-checked="true"] {
+  background: var(--accent-dark);
+  border-color: var(--accent);
+}
+
+.switch[aria-checked="true"]::after {
+  transform: translateX(24px);
+  background: var(--text-primary);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Team members */
+.member-list {
+  list-style: none;
+  margin-bottom: 32px;
+}
+
+.member-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid rgba(45, 139, 139, 0.3);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.member-info h3 {
+  font-size: 1rem;
+  margin-bottom: 2px;
+}
+
+.member-info p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.member-role {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(45, 139, 139, 0.2);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: var(--accent-light);
+  margin-left: 8px;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--bg-card);
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+}
+
+.empty-state p {
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+}
+
+/* Project list */
+.project-list {
+  list-style: none;
+  margin-bottom: 16px;
+}
+
+.project-item {
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid rgba(45, 139, 139, 0.3);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+
+/* Billing */
+.plan-card {
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.plan-card h3 {
+  font-size: 1.1rem;
+  margin-bottom: 4px;
+}
+
+.plan-card p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* Danger zone */
+.danger-zone {
+  border: 1px solid var(--error);
+  border-radius: 8px;
+  padding: 24px;
+  background: rgba(231, 111, 81, 0.05);
+}
+
+.danger-zone h3 {
+  color: var(--error);
+  margin-bottom: 8px;
+}
+
+.danger-zone p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+}
+
+/* Dialog */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 35, 50, 0.8);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog-overlay.visible {
+  display: flex;
+}
+
+.dialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 440px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+.dialog h2 {
+  font-size: 1.25rem;
+  margin-bottom: 12px;
+}
+
+.dialog p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-bottom: 24px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+/* Section divider */
+.section-divider {
+  border: none;
+  border-top: 1px solid rgba(45, 139, 139, 0.3);
+  margin: 32px 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    min-width: unset;
+    padding: 16px 0;
+    border-right: none;
+    border-bottom: 1px solid var(--accent);
+  }
+  .sidebar-header {
+    padding: 0 16px 16px;
+  }
+  .main {
+    padding: 24px 16px;
+  }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>Harbor</h1>
+      <p>Northwind Workspace</p>
+    </div>
+    <nav aria-label="Settings navigation">
+      <ul>
+        <li><button data-nav="profile" aria-current="page">Profile</button></li>
+        <li><button data-nav="notifications">Notifications</button></li>
+        <li><button data-nav="team">Team</button></li>
+        <li><button data-nav="projects">Projects</button></li>
+        <li><button data-nav="billing">Billing</button></li>
+        <li><button data-nav="danger">Danger Zone</button></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <!-- Profile Panel -->
+    <section id="profile" data-panel="profile" class="panel active">
+      <h2>Profile</h2>
+      <p class="panel-desc">Update your personal information for the Northwind workspace.</p>
+      <form id="profile-form" novalidate>
+        <div class="form-group">
+          <label for="profile-name">Full name</label>
+          <input type="text" id="profile-name" data-field="name" value="Alex Morgan" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label for="profile-email">Email</label>
+          <input type="email" id="profile-email" data-field="email" value="alex@northwind.io" autocomplete="email">
+        </div>
+        <button type="submit" class="btn btn-primary" data-action="save-profile">Save profile</button>
+      </form>
+      <div class="message error" data-error="profile-name" id="profile-error" role="alert"></div>
+      <div class="message success" id="profile-success" role="status"></div>
+    </section>
+
+    <!-- Notifications Panel -->
+    <section id="notifications" data-panel="notifications" class="panel" hidden>
+      <h2>Notifications</h2>
+      <p class="panel-desc">Choose which updates you want to receive from Northwind.</p>
+      <div class="switch-row">
+        <div>
+          <div class="switch-label" id="switch-product-label">Product updates</div>
+          <div class="switch-desc">New features and improvements</div>
+        </div>
+        <button role="switch" aria-checked="true" data-switch="product-updates" aria-labelledby="switch-product-label" class="switch"></button>
+      </div>
+      <div class="switch-row">
+        <div>
+          <div class="switch-label" id="switch-comments-label">Comments</div>
+          <div class="switch-desc">When someone comments on your work</div>
+        </div>
+        <button role="switch" aria-checked="true" data-switch="comments" aria-labelledby="switch-comments-label" class="switch"></button>
+      </div>
+      <div class="switch-row">
+        <div>
+          <div class="switch-label" id="switch-mentions-label">Mentions</div>
+          <div class="switch-desc">When someone @mentions you</div>
+        </div>
+        <button role="switch" aria-checked="true" data-switch="mentions" aria-labelledby="switch-mentions-label" class="switch"></button>
+      </div>
+      <div class="switch-row">
+        <div>
+          <div class="switch-label" id="switch-digest-label">Weekly digest</div>
+          <div class="switch-desc">A summary of activity every Monday</div>
+        </div>
+        <button role="switch" aria-checked="false" data-switch="weekly-digest" aria-labelledby="switch-digest-label" class="switch"></button>
+      </div>
+      <br>
+      <button type="button" class="btn btn-primary" data-action="save-notifications">Save preferences</button>
+      <div class="message success" id="notif-success" role="status"></div>
+    </section>
+
+    <!-- Team Panel -->
+    <section id="team" data-panel="team" class="panel" hidden>
+      <h2>Team</h2>
+      <p class="panel-desc">Manage who has access to the Northwind workspace.</p>
+      <ul class="member-list" id="member-list">
+        <li class="member-item" data-member="1">
+          <div class="member-info">
+            <h3>Sam Rivera <span class="member-role">Admin</span></h3>
+            <p>sam@northwind.io</p>
+          </div>
+          <button type="button" class="btn btn-secondary" data-action="remove-member" data-member-id="1">Remove</button>
+        </li>
+        <li class="member-item" data-member="2">
+          <div class="member-info">
+            <h3>Jade Chen <span class="member-role">Editor</span></h3>
+            <p>jade@northwind.io</p>
+          </div>
+          <button type="button" class="btn btn-secondary" data-action="remove-member" data-member-id="2">Remove</button>
+        </li>
+        <li class="member-item" data-member="3">
+          <div class="member-info">
+            <h3>Leo Park <span class="member-role">Viewer</span></h3>
+            <p>leo@northwind.io</p>
+          </div>
+          <button type="button" class="btn btn-secondary" data-action="remove-member" data-member-id="3">Remove</button>
+        </li>
+      </ul>
+      <hr class="section-divider">
+      <h3 style="margin-bottom: 16px;">Invite a teammate</h3>
+      <div class="form-group">
+        <label for="invite-email-input">Email address</label>
+        <input type="email" id="invite-email-input" data-field="invite-email" placeholder="teammate@example.com" autocomplete="off">
+      </div>
+      <button type="button" class="btn btn-primary" data-action="invite">Send invite</button>
+      <div class="message error" data-error="invite-email" id="invite-error" role="alert"></div>
+      <div class="message success" id="invite-success" role="status"></div>
+    </section>
+
+    <!-- Projects Panel -->
+    <section id="projects" data-panel="projects" class="panel" hidden>
+      <h2>Projects</h2>
+      <p class="panel-desc">Organize your team's work into focused projects.</p>
+      <div data-empty id="projects-empty" class="empty-state">
+        <p>No projects yet. Create your first project to start organizing your team's work.</p>
+        <button type="button" class="btn btn-primary" data-action="create-project">Create project</button>
+      </div>
+      <ul class="project-list" id="project-list"></ul>
+    </section>
+
+    <!-- Billing Panel -->
+    <section id="billing" data-panel="billing" class="panel" hidden>
+      <h2>Billing</h2>
+      <p class="panel-desc">Manage your plan and payment details for Northwind.</p>
+      <div class="plan-card">
+        <h3>Current plan: Professional</h3>
+        <p>$24 per user/month · 12 seats included</p>
+      </div>
+      <h3 style="margin-bottom: 16px;">Update payment method</h3>
+      <form id="billing-form" novalidate>
+        <div class="form-group">
+          <label for="card-number-input">Card number</label>
+          <input type="text" id="card-number-input" data-field="card-number" placeholder="1234 5678 9012 3456" inputmode="numeric" autocomplete="cc-number" maxlength="19">
+        </div>
+        <div class="form-group">
+          <label for="card-expiry-input">Expiry date</label>
+          <input type="text" id="card-expiry-input" data-field="card-expiry" placeholder="MM/YY" autocomplete="cc-exp" maxlength="5">
+        </div>
+        <div class="form-group">
+          <label for="card-cvc-input">Security code</label>
+          <input type="text" id="card-cvc-input" data-field="card-cvc" placeholder="123" inputmode="numeric" autocomplete="cc-csc" maxlength="4">
+        </div>
+        <button type="submit" class="btn btn-primary" data-action="pay">Update card</button>
+      </form>
+      <div class="message error" data-error="card" id="billing-error" role="alert"></div>
+      <div class="message success" id="billing-success" role="status"></div>
+    </section>
+
+    <!-- Danger Zone Panel -->
+    <section id="danger" data-panel="danger" class="panel" hidden>
+      <h2>Danger Zone</h2>
+      <p class="panel-desc">Irreversible actions for the Northwind workspace.</p>
+      <div class="danger-zone">
+        <h3>Delete workspace</h3>
+        <p>This will permanently remove Northwind, including all projects, files, and team access. This cannot be undone.</p>
+        <button type="button" class="btn btn-danger" data-action="delete-workspace">Delete workspace</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Remove Member Dialog -->
+<div class="dialog-overlay" id="remove-dialog-overlay">
+  <div role="dialog" aria-modal="true" aria-labelledby="remove-dialog-title" id="remove-dialog" class="dialog">
+    <h2 id="remove-dialog-title">Remove team member?</h2>
+    <p id="remove-dialog-message">This person will lose access to Northwind immediately. You can invite them back later if needed.</p>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" id="remove-dialog-cancel">Keep member</button>
+      <button type="button" class="btn btn-danger" id="remove-dialog-confirm">Remove member</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Workspace Dialog -->
+<div class="dialog-overlay" id="delete-dialog-overlay">
+  <div role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" id="delete-dialog" class="dialog">
+    <h2 id="delete-dialog-title">Delete Northwind?</h2>
+    <p>All projects, files, and team access will be permanently removed. This action cannot be undone.</p>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" id="delete-dialog-cancel">Keep workspace</button>
+      <button type="button" class="btn btn-danger" id="delete-dialog-confirm">Delete workspace</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // === Navigation ===
+  const navButtons = document.querySelectorAll('[data-nav]');
+  const panels = document.querySelectorAll('[data-panel]');
+
+  function navigateTo(panelName) {
+    panels.forEach(p => {
+      if (p.dataset.panel === panelName) {
+        p.classList.add('active');
+        p.removeAttribute('hidden');
+      } else {
+        p.classList.remove('active');
+        p.setAttribute('hidden', '');
+      }
+    });
+    navButtons.forEach(btn => {
+      if (btn.dataset.nav === panelName) {
+        btn.setAttribute('aria-current', 'page');
+      } else {
+        btn.removeAttribute('aria-current');
+      }
+    });
+  }
+
+  navButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      navigateTo(btn.dataset.nav);
+    });
+  });
+
+  // === Profile ===
+  const profileForm = document.getElementById('profile-form');
+  const profileError = document.getElementById('profile-error');
+  const profileSuccess = document.getElementById('profile-success');
+
+  profileForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const nameInput = document.getElementById('profile-name');
+    const name = nameInput.value.trim();
+
+    profileError.classList.remove('visible');
+    profileSuccess.classList.remove('visible');
+
+    if (!name) {
+      profileError.textContent = 'Name is required. Enter your full name so teammates can identify you.';
+      profileError.classList.add('visible');
+      nameInput.focus();
+      return;
+    }
+
+    profileSuccess.textContent = 'Profile saved successfully.';
+    profileSuccess.classList.add('visible');
+  });
+
+  // === Notifications ===
+  const switches = document.querySelectorAll('[role="switch"]');
+  const notifSuccess = document.getElementById('notif-success');
+
+  switches.forEach(switchEl => {
+    switchEl.addEventListener('click', function() {
+      const checked = this.getAttribute('aria-checked') === 'true';
+      this.setAttribute('aria-checked', String(!checked));
+    });
+
+    switchEl.addEventListener('keydown', function(e) {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        const checked = this.getAttribute('aria-checked') === 'true';
+        this.setAttribute('aria-checked', String(!checked));
+      }
+    });
+  });
+
+  document.querySelector('[data-action="save-notifications"]').addEventListener('click', function() {
+    notifSuccess.textContent = 'Notification preferences saved.';
+    notifSuccess.classList.add('visible');
+  });
+
+  // === Team ===
+  let memberCounter = 4;
+  let removeTargetMemberId = null;
+
+  function openDialog(overlayId) {
+    const overlay = document.getElementById(overlayId);
+    overlay.classList.add('visible');
+    const dialog = overlay.querySelector('[role="dialog"]');
+    const focusable = dialog.querySelectorAll('button');
+    if (focusable.length) focusable[0].focus();
+  }
+
+  function closeDialog(overlayId) {
+    const overlay = document.getElementById(overlayId);
+    overlay.classList.remove('visible');
+  }
+
+  // Remove member
+  document.querySelectorAll('[data-action="remove-member"]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      removeTargetMemberId = this.dataset.memberId;
+      openDialog('remove-dialog-overlay');
+    });
+  });
+
+  document.getElementById('remove-dialog-cancel').addEventListener('click', function() {
+    closeDialog('remove-dialog-overlay');
+    removeTargetMemberId = null;
+  });
+
+  document.getElementById('remove-dialog-confirm').addEventListener('click', function() {
+    if (removeTargetMemberId) {
+      const memberEl = document.querySelector('[data-member="' + removeTargetMemberId + '"]');
+      if (memberEl) memberEl.remove();
+    }
+    removeTargetMemberId = null;
+    closeDialog('remove-dialog-overlay');
+  });
+
+  // Invite
+  const inviteBtn = document.querySelector('[data-action="invite"]');
+  const inviteError = document.getElementById('invite-error');
+  const inviteSuccess = document.getElementById('invite-success');
+  const inviteInput = document.getElementById('invite-email-input');
+
+  function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  inviteBtn.addEventListener('click', function() {
+    const email = inviteInput.value.trim();
+    inviteError.classList.remove('visible');
+    inviteSuccess.classList.remove('visible');
+
+    if (!email || !isValidEmail(email)) {
+      inviteError.textContent = 'That email doesn\'t look right. Check the format and try again (e.g. name@example.com).';
+      inviteError.classList.add('visible');
+      inviteInput.focus();
+      return;
+    }
+
+    memberCounter++;
+    const li = document.createElement('li');
+    li.className = 'member-item';
+    li.setAttribute('data-member', String(memberCounter));
+    li.innerHTML = '<div class="member-info"><h3>New Member <span class="member-role">Invited</span></h3><p>' + escapeHtml(email) + '</p></div>';
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn btn-secondary';
+    removeBtn.setAttribute('data-action', 'remove-member');
+    removeBtn.setAttribute('data-member-id', String(memberCounter));
+    removeBtn.textContent = 'Remove';
+    removeBtn.addEventListener('click', function() {
+      removeTargetMemberId = removeBtn.dataset.memberId;
+      openDialog('remove-dialog-overlay');
+    });
+    li.appendChild(removeBtn);
+    document.getElementById('member-list').appendChild(li);
+
+    inviteInput.value = '';
+    inviteSuccess.textContent = 'Invite sent to ' + email + '.';
+    inviteSuccess.classList.add('visible');
+  });
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // === Projects ===
+  let projectCounter = 0;
+  const projectsEmpty = document.getElementById('projects-empty');
+  const projectList = document.getElementById('project-list');
+
+  document.querySelector('[data-action="create-project"]').addEventListener('click', function() {
+    projectCounter++;
+    const li = document.createElement('li');
+    li.className = 'project-item';
+    li.setAttribute('data-project', String(projectCounter));
+    li.textContent = 'Project ' + projectCounter;
+    projectList.appendChild(li);
+    projectsEmpty.style.display = 'none';
+    projectsEmpty.setAttribute('hidden', '');
+  });
+
+  // === Billing ===
+  const billingForm = document.getElementById('billing-form');
+  const billingError = document.getElementById('billing-error');
+  const billingSuccess = document.getElementById('billing-success');
+
+  billingForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    billingError.classList.remove('visible');
+    billingSuccess.classList.remove('visible');
+
+    const cardNumber = document.getElementById('card-number-input').value.replace(/\s/g, '');
+    const expiry = document.getElementById('card-expiry-input').value.trim();
+    const cvc = document.getElementById('card-cvc-input').value.trim();
+
+    if (!cardNumber || cardNumber.length !== 16 || !/^\d{16}$/.test(cardNumber)) {
+      billingError.textContent = 'Card number must be 16 digits. Check the number on your card and try again.';
+      billingError.classList.add('visible');
+      document.getElementById('card-number-input').focus();
+      return;
+    }
+
+    if (cardNumber === '4000000000000002') {
+      billingError.textContent = 'Payment declined. Your card was declined by your bank. Try a different card or contact your bank for help.';
+      billingError.classList.add('visible');
+      return;
+    }
+
+    billingSuccess.textContent = 'Payment method updated successfully.';
+    billingSuccess.classList.add('visible');
+  });
+
+  // === Danger Zone ===
+  document.querySelector('[data-action="delete-workspace"]').addEventListener('click', function() {
+    openDialog('delete-dialog-overlay');
+  });
+
+  document.getElementById('delete-dialog-cancel').addEventListener('click', function() {
+    closeDialog('delete-dialog-overlay');
+  });
+
+  document.getElementById('delete-dialog-confirm').addEventListener('click', function() {
+    closeDialog('delete-dialog-overlay');
+  });
+
+  // === Dialog: Escape key and focus trap ===
+  function setupDialogBehavior(overlayId) {
+    const overlay = document.getElementById(overlayId);
+    const dialog = overlay.querySelector('[role="dialog"]');
+
+    overlay.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeDialog(overlayId);
+        return;
+      }
+      if (e.key === 'Tab') {
+        const focusable = dialog.querySelectorAll('button');
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    });
+
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) {
+        closeDialog(overlayId);
+      }
+    });
+  }
+
+  setupDialogBehavior('remove-dialog-overlay');
+  setupDialogBehavior('delete-dialog-overlay');
+
+  // Global escape for dialogs
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      const removeOverlay = document.getElementById('remove-dialog-overlay');
+      const deleteOverlay = document.getElementById('delete-dialog-overlay');
+      if (removeOverlay.classList.contains('visible')) {
+        closeDialog('remove-dialog-overlay');
+      }
+      if (deleteOverlay.classList.contains('visible')) {
+        closeDialog('delete-dialog-overlay');
+      }
+    }
+  });
+
+})();
+</script>
+</body>
+</html>

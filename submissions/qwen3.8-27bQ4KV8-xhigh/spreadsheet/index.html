@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gridcalc</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%232563eb'/%3E%3Cpath d='M9 5v14M15 5v14M5 9h14M5 15h14' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --ink:#182230; --ink-soft:#5f6b7a;
+  --line:#e7ebf1; --line-strong:#d5dce5;
+  --gridline:#e8edf3;
+  --head-bg:#f7f9fc;
+  --accent:#2563eb;
+  --accent-soft:#eef4fe;
+  --err:#c2251c; --err-bg:#fdf1f0;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:var(--font);color:var(--ink);background:#fff;overflow:hidden;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body.colresize,body.colresize *{cursor:col-resize !important;user-select:none !important}
+
+/* ---------- top bar ---------- */
+#topbar{height:46px;flex:none;background:#fff;border-bottom:1px solid var(--line-strong);box-shadow:0 1px 0 rgba(15,23,42,.02);display:flex;align-items:center;gap:10px;padding:0 12px;user-select:none}
+.brand{display:flex;align-items:center;gap:8px;user-select:none}
+.brand-name{font-size:14px;font-weight:700;letter-spacing:-.01em;color:#101828}
+.brand-name b{color:var(--accent);font-weight:700}
+.tb-div{width:1px;height:22px;background:var(--line-strong);margin:0 2px;flex:none}
+.namebox{width:76px;height:28px;flex:none;border:1px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#33415c;background:#f8fafc;font-variant-numeric:tabular-nums}
+.fb-wrap{position:relative;flex:1;height:28px;min-width:60px}
+#fb-mirror{position:absolute;inset:0;padding:0 11px;margin:0;font-family:var(--font);font-size:13px;line-height:26px;white-space:nowrap;overflow:hidden;pointer-events:none;color:var(--ink);font-variant-numeric:tabular-nums;border:1px solid transparent}
+#formula-bar{position:absolute;inset:0;width:100%;height:100%;border:1px solid var(--line);border-radius:6px;padding:0 10px;font-family:var(--font);font-size:13px;color:transparent;background:#fff;caret-color:var(--ink);outline:none;font-variant-numeric:tabular-nums}
+#formula-bar::placeholder{color:#9aa7ba;font-family:var(--font);font-size:13px}
+#formula-bar:focus{border-color:#93b4f5;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
+.save-chip{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink-soft);padding:4px 11px;border:1px solid var(--line);border-radius:999px;background:#fbfcfe;flex:none;user-select:none;transition:border-color .2s}
+.save-chip .dot{width:7px;height:7px;border-radius:50%;background:#22c55e;transition:background .2s}
+.save-chip.saving .dot{background:#f59e0b;animation:pulse .9s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ---------- grid ---------- */
+#viewport{flex:1;position:relative;overflow:auto;background:#fff;outline:none}
+#viewport::-webkit-scrollbar{width:11px;height:11px}
+#viewport::-webkit-scrollbar-thumb{background:#c5cfdb;border-radius:8px;border:3px solid #fff}
+#viewport::-webkit-scrollbar-thumb:hover{background:#a8b4c4}
+#viewport::-webkit-scrollbar-corner{background:transparent}
+#grid{position:relative;border-collapse:separate;border-spacing:0;table-layout:fixed}
+#grid td{border-right:1px solid var(--gridline);border-bottom:1px solid var(--gridline);padding:0 7px;font-size:13px;line-height:24px;height:24px;white-space:nowrap;overflow:hidden;background:#fff;color:var(--ink);user-select:none;font-variant-numeric:tabular-nums}
+#grid td.n{text-align:right}
+#grid td.err{color:var(--err);background:var(--err-bg);font-weight:500}
+#grid td.sel{background:var(--accent-soft)}
+#grid td.active{background:#fff;box-shadow:inset 0 0 0 2px var(--accent)}
+#grid td.ref-0{outline:2px solid #e11d48;outline-offset:-2px;background:rgba(225,29,72,.06)}
+#grid td.ref-1{outline:2px solid #7c3aed;outline-offset:-2px;background:rgba(124,58,237,.06)}
+#grid td.ref-2{outline:2px solid #0d9488;outline-offset:-2px;background:rgba(13,148,136,.08)}
+#grid td.ref-3{outline:2px solid #d97706;outline-offset:-2px;background:rgba(217,119,6,.08)}
+#grid td.ref-4{outline:2px solid #2563eb;outline-offset:-2px;background:rgba(37,99,235,.06)}
+#grid td.ref-5{outline:2px solid #65a30d;outline-offset:-2px;background:rgba(101,163,13,.09)}
+#grid thead th{position:sticky;top:0;z-index:4;height:24px;background:var(--head-bg);border-right:1px solid var(--gridline);border-bottom:1px solid var(--line-strong);color:#66748a;font-size:11px;font-weight:600;letter-spacing:.04em;text-align:center;user-select:none}
+#grid thead th.hl{background:#eaeffa;color:#3c5292}
+#grid thead th.hl2{background:#dbe6fb;color:#1d4ed8;box-shadow:inset 0 -2px 0 var(--accent)}
+#grid th.corner{position:sticky;top:0;left:0;z-index:5;width:46px;background:var(--head-bg);border-right:1px solid var(--line-strong)}
+#grid th.rowhead{position:sticky;left:0;z-index:3;width:46px;background:var(--head-bg);border-right:1px solid var(--line-strong);border-bottom:1px solid var(--gridline);color:#66748a;font-size:11px;font-weight:500;text-align:center;user-select:none;font-variant-numeric:tabular-nums}
+#grid th.rowhead.hl{background:#eaeffa;color:#3c5292}
+#grid th.rowhead.hl2{background:#dbe6fb;color:#1d4ed8;box-shadow:inset 2px 0 0 var(--accent)}
+.rz{position:absolute;right:-3px;top:0;width:7px;height:100%;cursor:col-resize;z-index:6}
+.rz:hover,.rz.on{background:var(--accent);opacity:.45}
+
+/* ---------- syntax tokens ---------- */
+.tk-fn{color:#0e7490;font-weight:600}
+.tk-num{color:#b45309}
+.tk-bool{color:#be185d;font-weight:600}
+.tk-str{color:#15803d}
+.tk-op{color:#64748b}
+.tk-ref0{color:#e11d48;font-weight:600}
+.tk-ref1{color:#7c3aed;font-weight:600}
+.tk-ref2{color:#0d9488;font-weight:600}
+.tk-ref3{color:#d97706;font-weight:600}
+.tk-ref4{color:#2563eb;font-weight:600}
+.tk-ref5{color:#65a30d;font-weight:600}
+
+/* ---------- cell editor ---------- */
+.cell-editor{position:absolute;z-index:20;background:#fff;box-shadow:0 0 0 2px var(--accent),0 8px 22px -8px rgba(15,35,80,.45)}
+.cell-editor .em{position:absolute;inset:0;margin:0;padding:0 7px;font-family:var(--font);font-size:13px;line-height:24px;white-space:nowrap;overflow:hidden;pointer-events:none;color:var(--ink);font-variant-numeric:tabular-nums}
+.cell-editor input{position:relative;display:block;width:100%;height:24px;border:0;padding:0 7px;font-family:var(--font);font-size:13px;background:transparent;color:transparent;caret-color:var(--ink);outline:none;font-variant-numeric:tabular-nums}
+.cell-editor.num .em,.cell-editor.num input{text-align:right}
+
+/* ---------- status bar ---------- */
+#statusbar{height:27px;flex:none;background:#fff;border-top:1px solid var(--line-strong);display:flex;align-items:center;gap:10px;padding:0 12px;font-size:12px;color:var(--ink-soft);user-select:none}
+#sb-ref{font-weight:600;color:#33415c;font-variant-numeric:tabular-nums}
+.sb-sep{width:1px;height:12px;background:var(--line-strong)}
+.sb-flash{margin-left:8px;color:var(--accent);font-weight:500;opacity:0;transition:opacity .35s;white-space:nowrap}
+.sb-hint{margin-left:auto;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.sb-stats{display:flex;align-items:center;gap:16px;margin-left:16px;flex:none}
+.sb-stat{display:flex;align-items:baseline;gap:5px}
+.sb-stat label{font-size:9.5px;font-weight:700;letter-spacing:.08em;color:#8b98ab}
+.sb-stat b{color:#1e293b;font-weight:600;font-variant-numeric:tabular-nums;min-width:14px}
+kbd{font:600 10.5px var(--font);background:#f1f5f9;border:1px solid #dbe2ea;border-bottom-width:2px;border-radius:4px;padding:1px 4.5px;color:#475569;white-space:nowrap}
+@media (max-width:1150px){.sb-hint{display:none}}
+
+/* ---------- tooltip ---------- */
+#tip{position:fixed;z-index:100;max-width:290px;background:#101828;color:#fff;padding:8px 11px;border-radius:7px;font-size:12px;line-height:1.4;pointer-events:none;display:none;box-shadow:0 8px 24px rgba(10,20,40,.35)}
+#tip .code{font-weight:700;color:#fca5a5;margin-bottom:2px;letter-spacing:.02em}
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" rx="5.5" fill="#2563eb"></rect><path d="M9 5.5v13M15 5.5v13M5.5 9h13M5.5 15h13" stroke="#fff" stroke-width="1.7" stroke-linecap="round" fill="none"></path></svg>
+    <span class="brand-name">Grid<b>calc</b></span>
+  </div>
+  <div class="tb-div"></div>
+  <div class="namebox" id="name-box" aria-label="Active cell">A1</div>
+  <div class="fb-wrap">
+    <pre id="fb-mirror" aria-hidden="true"></pre>
+    <input id="formula-bar" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Enter a value or a formula — e.g. =SUM(A1:A5)" aria-label="Formula bar">
+  </div>
+  <div class="save-chip" id="save-chip"><span class="dot"></span><span id="save-label">Saved</span></div>
+</header>
+
+<div id="viewport" tabindex="0" aria-label="Spreadsheet grid">
+  <table id="grid" role="grid"></table>
+</div>
+
+<div id="statusbar">
+  <span id="sb-ref">A1</span>
+  <span class="sb-sep"></span>
+  <span id="sb-count">1 cell</span>
+  <span id="sb-flash" class="sb-flash"></span>
+  <div class="sb-hint">
+    <span><kbd>F2</kbd> edit</span><span><kbd>Enter</kbd> ↓</span><span><kbd>Tab</kbd> →</span><span><kbd>Del</kbd> clear</span><span><kbd>Ctrl+C</kbd> copy</span><span><kbd>Ctrl+V</kbd> paste</span>
+  </div>
+  <div class="sb-stats">
+    <span class="sb-stat"><label>SUM</label><b id="sb-sum">—</b></span>
+    <span class="sb-stat"><label>COUNT</label><b id="sb-countn">—</b></span>
+    <span class="sb-stat"><label>AVG</label><b id="sb-avg">—</b></span>
+  </div>
+</div>
+
+<div id="tip" role="tooltip"></div>
+
+<script>
+(function () {
+'use strict';
+
+/* ================= constants & helpers ================= */
+var COLS = 26, ROWS = 100, N = COLS * ROWS;
+var RH_W = 46, DEF_W = 84;
+var LS_CELLS = 'gridcalc.cells.v1', LS_COLS = 'gridcalc.cols.v1';
+
+function colName(c){ return String.fromCharCode(65 + c); }
+function addrOf(c, r){ return colName(c) + (r + 1); }
+function colIndex(s){ var n = 0; for (var i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64); return n - 1; }
+function clampC(c){ return c < 0 ? 0 : (c >= COLS ? COLS - 1 : c); }
+function clampR(r){ return r < 0 ? 0 : (r >= ROWS ? ROWS - 1 : r); }
+
+/* ================= values ================= */
+var T_EMPTY = 0, T_NUM = 1, T_TEXT = 2, T_BOOL = 3, T_ERR = 4;
+var V_EMPTY = { t: T_EMPTY };
+var ERR_DIV0  = { t: T_ERR, code: '#DIV/0!' };
+var ERR_VALUE = { t: T_ERR, code: '#VALUE!' };
+var ERR_REF   = { t: T_ERR, code: '#REF!' };
+var ERR_PARSE = { t: T_ERR, code: '#ERROR!' };
+var ERR_CYCLE = { t: T_ERR, code: '#CYCLE!' };
+
+var NUM_RE = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+function numParse(s){ if (typeof s !== 'string' || !NUM_RE.test(s)) return null; var n = parseFloat(s); return isFinite(n) ? n : null; }
+
+function fmtNum(n){
+  if (n === 0) return '0';
+  if (!isFinite(n)) return '#VALUE!';
+  return Number(n.toPrecision(10)).toString();
+}
+
+var FUNCS = { SUM:1, AVERAGE:1, MIN:1, MAX:1, COUNT:1, IF:1, ABS:1, ROUND:1 };
+
+/* ================= DOM refs ================= */
+var viewport  = document.getElementById('viewport');
+var grid      = document.getElementById('grid');
+var nameBox   = document.getElementById('name-box');
+var fbInput   = document.getElementById('formula-bar');
+var fbMirror  = document.getElementById('fb-mirror');
+var saveChip  = document.getElementById('save-chip');
+var saveLabel = document.getElementById('save-label');
+var sbRef     = document.getElementById('sb-ref');
+var sbCount   = document.getElementById('sb-count');
+var sbFlash   = document.getElementById('sb-flash');
+var sbSum     = document.getElementById('sb-sum');
+var sbCountN  = document.getElementById('sb-countn');
+var sbAvg     = document.getElementById('sb-avg');
+var tip       = document.getElementById('tip');
+
+var cells = new Array(N);
+for (var i0 = 0; i0 < N; i0++) cells[i0] = { raw:'', disp:'', memo:V_EMPTY, memoValid:false, deps:new Set(), el:null };
+var dependents = new Array(N);
+for (var i1 = 0; i1 < N; i1++) dependents[i1] = new Set();
+
+var colW = []; for (var i2 = 0; i2 < COLS; i2++) colW.push(DEF_W);
+var colEls = [], colHeads = [], rowHeads = [];
+
+/* ================= grid build ================= */
+function buildGrid(){
+  var cg = document.createElement('colgroup');
+  var c0 = document.createElement('col'); c0.style.width = RH_W + 'px'; cg.appendChild(c0);
+  for (var c = 0; c < COLS; c++){ var col = document.createElement('col'); col.style.width = colW[c] + 'px'; colEls[c] = col; cg.appendChild(col); }
+  grid.appendChild(cg);
+
+  var thead = document.createElement('thead');
+  var h = '<tr role="row"><th class="corner" role="columnheader"></th>';
+  for (c = 0; c < COLS; c++) h += '<th class="colhead" data-c="' + c + '" role="columnheader">' + colName(c) + '<span class="rz" data-c="' + c + '"></span></th>';
+  h += '</tr>';
+  thead.innerHTML = h;
+  grid.appendChild(thead);
+
+  var tbody = document.createElement('tbody');
+  var rows = '';
+  for (var r = 0; r < ROWS; r++){
+    rows += '<tr role="row"><th class="rowhead" data-r="' + r + '" role="rowheader">' + (r + 1) + '</th>';
+    for (c = 0; c < COLS; c++) rows += '<td role="gridcell" data-cell="' + addrOf(c, r) + '" data-idx="' + (r * COLS + c) + '"></td>';
+    rows += '</tr>';
+  }
+  tbody.innerHTML = rows;
+  grid.appendChild(tbody);
+
+  var tds = tbody.querySelectorAll('td');
+  for (var i = 0; i < N; i++) cells[i].el = tds[i];
+  colHeads = Array.prototype.slice.call(grid.querySelectorAll('th.colhead'));
+  rowHeads = Array.prototype.slice.call(grid.querySelectorAll('th.rowhead'));
+}
+
+/* ================= tokenizer / parser ================= */
+var NUM_TOK = /^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/;
+var REF_TOK = /^\$?([A-Za-z]{1,3})\$?(\d{1,3})/;
+var IDENT_TOK = /^[A-Za-z_][A-Za-z0-9_]*/;
+
+function tokenize(src){
+  var toks = [], i = 0, n = src.length, m;
+  while (i < n){
+    var ch = src[i];
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r'){ i++; continue; }
+    if (ch === '"'){
+      var j = i + 1, s = '';
+      for (;;){
+        if (j >= n) throw 1;
+        var c2 = src[j];
+        if (c2 === '"'){ if (src[j + 1] === '"'){ s += '"'; j += 2; } else { j++; break; } }
+        else { s += c2; j++; }
+      }
+      toks.push({ k: 2, s: s }); i = j; continue;
+    }
+    if ((ch >= '0' && ch <= '9') || (ch === '.' && i + 1 < n && src[i + 1] >= '0' && src[i + 1] <= '9')){
+      m = NUM_TOK.exec(src.slice(i));
+      toks.push({ k: 1, n: parseFloat(m[0]) });
+      i += m[0].length; continue;
+    }
+    if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch === '$'){
+      m = REF_TOK.exec(src.slice(i));
+      if (m){ toks.push({ k: 3, col: colIndex(m[1].toUpperCase()), row: +m[2] - 1 }); i += m[0].length; continue; }
+      if (ch !== '$'){
+        m = IDENT_TOK.exec(src.slice(i));
+        var w = m[0].toUpperCase();
+        if (w === 'TRUE' || w === 'FALSE') toks.push({ k: 4, b: w === 'TRUE' });
+        else toks.push({ k: 5, v: w });
+        i += m[0].length; continue;
+      }
+      throw 1;
+    }
+    var two = src.substr(i, 2);
+    if (two === '<>' || two === '<=' || two === '>='){ toks.push({ k: 6, v: two }); i += 2; continue; }
+    if ('+-*/^&<>=:'.indexOf(ch) !== -1){ toks.push({ k: 6, v: ch }); i++; continue; }
+    if (ch === '('){ toks.push({ k: 7 }); i++; continue; }
+    if (ch === ')'){ toks.push({ k: 8 }); i++; continue; }
+    if (ch === ','){ toks.push({ k: 9 }); i++; continue; }
+    throw 1;
+  }
+  return toks;
+}
+
+function parse(src){
+  var toks = tokenize(src);
+  var p = 0;
+  function peek(){ return toks[p]; }
+  function isOp(t, v){ return !!t && t.k === 6 && t.v === v; }
+  function expect(k){ var t = toks[p++]; if (!t || t.k !== k) throw 1; return t; }
+  function parseExpr(){
+    var l = parseConcat(), t;
+    for (;;){
+      t = peek();
+      if (isOp(t,'=')||isOp(t,'<>')||isOp(t,'<')||isOp(t,'>')||isOp(t,'<=')||isOp(t,'>=')){ p++; l = { k: 7, op: t.v, l: l, r: parseConcat() }; }
+      else break;
+    }
+    return l;
+  }
+  function parseConcat(){
+    var l = parseAdd(), t;
+    for (;;){ t = peek(); if (isOp(t,'&')){ p++; l = { k: 7, op: '&', l: l, r: parseAdd() }; } else break; }
+    return l;
+  }
+  function parseAdd(){
+    var l = parseMul(), t;
+    for (;;){ t = peek(); if (isOp(t,'+')||isOp(t,'-')){ p++; l = { k: 7, op: t.v, l: l, r: parseMul() }; } else break; }
+    return l;
+  }
+  function parseMul(){
+    var l = parseUnary(), t;
+    for (;;){ t = peek(); if (isOp(t,'*')||isOp(t,'/')){ p++; l = { k: 7, op: t.v, l: l, r: parseUnary() }; } else break; }
+    return l;
+  }
+  function parseUnary(){
+    var t = peek();
+    if (isOp(t,'+')||isOp(t,'-')){ p++; return { k: 6, neg: t.v === '-', a: parseUnary() }; }
+    return parsePower();
+  }
+  function parsePower(){
+    var l = parseAtom(), t = peek();
+    if (isOp(t,'^')){ p++; return { k: 7, op: '^', l: l, r: parseUnary() }; }
+    return l;
+  }
+  function parseAtom(){
+    var t = toks[p++];
+    if (!t) throw 1;
+    if (t.k === 1) return { k: 1, n: t.n };
+    if (t.k === 2) return { k: 2, s: t.s };
+    if (t.k === 4) return { k: 4, b: t.b };
+    if (t.k === 3) return { k: 3, col: t.col, row: t.row };
+    if (t.k === 7){ var e = parseExpr(); expect(8); return e; }
+    if (t.k === 5){
+      var nt = peek();
+      if (nt && nt.k === 7){
+        p++;
+        var name = t.v;
+        if (!FUNCS[name]) throw 1;
+        var args = [];
+        if (!(peek() && peek().k === 8)){
+          args.push(parseArg());
+          while (peek() && peek().k === 9){ p++; args.push(parseArg()); }
+        }
+        expect(8);
+        return { k: 8, name: name, args: args };
+      }
+      throw 1;
+    }
+    throw 1;
+  }
+  function parseArg(){
+    var t = peek();
+    if (t && t.k === 3 && p + 1 < toks.length && toks[p + 1].k === 6 && toks[p + 1].v === ':'){
+      p += 2;
+      var t2 = toks[p++];
+      if (!t2 || t2.k !== 3) throw 1;
+      var c1 = t.col, r1 = t.row, c2 = t2.col, r2 = t2.row;
+      var bad = c1 < 0 || c1 >= COLS || c2 < 0 || c2 >= COLS || r1 < 0 || r1 >= ROWS || r2 < 0 || r2 >= ROWS;
+      if (c2 < c1){ var tc = c1; c1 = c2; c2 = tc; }
+      if (r2 < r1){ var tr = r1; r1 = r2; r2 = tr; }
+      var arr = [];
+      if (!bad) for (var r = r1; r <= r2; r++) for (var c = c1; c <= c2; c++) arr.push(r * COLS + c);
+      return { k: 5, bad: bad, cells: arr };
+    }
+    return parseExpr();
+  }
+  if (!toks.length) throw 1;
+  var ast = parseExpr();
+  if (p !== toks.length) throw 1;
+  return ast;
+}
+
+/* ================= evaluator ================= */
+function toNum(v){
+  if (v.t === T_EMPTY) return 0;
+  if (v.t === T_NUM) return v.n;
+  if (v.t === T_BOOL) return v.b ? 1 : 0;
+  throw ERR_VALUE;
+}
+function dispVal(v){
+  if (v.t === T_EMPTY) return '';
+  if (v.t === T_NUM) return fmtNum(v.n);
+  if (v.t === T_BOOL) return v.b ? 'TRUE' : 'FALSE';
+  return v.s;
+}
+function compare(a, b, op){
+  if (a.t === T_EMPTY) a = (b.t === T_TEXT) ? { t: T_TEXT, s: '' } : { t: T_NUM, n: 0 };
+  if (b.t === T_EMPTY) b = (a.t === T_TEXT) ? { t: T_TEXT, s: '' } : { t: T_NUM, n: 0 };
+  var c;
+  if (a.t === T_NUM && b.t === T_NUM) c = a.n - b.n;
+  else if (a.t === T_BOOL && b.t === T_BOOL) c = (a.b ? 1 : 0) - (b.b ? 1 : 0);
+  else if (a.t === T_TEXT && b.t === T_TEXT){
+    var A = a.s.toUpperCase(), B = b.s.toUpperCase();
+    c = A < B ? -1 : (A > B ? 1 : 0);
+  }
+  else c = (a.t === T_NUM ? 0 : a.t === T_BOOL ? 1 : 2) - (b.t === T_NUM ? 0 : b.t === T_BOOL ? 1 : 2);
+  c = c < 0 ? -1 : (c > 0 ? 1 : 0);
+  switch (op){
+    case '=': return c === 0;
+    case '<>': return c !== 0;
+    case '<': return c < 0;
+    case '>': return c > 0;
+    case '<=': return c <= 0;
+    case '>=': return c >= 0;
+  }
+  return false;
+}
+function evalFn(node, st, stSet){
+  var name = node.name, args = node.args, i, v, e;
+  if (name === 'IF'){
+    if (args.length < 2) return ERR_PARSE;
+    var c0 = evalNode(args[0], st, stSet); if (c0.t === T_ERR) return c0;
+    var truthy;
+    if (c0.t === T_EMPTY) truthy = false;
+    else if (c0.t === T_BOOL) truthy = c0.b;
+    else if (c0.t === T_NUM) truthy = c0.n !== 0;
+    else return ERR_VALUE;
+    return truthy ? evalNode(args[1], st, stSet) : (args[2] ? evalNode(args[2], st, stSet) : V_EMPTY);
+  }
+  if (name === 'ABS'){
+    if (args.length !== 1) return ERR_PARSE;
+    v = evalNode(args[0], st, stSet); if (v.t === T_ERR) return v;
+    return { t: T_NUM, n: Math.abs(toNum(v)) };
+  }
+  if (name === 'ROUND'){
+    if (args.length < 1 || args.length > 2) return ERR_PARSE;
+    v = evalNode(args[0], st, stSet); if (v.t === T_ERR) return v;
+    var d = 0;
+    if (args.length === 2){
+      var d0 = evalNode(args[1], st, stSet); if (d0.t === T_ERR) return d0;
+      d = toNum(d0);
+    }
+    return { t: T_NUM, n: roundNum(toNum(v), d) };
+  }
+  var sum = 0, cnt = 0, mn = Infinity, mx = -Infinity, count = 0;
+  function feed(val){
+    if (val.t === T_ERR) return val;
+    var n, has = false;
+    if (val.t === T_NUM){ n = val.n; has = true; count++; }
+    else if (val.t === T_BOOL){ n = val.b ? 1 : 0; has = true; }
+    if (has){ sum += n; cnt++; if (n < mn) mn = n; if (n > mx) mx = n; }
+    return null;
+  }
+  for (i = 0; i < args.length; i++){
+    var a = args[i];
+    if (a.k === 5){
+      if (a.bad) return ERR_REF;
+      for (var j = 0; j < a.cells.length; j++){
+        v = getVal(a.cells[j], st, stSet);
+        e = feed(v); if (e) return e;
+      }
+    } else {
+      v = evalNode(a, st, stSet); if (v.t === T_ERR) return v;
+      e = feed(v); if (e) return e;
+    }
+  }
+  switch (name){
+    case 'SUM': return { t: T_NUM, n: sum };
+    case 'AVERAGE': return cnt ? { t: T_NUM, n: sum / cnt } : ERR_DIV0;
+    case 'MIN': return cnt ? { t: T_NUM, n: mn } : { t: T_NUM, n: 0 };
+    case 'MAX': return cnt ? { t: T_NUM, n: mx } : { t: T_NUM, n: 0 };
+    case 'COUNT': return { t: T_NUM, n: count };
+  }
+  return V_EMPTY;
+}
+function evalNode(node, st, stSet){
+  switch (node.k){
+    case 1: return { t: T_NUM, n: node.n };
+    case 2: return { t: T_TEXT, s: node.s };
+    case 4: return { t: T_BOOL, b: node.b };
+    case 3:
+      if (node.col < 0 || node.col >= COLS || node.row < 0 || node.row >= ROWS) return ERR_REF;
+      return getVal(node.row * COLS + node.col, st, stSet);
+    case 6: {
+      var v1 = evalNode(node.a, st, stSet); if (v1.t === T_ERR) return v1;
+      var n1 = toNum(v1);
+      return { t: T_NUM, n: node.neg ? -n1 : n1 };
+    }
+    case 7: {
+      var a = evalNode(node.l, st, stSet); if (a.t === T_ERR) return a;
+      var b = evalNode(node.r, st, stSet); if (b.t === T_ERR) return b;
+      var op = node.op;
+      if (op === '+') return { t: T_NUM, n: toNum(a) + toNum(b) };
+      if (op === '-') return { t: T_NUM, n: toNum(a) - toNum(b) };
+      if (op === '*') return { t: T_NUM, n: toNum(a) * toNum(b) };
+      if (op === '/'){ var d = toNum(b); if (d === 0) return ERR_DIV0; return { t: T_NUM, n: toNum(a) / d }; }
+      if (op === '^'){
+        var pw = Math.pow(toNum(a), toNum(b));
+        if (isNaN(pw)) return ERR_VALUE;
+        if (!isFinite(pw)) return ERR_DIV0;
+        return { t: T_NUM, n: pw };
+      }
+      if (op === '&') return { t: T_TEXT, s: dispVal(a) + dispVal(b) };
+      return { t: T_BOOL, b: compare(a, b, op) };
+    }
+    case 8: return evalFn(node, st, stSet);
+  }
+  return V_EMPTY;
+}
+
+/* ---------- decimal-exact ROUND ---------- */
+function toPlainStr(a){
+  var s = a.toPrecision(15);
+  if (s.indexOf('e') !== -1 || s.indexOf('E') !== -1){
+    var m = /^(-?)(\d+)(?:\.(\d+))?[eE]([+-]?\d+)$/.exec(s);
+    var ip = m[2], fp = m[3] || '', exp = parseInt(m[4], 10);
+    var digits = ip + fp;
+    var point = ip.length + exp;
+    if (point <= 0) s = '0.' + '0'.repeat(-point) + digits;
+    else if (point >= digits.length) s = digits + '0'.repeat(point - digits.length);
+    else s = digits.slice(0, point) + '.' + digits.slice(point);
+    s = m[1] + s;
+  }
+  return s;
+}
+function roundNum(x, d){
+  if (x === 0) return 0;
+  if (!isFinite(x)) return x;
+  d = Math.trunc(d); if (isNaN(d)) d = 0;
+  d = Math.max(-25, Math.min(25, d));
+  var neg = x < 0;
+  var s = toPlainStr(Math.abs(x));
+  var dot = s.indexOf('.');
+  var digits = dot === -1 ? s : s.slice(0, dot) + s.slice(dot + 1);
+  var intLen = dot === -1 ? s.length : dot;
+  var point = intLen + d;
+  var intStr, fracStr;
+  if (point <= 0){ intStr = '0'; fracStr = digits.slice(-point); }
+  else if (point >= digits.length){ intStr = digits + '0'.repeat(point - digits.length); fracStr = ''; }
+  else { intStr = digits.slice(0, point); fracStr = digits.slice(point); }
+  if (fracStr.length && fracStr.charCodeAt(0) >= 53) intStr = (BigInt(intStr) + 1n).toString();
+  intStr = intStr.replace(/^0+(?=\d)/, '');
+  if (intStr === '') intStr = '0';
+  var out;
+  if (d > 0) out = Number(intStr) / Math.pow(10, d);
+  else if (d < 0) out = Number(intStr) * Math.pow(10, -d);
+  else out = Number(intStr);
+  return neg ? -out : out;
+}
+
+/* ================= dependency graph & recalculation ================= */
+var pcache = new Map();
+var DEP_RE = /\$?([A-Za-z]{1,3})\$?(\d{1,3})(?::\$?([A-Za-z]{1,3})\$?(\d{1,3}))?/g;
+function refIdxs(raw){
+  var out = new Set();
+  if (!raw || raw.charCodeAt(0) !== 61) return out;
+  var s = raw.slice(1).replace(/"(?:[^"]|"")*"/g, '');
+  DEP_RE.lastIndex = 0;
+  var m;
+  while ((m = DEP_RE.exec(s))){
+    var c1 = colIndex(m[1].toUpperCase()), r1 = +m[2] - 1;
+    var c2 = m[3] ? colIndex(m[3].toUpperCase()) : c1;
+    var r2 = m[4] ? +m[4] - 1 : r1;
+    var loC = Math.max(0, Math.min(c1, c2)), hiC = Math.min(COLS - 1, Math.max(c1, c2));
+    var loR = Math.max(0, Math.min(r1, r2)), hiR = Math.min(ROWS - 1, Math.max(r1, r2));
+    for (var r = loR; r <= hiR; r++) for (var c = loC; c <= hiC; c++) out.add(r * COLS + c);
+  }
+  return out;
+}
+
+function setRaw(idx, raw, list){
+  var cell = cells[idx];
+  if (cell.raw === raw) return;
+  var old = cell.deps, nd = refIdxs(raw);
+  old.forEach(function (d){ if (!nd.has(d)) dependents[d].delete(idx); });
+  nd.forEach(function (d){ if (!old.has(d)) dependents[d].add(idx); });
+  cell.deps = nd;
+  cell.raw = raw;
+  if (list) list.push(idx);
+  scheduleSave();
+}
+
+function computeCell(i, st, stSet){
+  var raw = cells[i].raw;
+  if (raw === '') return V_EMPTY;
+  if (raw.charCodeAt(0) === 61){
+    var ast = pcache.get(raw);
+    if (ast === undefined){
+      if (pcache.size > 3000) pcache.clear();
+      try { ast = parse(raw.slice(1)); } catch (e){ ast = null; }
+      pcache.set(raw, ast);
+    }
+    if (!ast) return ERR_PARSE;
+    return evalNode(ast, st, stSet);
+  }
+  var n = numParse(raw);
+  return n === null ? { t: T_TEXT, s: raw } : { t: T_NUM, n: n };
+}
+
+function getVal(i, st, stSet){
+  var cell = cells[i];
+  if (cell.memoValid) return cell.memo;
+  if (stSet.has(i)){
+    var k = st.indexOf(i);
+    for (var j = k; j < st.length; j++){
+      var m = cells[st[j]]; m.memo = ERR_CYCLE; m.memoValid = true;
+    }
+    return ERR_CYCLE;
+  }
+  st.push(i); stSet.add(i);
+  var v;
+  try { v = computeCell(i, st, stSet); } catch (e){ v = e; }
+  st.pop(); stSet.delete(i);
+  cell.memo = v; cell.memoValid = true;
+  return v;
+}
+
+function recompute(list){
+  var dirty = new Set();
+  var stk = list.slice();
+  while (stk.length){
+    var i = stk.pop();
+    if (dirty.has(i)) continue;
+    dirty.add(i);
+    var d = dependents[i];
+    if (d.size) d.forEach(function (j){ if (!dirty.has(j)) stk.push(j); });
+  }
+  dirty.forEach(function (i){ cells[i].memoValid = false; });
+  var st = [], stSet = new Set(), upd = [];
+  dirty.forEach(function (i){
+    var v = getVal(i, st, stSet);
+    var d = dispOf(v);
+    if (d !== cells[i].disp){ cells[i].disp = d; upd.push(i); }
+  });
+  for (var u = 0; u < upd.length; u++) paintCell(upd[u]);
+  updateStats();
+}
+
+function dispOf(v){
+  if (v.t === T_EMPTY) return '';
+  if (v.t === T_NUM) return fmtNum(v.n);
+  if (v.t === T_BOOL) return v.b ? 'TRUE' : 'FALSE';
+  if (v.t === T_ERR) return v.code;
+  return v.s;
+}
+function paintCell(i){
+  var cell = cells[i], el = cell.el, v = cell.memo;
+  el.textContent = cell.disp;
+  el.classList.remove('n', 'err');
+  if (v.t === T_NUM) el.classList.add('n');
+  else if (v.t === T_ERR) el.classList.add('err');
+}
+
+/* ================= syntax highlighting & ref colors ================= */
+var HL_RE = /"(?:[^"]|"")*"|\$?[A-Za-z]{1,3}\$?\d{1,3}(?::\$?[A-Za-z]{1,3}\$?\d{1,3})?|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[A-Za-z_][A-Za-z0-9_]*|<=|>=|<>|=|<|>|\+|-|\*|\/|\^|&|,|\(|\)|\$|:/g;
+var REF_TOK_RE = /^\$?[A-Za-z]{1,3}\$?\d{1,3}(?::\$?[A-Za-z]{1,3}\$?\d{1,3})?$/;
+function esc(s){ return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function nextIsParen(src, pos){
+  for (var i = pos; i < src.length; i++){
+    var c = src[i];
+    if (c === ' ' || c === '\t') continue;
+    return c === '(';
+  }
+  return false;
+}
+function highlight(src){
+  var refs = [], refMap = new Map();
+  var html = '', last = 0, m;
+  HL_RE.lastIndex = 0;
+  while ((m = HL_RE.exec(src))){
+    if (m.index > last) html += esc(src.slice(last, m.index));
+    var tok = m[0], cls = '';
+    if (tok.charCodeAt(0) === 34){
+      cls = 'tk-str';
+    } else if (REF_TOK_RE.test(tok)){
+      var parts = tok.split(':');
+      var norm = parts.map(function (p){
+        var mm = /^\$?([A-Za-z]{1,3})\$?(\d{1,3})$/.exec(p);
+        return [colIndex(mm[1].toUpperCase()), +mm[2]];
+      });
+      var key, cellList = [];
+      if (norm.length === 1){
+        key = 'c' + norm[0][0] + 'r' + norm[0][1];
+        if (norm[0][0] >= 0 && norm[0][0] < COLS && norm[0][1] >= 0 && norm[0][1] < ROWS) cellList.push(norm[0][1] * COLS + norm[0][0]);
+      } else {
+        var c1 = Math.min(norm[0][0], norm[1][0]), r1 = Math.min(norm[0][1], norm[1][1]);
+        var c2 = Math.max(norm[0][0], norm[1][0]), r2 = Math.max(norm[0][1], norm[1][1]);
+        key = 'r' + c1 + ',' + r1 + ',' + c2 + ',' + r2;
+        for (var r = Math.max(0, r1); r <= Math.min(ROWS - 1, r2); r++)
+          for (var c = Math.max(0, c1); c <= Math.min(COLS - 1, c2); c++)
+            cellList.push(r * COLS + c);
+      }
+      var ri = refMap.get(key);
+      if (ri === undefined){ ri = refs.length; refMap.set(key, ri); refs.push({ color: ri % 6, cells: [] }); }
+      refs[ri].cells = refs[ri].cells.concat(cellList);
+      cls = 'tk-ref' + (ri % 6);
+    } else if (tok.charCodeAt(0) >= 48 && tok.charCodeAt(0) <= 57 || (tok.charCodeAt(0) === 46 && tok.charCodeAt(1) >= 48 && tok.charCodeAt(1) <= 57)){
+      cls = 'tk-num';
+    } else if (/[A-Za-z_]/.test(tok.charAt(0))){
+      var up = tok.toUpperCase();
+      if (up === 'TRUE' || up === 'FALSE') cls = 'tk-bool';
+      else if (FUNCS[up] && nextIsParen(src, HL_RE.lastIndex)) cls = 'tk-fn';
+    } else cls = 'tk-op';
+    html += cls ? '<span class="' + cls + '">' + esc(tok) + '</span>' : esc(tok);
+    last = m.index + tok.length;
+  }
+  if (last < src.length) html += esc(src.slice(last));
+  return { html: html, refs: refs };
+}
+
+var refMarked = [];
+function clearRefHighlights(){
+  for (var i = 0; i < refMarked.length; i++) refMarked[i][0].classList.remove(refMarked[i][1]);
+  refMarked = [];
+}
+function applyRefHighlights(refs){
+  clearRefHighlights();
+  if (!refs.length) return;
+  var seen = new Set();
+  for (var r = 0; r < refs.length; r++){
+    var cls = 'ref-' + refs[r].color, cs = refs[r].cells;
+    for (var i = 0; i < cs.length; i++){
+      var idx = cs[i];
+      if (seen.has(idx)) continue;
+      seen.add(idx);
+      cells[idx].el.classList.add(cls);
+      refMarked.push([cells[idx].el, cls]);
+    }
+  }
+}
+
+/* ================= selection ================= */
+var sel = { c: 0, r: 0 }, anch = { c: 0, r: 0 };
+var prevActiveEl = null, prevRect = null;
+
+function getRect(){
+  return {
+    c0: Math.min(sel.c, anch.c), c1: Math.max(sel.c, anch.c),
+    r0: Math.min(sel.r, anch.r), r1: Math.max(sel.r, anch.r)
+  };
+}
+function updateHeaders(){
+  var rc = getRect();
+  for (var c = 0; c < COLS; c++){
+    colHeads[c].classList.toggle('hl', c >= rc.c0 && c <= rc.c1);
+    colHeads[c].classList.toggle('hl2', c === sel.c);
+  }
+  for (var r = 0; r < ROWS; r++){
+    rowHeads[r].classList.toggle('hl', r >= rc.r0 && r <= rc.r1);
+    rowHeads[r].classList.toggle('hl2', r === sel.r);
+  }
+}
+function syncBar(){
+  fbInput.value = cells[sel.r * COLS + sel.c].raw;
+  paintFbMirror();
+}
+function updateSelection(){
+  var rc = getRect();
+  if (prevRect){
+    for (var r = prevRect.r0; r <= prevRect.r1; r++)
+      for (var c = prevRect.c0; c <= prevRect.c1; c++){
+        var el = cells[r * COLS + c].el;
+        el.classList.remove('sel');
+        el.classList.remove('active');
+      }
+  }
+  for (r = rc.r0; r <= rc.r1; r++)
+    for (c = rc.c0; c <= rc.c1; c++){
+      if (c === sel.c && r === sel.r) continue;
+      cells[r * COLS + c].el.classList.add('sel');
+    }
+  var actEl = cells[sel.r * COLS + sel.c].el;
+  actEl.classList.add('active');
+  actEl.setAttribute('aria-selected', 'true');
+  prevActiveEl = actEl;
+  prevRect = rc;
+  updateHeaders();
+  var label = (rc.c0 === rc.c1 && rc.r0 === rc.r1) ? addrOf(sel.c, sel.r) : addrOf(rc.c0, rc.r0) + ':' + addrOf(rc.c1, rc.r1);
+  nameBox.textContent = label;
+  sbRef.textContent = label;
+  if (document.activeElement !== fbInput) syncBar();
+  updateStats();
+}
+function scrollActive(){
+  cells[sel.r * COLS + sel.c].el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+var DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+function moveSel(dir, extend){
+  var d = DIRS[dir];
+  sel = { c: clampC(sel.c + d[0]), r: clampR(sel.r + d[1]) };
+  if (!extend) anch = { c: clampC(anch.c + d[0]), r: clampR(anch.r + d[1]) };
+  updateSelection();
+  scrollActive();
+}
+function updateStats(){
+  var rc = getRect();
+  var n = (rc.c1 - rc.c0 + 1) * (rc.r1 - rc.r0 + 1);
+  var sum = 0, cnt = 0;
+  for (var r = rc.r0; r <= rc.r1; r++)
+    for (var c = rc.c0; c <= rc.c1; c++){
+      var m = cells[r * COLS + c].memo;
+      if (m && m.t === T_NUM){ sum += m.n; cnt++; }
+    }
+  sbCount.textContent = n + (n === 1 ? ' cell' : ' cells');
+  if (cnt){
+    sbSum.textContent = fmtNum(sum);
+    sbCountN.textContent = cnt;
+    sbAvg.textContent = fmtNum(sum / cnt);
+  } else {
+    sbSum.textContent = '—'; sbCountN.textContent = '—'; sbAvg.textContent = '—';
+  }
+}
+
+/* ================= formula bar ================= */
+function paintFbMirror(){
+  var h = highlight(fbInput.value);
+  fbMirror.innerHTML = h.html;
+  fbMirror.scrollLeft = fbInput.scrollLeft;
+  if (document.activeElement === fbInput) applyRefHighlights(h.refs);
+}
+fbInput.addEventListener('input', paintFbMirror);
+fbInput.addEventListener('scroll', function (){ fbMirror.scrollLeft = fbInput.scrollLeft; });
+fbInput.addEventListener('focus', function (){
+  fbInput.value = cells[sel.r * COLS + sel.c].raw;
+  paintFbMirror();
+});
+fbInput.addEventListener('blur', function (){
+  applyRefHighlights([]);
+  commitBar();
+});
+function commitBar(){
+  var idx = sel.r * COLS + sel.c;
+  var changed = [];
+  setRaw(idx, fbInput.value, changed);
+  if (changed.length) recompute(changed);
+}
+
+/* ================= cell editor ================= */
+var editor = null;
+function startEdit(idx, text){
+  if (editor) commitEdit(null);
+  var td = cells[idx].el, raw = cells[idx].raw;
+  var wrap = document.createElement('div');
+  wrap.className = 'cell-editor' + (raw !== '' && raw.charCodeAt(0) !== 61 && numParse(raw) !== null ? ' num' : '');
+  wrap.style.width = td.offsetWidth + 'px';
+  wrap.style.height = td.offsetHeight + 'px';
+  wrap.style.left = td.offsetLeft + 'px';
+  wrap.style.top = td.offsetTop + 'px';
+  var em = document.createElement('pre'); em.className = 'em';
+  var input = document.createElement('input');
+  input.setAttribute('spellcheck', 'false');
+  input.setAttribute('autocomplete', 'off');
+  input.setAttribute('autocorrect', 'off');
+  input.setAttribute('aria-label', 'Edit cell ' + addrOf(idx % COLS, Math.floor(idx / COLS)));
+  wrap.appendChild(em); wrap.appendChild(input);
+  viewport.appendChild(wrap);
+  editor = { idx: idx, input: input, mirror: em, wrap: wrap };
+  input.value = text;
+  input.addEventListener('input', function (){
+    var h = highlight(input.value);
+    em.innerHTML = h.html;
+    em.scrollLeft = input.scrollLeft;
+    applyRefHighlights(h.refs);
+    if (document.activeElement !== fbInput){ fbInput.value = input.value; paintFbMirror(); }
+  });
+  input.addEventListener('scroll', function (){ em.scrollLeft = input.scrollLeft; });
+  input.addEventListener('blur', function (){ if (editor) commitEdit(null); });
+  var h0 = highlight(input.value);
+  em.innerHTML = h0.html;
+  applyRefHighlights(h0.refs);
+  input.focus();
+  var L = input.value.length;
+  input.setSelectionRange(L, L);
+}
+function teardownEditor(){
+  if (!editor) return;
+  editor.wrap.remove();
+  editor = null;
+  clearRefHighlights();
+}
+function commitEdit(dir){
+  if (!editor) return;
+  var idx = editor.idx, raw = editor.input.value;
+  teardownEditor();
+  var changed = [];
+  setRaw(idx, raw, changed);
+  if (changed.length) recompute(changed);
+  syncBar();
+  if (dir) moveSel(dir, false);
+}
+function cancelEdit(){
+  if (!editor) return;
+  teardownEditor();
+  syncBar();
+  viewport.focus({ preventScroll: true });
+}
+
+/* ================= copy / paste ================= */
+var clip = null;
+var SHIFT_RE = /(\$?)([A-Za-z]{1,3})(\$?)(\d{1,3})/g;
+function shiftRefs(raw, dc, dr){
+  var parts = raw.split(/"(?:[^"]|"")*"/);
+  var out = '';
+  for (var i = 0; i < parts.length; i++){
+    if (i % 2) { out += parts[i]; continue; }
+    out += parts[i].replace(SHIFT_RE, function (m, $c, col, $r, row){
+      var c0 = colIndex(col.toUpperCase());
+      var c = $c ? c0 : c0 + dc;
+      var r = ($r ? row - 1 : row - 1 + dr);
+      if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return m;
+      return ($c ? '$' : '') + colName(c) + ($r ? '$' : '') + (r + 1);
+    });
+  }
+  return out;
+}
+function copySel(){
+  var rc = getRect();
+  var rows = [];
+  for (var r = rc.r0; r <= rc.r1; r++){
+    var row = [];
+    for (var c = rc.c0; c <= rc.c1; c++) row.push(cells[r * COLS + c].raw);
+    rows.push(row);
+  }
+  clip = { c0: rc.c0, r0: rc.r0, rows: rows };
+  var n = (rc.r1 - rc.r0 + 1) * (rc.c1 - rc.c0 + 1);
+  flash('Copied ' + n + (n === 1 ? ' cell' : ' cells'));
+}
+function pasteSel(){
+  if (!clip) return;
+  var dc = sel.c - clip.c0, dr = sel.r - clip.r0;
+  var changed = [];
+  var rows = clip.rows.length, cols = clip.rows[0].length;
+  for (var ri = 0; ri < rows; ri++)
+    for (var ci = 0; ci < cols; ci++){
+      var raw = clip.rows[ri][ci];
+      if (raw.charCodeAt(0) === 61) raw = shiftRefs(raw, dc, dr);
+      setRaw(clampR(sel.r + ri) * COLS + clampC(sel.c + ci), raw, changed);
+    }
+  if (changed.length) recompute(changed);
+  flash('Pasted ' + rows * cols + ' cell' + (rows * cols === 1 ? '' : 's'));
+}
+var flashTimer = 0;
+function flash(msg){
+  sbFlash.textContent = msg;
+  sbFlash.style.opacity = 1;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(function (){ sbFlash.style.opacity = 0; }, 1400);
+}
+
+/* ================= persistence ================= */
+var saveTimer = 0;
+function setChip(state){
+  saveChip.classList.toggle('saving', state === 'saving');
+  saveLabel.textContent = state === 'saving' ? 'Saving…' : 'Saved';
+}
+function scheduleSave(){
+  setChip('saving');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 300);
+}
+function saveNow(){
+  try {
+    var o = {};
+    for (var i = 0; i < N; i++) if (cells[i].raw) o[addrOf(i % COLS, Math.floor(i / COLS))] = cells[i].raw;
+    localStorage.setItem(LS_CELLS, JSON.stringify(o));
+  } catch (e) {}
+  setChip('saved');
+}
+function saveCols(){ try { localStorage.setItem(LS_COLS, JSON.stringify(colW)); } catch (e) {} }
+function loadCells(){
+  try {
+    var o = JSON.parse(localStorage.getItem(LS_CELLS) || 'null');
+    if (o && typeof o === 'object'){
+      for (var a in o){
+        var m = /^([A-Z]{1,3})(\d{1,3})$/.exec(a);
+        if (!m) continue;
+        var c = colIndex(m[1]), r = +m[2] - 1;
+        if (c >= 0 && c < COLS && r >= 0 && r < ROWS) cells[r * COLS + c].raw = String(o[a]);
+      }
+    }
+  } catch (e) {}
+}
+function loadCols(){
+  try {
+    var w = JSON.parse(localStorage.getItem(LS_COLS) || 'null');
+    if (Array.isArray(w)) for (var c = 0; c < COLS; c++) if (w[c] >= 36 && w[c] <= 500) colW[c] = Math.round(w[c]);
+  } catch (e) {}
+}
+window.addEventListener('beforeunload', saveNow);
+
+/* ================= mouse: selection, drag, resize ================= */
+grid.addEventListener('mousedown', function (e){
+  if (e.button !== 0) return;
+  var rz = e.target.closest ? e.target.closest('.rz') : null;
+  if (rz){ startColResize(+rz.dataset.c, rz, e); return; }
+  var ch = e.target.closest ? e.target.closest('th.colhead') : null;
+  if (ch){
+    if (editor) commitEdit(null);
+    var cc = +ch.dataset.c;
+    anch = { c: cc, r: 0 };
+    sel = { c: cc, r: clampR(sel.r) };
+    updateSelection();
+    viewport.focus({ preventScroll: true });
+    return;
+  }
+  var rh = e.target.closest ? e.target.closest('th.rowhead') : null;
+  if (rh){
+    if (editor) commitEdit(null);
+    var rr = +rh.dataset.r;
+    anch = { c: 0, r: rr };
+    sel = { c: sel.c, r: rr };
+    updateSelection();
+    viewport.focus({ preventScroll: true });
+    return;
+  }
+  var td = e.target.closest ? e.target.closest('td[data-cell]') : null;
+  if (!td) return;
+  var idx = +td.dataset.idx;
+  if (editor){
+    if (editor.idx === idx) return;
+    commitEdit(null);
+  }
+  var c = idx % COLS, r = (idx - c) / COLS;
+  sel = { c: c, r: r };
+  if (e.shiftKey) {} else { anch = { c: c, r: r }; }
+  updateSelection();
+  viewport.focus({ preventScroll: true });
+
+  var moved = false;
+  function onMove(ev){
+    var el2 = document.elementFromPoint(ev.clientX, ev.clientY);
+    var t2 = el2 && el2.closest ? el2.closest('td[data-cell]') : null;
+    if (t2){
+      var i2 = +t2.dataset.idx;
+      if (i2 !== sel.r * COLS + sel.c){
+        sel = { c: i2 % COLS, r: Math.floor(i2 / COLS) };
+        moved = true;
+        updateSelection();
+      }
+    }
+  }
+  function onUp(){
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+  }
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+});
+
+grid.addEventListener('dblclick', function (e){
+  var td = e.target.closest ? e.target.closest('td[data-cell]') : null;
+  if (!td) return;
+  e.preventDefault();
+  var idx = +td.dataset.idx;
+  startEdit(idx, cells[idx].raw);
+});
+
+function startColResize(c, rzEl, e){
+  e.preventDefault();
+  if (editor) commitEdit(null);
+  var startX = e.clientX, startW = colW[c];
+  rzEl.classList.add('on');
+  document.body.classList.add('colresize');
+  function onMove(ev){
+    colW[c] = Math.max(36, Math.min(480, Math.round(startW + ev.clientX - startX)));
+    colEls[c].style.width = colW[c] + 'px';
+  }
+  function onUp(){
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+    rzEl.classList.remove('on');
+    document.body.classList.remove('colresize');
+    saveCols();
+  }
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+}
+grid.addEventListener('dblclick', function (e){
+  var rz = e.target.closest ? e.target.closest('.rz') : null;
+  if (!rz) return;
+  var c = +rz.dataset.c;
+  var w = 44;
+  for (var r = 0; r < ROWS; r++){
+    var sw = cells[r * COLS + c].el.scrollWidth;
+    if (sw > w) w = sw;
+  }
+  colW[c] = Math.max(44, Math.min(360, w + 12));
+  colEls[c].style.width = colW[c] + 'px';
+  saveCols();
+});
+
+/* ================= keyboard ================= */
+document.addEventListener('keydown', function (e){
+  var ae = document.activeElement;
+
+  if (editor && ae === editor.input){
+    if (e.key === 'Enter'){ e.preventDefault(); commitEdit(e.shiftKey ? 'up' : 'down'); }
+    else if (e.key === 'Tab'){ e.preventDefault(); commitEdit(e.shiftKey ? 'left' : 'right'); }
+    else if (e.key === 'Escape'){ e.preventDefault(); cancelEdit(); }
+    return;
+  }
+  if (ae === fbInput){
+    if (e.key === 'Enter'){ e.preventDefault(); commitBar(); }
+    else if (e.key === 'Escape'){ e.preventDefault(); fbInput.value = cells[sel.r * COLS + sel.c].raw; paintFbMirror(); }
+    else if (e.key === 'Tab'){ e.preventDefault(); commitBar(); }
+    return;
+  }
+
+  var k = e.key;
+  var mod = e.ctrlKey || e.metaKey;
+  if (mod && !e.altKey){
+    var lk = k.toLowerCase();
+    if (lk === 'c'){ e.preventDefault(); copySel(); return; }
+    if (lk === 'v'){ e.preventDefault(); pasteSel(); return; }
+    if (lk === 'a'){ e.preventDefault(); sel = { c: 0, r: 0 }; anch = { c: COLS - 1, r: ROWS - 1 }; updateSelection(); return; }
+    return;
+  }
+  if (e.altKey || mod) return;
+  if (editor){ commitEdit(null); return; }
+
+  if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight'){
+    e.preventDefault();
+    var dir = k === 'ArrowUp' ? 'up' : k === 'ArrowDown' ? 'down' : k === 'ArrowLeft' ? 'left' : 'right';
+    moveSel(dir, e.shiftKey);
+    return;
+  }
+  if (k === 'Enter'){ e.preventDefault(); moveSel('down', false); return; }
+  if (k === 'Tab'){ e.preventDefault(); moveSel(e.shiftKey ? 'left' : 'right', false); return; }
+  if (k === 'Delete' || k === 'Backspace'){ e.preventDefault(); clearSel(); return; }
+  if (k === 'F2'){ e.preventDefault(); var fi = sel.r * COLS + sel.c; startEdit(fi, cells[fi].raw); return; }
+  if (k === 'Escape'){ e.preventDefault(); anch = { c: sel.c, r: sel.r }; updateSelection(); return; }
+  if (k === 'Home'){ e.preventDefault(); sel.c = 0; anch = { c: 0, r: sel.r }; updateSelection(); scrollActive(); return; }
+  if (k === 'End'){ e.preventDefault(); sel.c = COLS - 1; anch = { c: COLS - 1, r: sel.r }; updateSelection(); scrollActive(); return; }
+  if (k === 'PageUp'){ e.preventDefault(); var pr = clampR(sel.r - 25); sel = { c: sel.c, r: pr }; anch = { c: anch.c, r: pr }; updateSelection(); scrollActive(); return; }
+  if (k === 'PageDown'){ e.preventDefault(); var nr = clampR(sel.r + 25); sel = { c: sel.c, r: nr }; anch = { c: anch.c, r: nr }; updateSelection(); scrollActive(); return; }
+  if (k && k.length === 1){
+    e.preventDefault();
+    startEdit(sel.r * COLS + sel.c, k);
+    return;
+  }
+});
+function clearSel(){
+  var rc = getRect(), changed = [];
+  for (var r = rc.r0; r <= rc.r1; r++)
+    for (var c = rc.c0; c <= rc.c1; c++) setRaw(r * COLS + c, '', changed);
+  if (changed.length) recompute(changed);
+}
+
+/* ================= error tooltip ================= */
+var ERR_MSG = {
+  '#DIV/0!': 'Division by zero — a formula divides by 0 or by an empty cell (treated as 0).',
+  '#VALUE!': 'A text value was used in arithmetic, or operand types don\u2019t match.',
+  '#REF!': 'A reference points outside the grid (A1:Z100).',
+  '#ERROR!': 'The formula could not be parsed, or it uses an unknown function.',
+  '#CYCLE!': 'Circular reference — these cells depend on each other.'
+};
+function moveTip(e){
+  var x = e.clientX + 14, y = e.clientY + 18;
+  var w = tip.offsetWidth, h = tip.offsetHeight;
+  if (x + w > window.innerWidth - 8) x = e.clientX - w - 10;
+  if (y + h > window.innerHeight - 8) y = e.clientY - h - 12;
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+}
+grid.addEventListener('mouseover', function (e){
+  var td = e.target.closest ? e.target.closest('td[data-cell]') : null;
+  if (!td){ tip.style.display = 'none'; return; }
+  var v = cells[+td.dataset.idx].memo;
+  if (v && v.t === T_ERR){
+    tip.innerHTML = '<div class="code">' + v.code + '</div><div>' + (ERR_MSG[v.code] || '') + '</div>';
+    tip.style.display = 'block';
+    moveTip(e);
+  } else tip.style.display = 'none';
+});
+grid.addEventListener('mousemove', function (e){
+  if (tip.style.display === 'block') moveTip(e);
+});
+grid.addEventListener('mouseleave', function (){ tip.style.display = 'none'; });
+
+/* ================= init ================= */
+function init(){
+  buildGrid();
+  loadCells();
+  loadCols();
+  for (var c = 0; c < COLS; c++) colEls[c].style.width = colW[c] + 'px';
+
+  for (var i = 0; i < N; i++){
+    var d = refIdxs(cells[i].raw);
+    cells[i].deps = d;
+    d.forEach(function (j){ dependents[j].add(i); });
+  }
+  var st = [], stSet = new Set();
+  for (i = 0; i < N; i++){
+    cells[i].memo = getVal(i, st, stSet);
+    cells[i].memoValid = true;
+  }
+  for (i = 0; i < N; i++){
+    cells[i].disp = dispOf(cells[i].memo);
+    if (cells[i].disp) paintCell(i);
+  }
+  updateSelection();
+  setChip('saved');
+  try { viewport.focus({ preventScroll: true }); } catch (e) {}
+}
+init();
+
+})();
+</script>
+</body>
+</html>

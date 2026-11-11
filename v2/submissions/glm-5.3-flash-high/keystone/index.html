@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Keystone · Parametric Sketcher</title>
+<style>
+  :root{
+    --bg:#0c1016;
+    --panel:rgba(19,24,32,.95);
+    --panel-border:#273140;
+    --text:#dde5f0;
+    --muted:#8c97a9;
+    --accent:#3f8cff;
+    --green:#35d07f;
+    --red:#ff5d5d;
+    --amber:#ffc36b;
+    --cyan:#5cc9ff;
+    --mono:ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    user-select:none;-webkit-user-select:none}
+  #cad-canvas{position:fixed;inset:0;display:block}
+
+  /* ---------- top bar ---------- */
+  #topbar{position:fixed;top:0;left:0;right:0;height:48px;z-index:20;
+    display:flex;align-items:center;gap:14px;padding:0 14px;
+    background:var(--panel);border-bottom:1px solid var(--panel-border);
+    backdrop-filter:blur(10px)}
+  #brand{display:flex;align-items:center;gap:9px;min-width:190px}
+  #brand svg{display:block}
+  #brand-name{font-size:13px;font-weight:700;letter-spacing:.22em}
+  #brand-sub{font-size:9px;letter-spacing:.18em;color:var(--muted)}
+  #dim-group{display:flex;align-items:center;gap:8px;margin-left:8px;
+    padding:5px 10px;background:#11161f;border:1px solid var(--panel-border);border-radius:8px}
+  #dim-group label{font-size:10px;letter-spacing:.14em;color:var(--muted)}
+  #dimension-input{width:96px;background:#0b0f15;border:1px solid #2c3543;border-radius:6px;
+    color:var(--amber);font:600 13px var(--mono);padding:4px 8px;outline:none;text-align:right}
+  #dimension-input:focus{border-color:var(--amber);box-shadow:0 0 0 2px rgba(255,195,107,.15)}
+  #dimension-input::-webkit-inner-spin-button{opacity:.4}
+  #sel-info{font-size:11px;color:var(--muted);min-width:80px}
+  #topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .tbtn{height:30px;min-width:32px;padding:0 10px;font-size:12px;color:var(--text);
+    background:#1a212d;border:1px solid #2a3342;border-radius:7px;cursor:pointer}
+  .tbtn:hover{background:#232c3c;border-color:#3a4658}
+  .tbtn:active{transform:translateY(1px)}
+  #clear{color:#ffb0b0}
+  #status{display:flex;align-items:center;gap:8px;height:30px;padding:0 13px;border-radius:999px;
+    border:1px solid;font:600 11.5px var(--mono);letter-spacing:.04em;transition:all .18s}
+  #status .st-dof{font-weight:700}
+  #status[data-state="under"]{color:#8db9ff;border-color:rgba(77,163,255,.45);background:rgba(77,163,255,.10)}
+  #status[data-state="fully"]{color:#63e2a8;border-color:rgba(53,208,127,.45);background:rgba(53,208,127,.10)}
+  #status[data-state="over"]{color:#ff8b8b;border-color:rgba(255,93,93,.55);background:rgba(255,93,93,.12)}
+
+  /* ---------- left toolbar ---------- */
+  #toolbar{position:fixed;top:60px;left:12px;width:178px;z-index:20;
+    background:var(--panel);border:1px solid var(--panel-border);border-radius:11px;
+    padding:10px;backdrop-filter:blur(10px);max-height:calc(100vh - 76px);overflow:auto}
+  .section-title{font-size:9.5px;font-weight:700;letter-spacing:.2em;color:var(--muted);
+    margin:4px 2px 7px}
+  .section + .section{margin-top:12px;padding-top:10px;border-top:1px solid var(--line-soft)}
+  .btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .btn-grid.tools{grid-template-columns:1fr 1fr}
+  .tool-btn,.cbtn{display:flex;align-items:center;gap:6px;padding:7px 8px;font-size:11.5px;
+    color:var(--text);background:#1a212d;border:1px solid #2a3342;border-radius:7px;cursor:pointer;
+    text-align:left;line-height:1.1}
+  .tool-btn svg{flex:none}
+  .tool-btn:hover,.cbtn:hover{background:#232c3c;border-color:#3a4658}
+  .tool-btn[aria-pressed="true"]{background:#2456ae;border-color:#5b9bff;color:#fff}
+  .cbtn .glyph{flex:none;width:16px;text-align:center;font-size:13px;color:var(--cyan);font-family:var(--mono)}
+  .cbtn.dim .glyph{color:var(--amber)}
+  .cbtn span.lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hints{font-size:10px;color:var(--muted);line-height:1.65}
+  .hints b{color:#b9c4d6;font-weight:600}
+
+  /* ---------- floating bits ---------- */
+  #coords{position:fixed;right:14px;bottom:12px;z-index:20;font:11px var(--mono);
+    color:var(--muted);background:rgba(13,17,23,.75);border:1px solid var(--panel-border);
+    padding:4px 9px;border-radius:6px;pointer-events:none;font-variant-numeric:tabular-nums}
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);z-index:30;
+    background:#18202c;border:1px solid #33405 4;border:1px solid #334054;color:var(--text);
+    font-size:12px;padding:8px 15px;border-radius:8px;opacity:0;pointer-events:none;
+    transition:opacity .18s, transform .18s;box-shadow:0 6px 24px rgba(0,0,0,.45);max-width:70vw}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.err{border-color:rgba(255,93,93,.6);color:#ffb3b3}
+</style>
+</head>
+<body>
+<canvas id="cad-canvas"></canvas>
+
+<header id="topbar">
+  <div id="brand">
+    <svg width="22" height="22" viewBox="0 0 22 22"><path d="M11 2 L20 19 L2 19 Z" fill="none" stroke="#3f8cff" stroke-width="1.8" stroke-linejoin="round"/><circle cx="11" cy="14" r="2.2" fill="#3f8cff"/></svg>
+    <div>
+      <div id="brand-name">KEYSTONE</div>
+      <div id="brand-sub">PARAMETRIC SKETCHER</div>
+    </div>
+  </div>
+  <div id="dim-group">
+    <label for="dimension-input">DIM</label>
+    <input id="dimension-input" type="number" step="any" placeholder="value">
+  </div>
+  <div id="sel-info"></div>
+  <div id="topbar-right">
+    <div id="status" data-dof="0" data-state="under"><span>DOF</span><span class="st-dof" id="dof-value">0</span><span id="state-value">Under-constrained</span></div>
+    <button class="tbtn" id="undo" title="Undo (Ctrl+Z)">↶ Undo</button>
+    <button class="tbtn" id="redo" title="Redo (Ctrl+Y)">↷ Redo</button>
+    <button class="tbtn" id="clear" title="Clear sketch and reset view">Clear</button>
+  </div>
+</header>
+
+<aside id="toolbar">
+  <div class="section">
+    <div class="section-title">TOOLS</div>
+    <div class="btn-grid tools">
+      <button class="tool-btn" data-tool="select" aria-pressed="true" title="Select / Move">
+        <svg width="14" height="14" viewBox="0 0 20 20"><path d="M5 2 L5 16 L8.4 12.6 L10.8 18 L13.2 17 L10.8 11.8 L15.5 11.2 Z" fill="currentColor"/></svg>
+        Select</button>
+      <button class="tool-btn" data-tool="point" aria-pressed="false" title="Place a free point">
+        <svg width="14" height="14" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-opacity=".45"/><circle cx="10" cy="10" r="2.6" fill="currentColor"/></svg>
+        Point</button>
+      <button class="tool-btn" data-tool="line" aria-pressed="false" title="Line segment — click start, click end">
+        <svg width="14" height="14" viewBox="0 0 20 20"><line x1="4.5" y1="15.5" x2="15.5" y2="4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="4.5" cy="15.5" r="2.2" fill="currentColor"/><circle cx="15.5" cy="4.5" r="2.2" fill="currentColor"/></svg>
+        Line</button>
+      <button class="tool-btn" data-tool="circle" aria-pressed="false" title="Circle — click center, click radius">
+        <svg width="14" height="14" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="10" r="1.6" fill="currentColor"/></svg>
+        Circle</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">CONSTRAINTS</div>
+    <div class="btn-grid">
+      <button class="cbtn" data-constraint="coincident" title="Coincident — 2 points share one location"><span class="glyph">◎</span><span class="lbl">Coincident</span></button>
+      <button class="cbtn" data-constraint="horizontal" title="Horizontal — 1 line or 2 points"><span class="glyph">─</span><span class="lbl">Horizontal</span></button>
+      <button class="cbtn" data-constraint="vertical" title="Vertical — 1 line or 2 points"><span class="glyph">│</span><span class="lbl">Vertical</span></button>
+      <button class="cbtn" data-constraint="parallel" title="Parallel — 2 lines"><span class="glyph">∥</span><span class="lbl">Parallel</span></button>
+      <button class="cbtn" data-constraint="perpendicular" title="Perpendicular — 2 lines"><span class="glyph">⊥</span><span class="lbl">Perpendicular</span></button>
+      <button class="cbtn" data-constraint="equal" title="Equal — 2 lines or 2 circles"><span class="glyph">=</span><span class="lbl">Equal</span></button>
+      <button class="cbtn" data-constraint="fix" title="Fix — lock 1 point in place"><span class="glyph">⌖</span><span class="lbl">Fix</span></button>
+      <button class="cbtn dim" data-constraint="distance" title="Distance / Length — uses DIM field"><span class="glyph">↔</span><span class="lbl">Distance</span></button>
+      <button class="cbtn dim" data-constraint="radius" title="Radius — uses DIM field"><span class="glyph">R</span><span class="lbl">Radius</span></button>
+      <button class="cbtn dim" data-constraint="angle" title="Angle — uses DIM field"><span class="glyph">∠</span><span class="lbl">Angle</span></button>
+      <button class="cbtn" data-constraint="point-on-object" title="Point on object — 1 point + 1 line/circle"><span class="glyph">⊙</span><span class="lbl">On object</span></button>
+    </div>
+  </div>
+  <div class="section hints">
+    <b>Drag</b> a point to move it<br>
+    <b>Middle-drag</b> or <b>Space+drag</b> to pan<br>
+    <b>Wheel</b> to zoom · <b>Esc</b> cancel<br>
+    <b>Del</b> delete · <b>Ctrl+Z/Y</b> undo/redo
+  </div>
+</aside>
+
+<div id="coords">x 0.0&nbsp;&nbsp;y 0.0</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ============================================================
+   Keystone — parametric 2D sketcher with a Levenberg-Marquardt
+   constraint solver. Single file, no external resources.
+   ============================================================ */
+
+if (!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r){
+    r = Math.min(r, w/2, h/2);
+    this.moveTo(x+r,y); this.arcTo(x+w,y,x+w,y+h,r); this.arcTo(x+w,y+h,x,y+h,r);
+    this.arcTo(x,y+h,x,y,r); this.arcTo(x,y,x+w,y,r); this.closePath();
+  };
+}
+
+/* ---------- DOM ---------- */
+const canvas = document.getElementById('cad-canvas');
+const ctx = canvas.getContext('2d');
+const dimInput = document.getElementById('dimension-input');
+const statusEl = document.getElementById('status');
+const dofValue = document.getElementById('dof-value');
+const stateValue = document.getElementById('state-value');
+const selInfo = document.getElementById('sel-info');
+const toastEl = document.getElementById('toast');
+const coordsEl = document.getElementById('coords');
+
+const MONO = 'ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace';
+const COL = {
+  under:'#4da3ff', fully:'#35d07f', fail:'#ff5d5d',
+  geom:'#5cc9ff', dim:'#ffc36b', hover:'rgba(255,255,255,.55)', sel:'#ffffff'
+};
+
+/* ---------- view ---------- */
+let W=0, H=0, DPR=1;
+const view = { x:0, y:0, scale:1 };
+function resize(){
+  DPR = window.devicePixelRatio || 1;
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.max(1, Math.round(W*DPR));
+  canvas.height = Math.max(1, Math.round(H*DPR));
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+}
+window.addEventListener('resize', resize);
+resize();
+
+function worldToScreen(x,y){ return { x:(x-view.x)*view.scale + W/2, y:(y-view.y)*view.scale + H/2 }; }
+function screenToWorld(sx,sy){ return { x:(sx-W/2)/view.scale + view.x, y:(sy-H/2)/view.scale + view.y }; }
+
+/* ---------- model ---------- */
+const pts = new Map();   // id -> {id,x,y,auto}
+const lns = new Map();   // id -> {id,p1,p2}
+const crs = new Map();   // id -> {id,center,r}
+const cons = new Map();  // id -> {id,type,entities[],value?,fx?,fy?}
+let idCounters = { p:0, l:0, c:0, k:0 };
+
+function nextId(pre){
+  idCounters[pre] = (idCounters[pre]||0)+1;
+  let id = pre + idCounters[pre];
+  while (pts.has(id)||lns.has(id)||crs.has(id)||cons.has(id)){ idCounters[pre]++; id = pre+idCounters[pre]; }
+  return id;
+}
+function syncCounters(){
+  idCounters = { p:0, l:0, c:0, k:0 };
+  const bump = id => {
+    const m = /^([a-z]+)(\d+)$/.exec(id);
+    if (m && m[1] in idCounters) idCounters[m[1]] = Math.max(idCounters[m[1]], parseInt(m[2],10));
+  };
+  for (const id of [...pts.keys(), ...lns.keys(), ...crs.keys(), ...cons.keys()]) bump(id);
+}
+
+function createPoint(x,y,auto){
+  const p = { id: nextId('p'), x, y, auto: !!auto };
+  pts.set(p.id, p); return p;
+}
+function fixedPointsSet(){
+  const s = new Set();
+  for (const c of cons.values()) if (c.type==='fix' && c.entities[0]) s.add(c.entities[0]);
+  return s;
+}
+
+/* ---------- solver ---------- */
+function constraintCost(type){ return (type==='coincident'||type==='fix') ? 2 : 1; }
+
+function linePtsOf(c){
+  if (c.entities.length===1){
+    const l = lns.get(c.entities[0]);
+    if (!l) return [null,null];
+    return [pts.get(l.p1), pts.get(l.p2)];
+  }
+  return [pts.get(c.entities[0]), pts.get(c.entities[1])];
+}
+function distEndsOf(c){
+  if (lns.has(c.entities[0])){
+    const l = lns.get(c.entities[0]);
+    return [pts.get(l.p1), pts.get(l.p2)];
+  }
+  return [pts.get(c.entities[0]), pts.get(c.entities[1])];
+}
+
+function residualFor(c){
+  const e = c.entities, t = c.type;
+  switch(t){
+    case 'coincident': {
+      const a = pts.get(e[0]), b = pts.get(e[1]);
+      if (!a||!b) return [0];
+      return [a.x-b.x, a.y-b.y];
+    }
+    case 'horizontal': {
+      const [a,b] = linePtsOf(c); if (!a||!b) return [0];
+      return [a.y-b.y];
+    }
+    case 'vertical': {
+      const [a,b] = linePtsOf(c); if (!a||!b) return [0];
+      return [a.x-b.x];
+    }
+    case 'parallel': case 'perpendicular': {
+      const l1 = lns.get(e[0]), l2 = lns.get(e[1]);
+      if (!l1||!l2) return [0];
+      const a=pts.get(l1.p1), b=pts.get(l1.p2), d0=pts.get(l2.p1), d1=pts.get(l2.p2);
+      if (!a||!b||!d0||!d1) return [0];
+      const ux=b.x-a.x, uy=b.y-a.y, vx=d1.x-d0.x, vy=d1.y-d0.y;
+      const n1=Math.hypot(ux,uy), n2=Math.hypot(vx,vy);
+      if (n1<1e-12||n2<1e-12) return [0];
+      return t==='parallel' ? [(ux*vy-uy*vx)/(n1*n2)] : [(ux*vx+uy*vy)/(n1*n2)];
+    }
+    case 'equal': {
+      if (lns.has(e[0]) && lns.has(e[1])){
+        const [a,b]=linePtsOf({entities:e}), [c2,d2]=linePtsOf({entities:[e[1],e[1]]});
+        const L1 = lineLen(e[0]), L2 = lineLen(e[1]);
+        return [L1-L2];
+      }
+      const cA = crs.get(e[0]), cB = crs.get(e[1]);
+      if (!cA||!cB) return [0];
+      return [cA.r - cB.r];
+    }
+    case 'fix': {
+      const p = pts.get(e[0]); if (!p) return [0,0];
+      return [p.x - c.fx, p.y - c.fy];
+    }
+    case 'distance': {
+      const [a,b] = distEndsOf(c); if (!a||!b) return [0];
+      return [Math.hypot(a.x-b.x, a.y-b.y) - c.value];
+    }
+    case 'radius': {
+      const cc = crs.get(e[0]); if (!cc) return [0];
+      return [cc.r - c.value];
+    }
+    case 'angle': {
+      const l1 = lns.get(e[0]), l2 = lns.get(e[1]);
+      if (!l1||!l2) return [0,0];
+      const a=pts.get(l1.p1), b=pts.get(l1.p2), d0=pts.get(l2.p1), d1=pts.get(l2.p2);
+      if (!a||!b||!d0||!d1) return [0,0];
+      const ux=b.x-a.x, uy=b.y-a.y, vx=d1.x-d0.x, vy=d1.y-d0.y;
+      const phi = Math.atan2(ux*vy-uy*vx, ux*vx+uy*vy);
+      const T = (c.value||0) * Math.PI/180;
+      return [Math.cos(phi)-Math.cos(T), Math.sin(phi)-Math.sin(T)];
+    }
+    case 'point-on-object': {
+      const p = pts.get(e[0]); if (!p) return [0];
+      if (lns.has(e[1])){
+        const l = lns.get(e[1]);
+        const a = pts.get(l.p1), b = pts.get(l.p2);
+        if (!a||!b) return [0];
+        const ux=b.x-a.x, uy=b.y-a.y, n=Math.hypot(ux,uy);
+        if (n<1e-12) return [0];
+        return [(ux*(p.y-a.y) - uy*(p.x-a.x))/n];
+      }
+      const cc = crs.get(e[1]);
+      if (!cc) return [0];
+      const ct = pts.get(cc.center); if (!ct) return [0];
+      return [Math.hypot(p.x-ct.x, p.y-ct.y) - cc.r];
+    }
+  }
+  return [0];
+}
+function lineLen(lid){
+  const l = lns.get(lid); if (!l) return 0;
+  const a = pts.get(l.p1), b = pts.get(l.p2);
+  return (a&&b) ? Math.hypot(a.x-b.x, a.y-b.y) : 0;
+}
+
+function residualsDetailed(){
+  const rows = [];
+  for (const c of cons.values()) rows.push({ c, vals: residualFor(c) });
+  return rows;
+}
+function flatRows(rows){ const out=[]; for (const r of rows) for (const v of r.vals) out.push(v); return out; }
+function maxErrOf(rows){ let m=0; for (const r of rows) for (const v of r.vals){ const a=Math.abs(v); if (a>m) m=a; } return m; }
+function ssq(arr){ let s=0; for (const v of arr) s+=v*v; return s; }
+function maxAbs(arr){ let m=0; for (const v of arr){ const a=Math.abs(v); if (a>m) m=a; } return m; }
+
+function buildParams(exclude){
+  const params = [];
+  for (const id of pts.keys()){
+    if (!exclude || !exclude.has('px:'+id)) params.push({k:'px', id});
+    if (!exclude || !exclude.has('py:'+id)) params.push({k:'py', id});
+  }
+  for (const id of crs.keys()){
+    if (!exclude || !exclude.has('r:'+id)) params.push({k:'r', id});
+  }
+  return params;
+}
+function applyVec(vec, params){
+  for (let i=0;i<params.length;i++){
+    const p = params[i];
+    if (p.k==='px') pts.get(p.id).x = vec[i];
+    else if (p.k==='py') pts.get(p.id).y = vec[i];
+    else crs.get(p.id).r = vec[i];
+  }
+}
+function getVec(params){
+  const v = new Float64Array(params.length);
+  for (let i=0;i<params.length;i++){
+    const p = params[i];
+    v[i] = p.k==='px' ? pts.get(p.id).x : p.k==='py' ? pts.get(p.id).y : crs.get(p.id).r;
+  }
+  return v;
+}
+
+function linSolve(A, b, n){
+  for (let i=0;i<n;i++){
+    let piv=i, mx=Math.abs(A[i][i]);
+    for (let r=i+1;r<n;r++){ const v=Math.abs(A[r][i]); if (v>mx){ mx=v; piv=r; } }
+    if (mx < 1e-13) return null;
+    if (piv!==i){ const tA=A[i]; A[i]=A[piv]; A[piv]=tA; const tb=b[i]; b[i]=b[piv]; b[piv]=tb; }
+    const d = A[i][i];
+    for (let r=i+1;r<n;r++){
+      const f = A[r][i]/d;
+      if (f===0) continue;
+      for (let cc=i;cc<n;cc++) A[r][cc] -= f*A[i][cc];
+      b[r] -= f*b[i];
+    }
+  }
+  const x = new Float64Array(n);
+  for (let i=n-1;i>=0;i--){
+    let s = b[i];
+    for (let j=i+1;j<n;j++) s -= A[i][j]*x[j];
+    x[i] = s / A[i][i];
+  }
+  return x;
+}
+
+/* Levenberg–Marquardt with numeric (central-difference) Jacobian */
+function lmSolve(opts){
+  opts = opts || {};
+  const params = buildParams(opts.exclude || null);
+  const m = params.length;
+  if (m===0){
+    const rows = residualsDetailed();
+    const me = maxErrOf(rows);
+    return { converged: me<=1e-3, maxError: me };
+  }
+  let vec = getVec(params);
+  applyVec(vec, params);
+  let rows = residualsDetailed();
+  let res = flatRows(rows);
+  let cost = ssq(res);
+  let lambda = 1e-3;
+  const maxIter = opts.maxIter || 240;
+
+  for (let iter=0; iter<maxIter; iter++){
+    if (maxAbs(res) < 1e-10) break;
+    const n = res.length;
+    const J = new Float64Array(n*m);
+    for (let j=0;j<m;j++){
+      const orig = vec[j];
+      const h = Math.max(1e-7, Math.abs(orig)*1e-7);
+      const vp = vec.slice(), vm = vec.slice();
+      vp[j] = orig+h; vm[j] = orig-h;
+      applyVec(vp, params); const rp = flatRows(residualsDetailed());
+      applyVec(vm, params); const rm = flatRows(residualsDetailed());
+      applyVec(vec, params);
+      for (let i=0;i<n;i++) J[i*m+j] = (rp[i]-rm[i])/(2*h);
+    }
+    const A = []; for (let i=0;i<m;i++) A.push(new Float64Array(m));
+    const g = new Float64Array(m);
+    for (let i=0;i<n;i++){
+      const off = i*m;
+      for (let j=0;j<m;j++){
+        const Jij = J[off+j];
+        if (Jij===0) continue;
+        g[j] += Jij*res[i];
+        for (let k=j;k<m;k++) A[j][k] += Jij*J[off+k];
+      }
+    }
+    for (let j=0;j<m;j++) for (let k=0;k<j;k++) A[j][k]=A[k][j];
+
+    let solved = false;
+    for (let attempt=0; attempt<10; attempt++){
+      const Am = A.map(r=>r.slice());
+      const bb = new Float64Array(m);
+      for (let j=0;j<m;j++){ bb[j] = -g[j]; Am[j][j] += lambda*(A[j][j]+1e-10); }
+      const d = linSolve(Am, bb, m);
+      if (!d){ lambda*=5; continue; }
+      let big=0; for (let j=0;j<m;j++) big=Math.max(big, Math.abs(d[j]));
+      if (big>1e7){ lambda*=5; continue; }
+      const trial = vec.slice();
+      for (let j=0;j<m;j++) trial[j]+=d[j];
+      applyVec(trial, params);
+      const rT = flatRows(residualsDetailed());
+      const cT = ssq(rT);
+      if (cT < cost){
+        const improvement = cost - cT;
+        vec = trial; res = rT; cost = cT;
+        lambda = Math.max(lambda*0.25, 1e-9);
+        solved = true;
+        if (maxAbs(res) < 1e-10) iter = maxIter;
+        else if (improvement < 1e-16 && maxAbs(res) < 1e-7) iter = maxIter;
+        break;
+      }
+      lambda *= 3;
+    }
+    if (!solved) break;
+  }
+  applyVec(vec, params);
+  const finalRows = residualsDetailed();
+  const me = maxErrOf(finalRows);
+  lastRows = finalRows;
+  return { converged: me<=1e-3, maxError: me };
+}
+
+/* ---------- status / DOF ---------- */
+let lastRows = [];
+let lastMaxError = 0;
+let failingEnts = new Set();
+let curStatus = { dof:0, state:'under', maxError:0 };
+
+function computeFailing(){
+  failingEnts = new Set();
+  for (const r of lastRows){
+    if (maxAbs(r.vals) > 1e-2) for (const e of r.c.entities) failingEnts.add(e);
+  }
+}
+function refreshStatus(){
+  let cost = 0;
+  for (const c of cons.values()) cost += constraintCost(c.type);
+  const dof = pts.size*2 + crs.size - cost;
+  const hasEnt = pts.size>0 || lns.size>0 || crs.size>0;
+  let st;
+  if (!hasEnt && cons.size===0) st = 'under';
+  else if (lastMaxError > 1e-3 || dof < 0) st = 'over';
+  else if (dof === 0) st = 'fully';
+  else st = 'under';
+  curStatus = { dof, state: st, maxError: lastMaxError };
+  statusEl.dataset.dof = String(dof);
+  statusEl.dataset.state = st;
+  dofValue.textContent = String(dof);
+  stateValue.textContent = st==='under' ? 'Under-constrained' : st==='fully' ? 'Fully constrained' : 'Conflicting';
+}
+function solveAll(opts){
+  const r = lmSolve(opts);
+  lastMaxError = r.maxError;
+  if (!dragging){        // keep colors/status stable while dragging
+    computeFailing();
+    refreshStatus();
+  }
+  return r;
+}
+
+/* ---------- serialization / persistence / history ---------- */
+function serialize(){
+  return {
+    v:1,
+    points: [...pts.values()].map(p=>({id:p.id, x:p.x, y:p.y, auto:!!p.auto})),
+    lines:  [...lns.values()].map(l=>({id:l.id, p1:l.p1, p2:l.p2})),
+    circles:[...crs.values()].map(c=>({id:c.id, center:c.center, r:c.r})),
+    constraints:[...cons.values()].map(c=>{
+      const o = { id:c.id, type:c.type, entities:c.entities.slice() };
+      if (c.type==='fix'){ o.fx=c.fx; o.fy=c.fy; }
+      if (c.value!==undefined) o.value=c.value;
+      return o;
+    })
+  };
+}
+function restoreData(s){
+  pts.clear(); lns.clear(); crs.clear(); cons.clear();
+  for (const p of (s.points||[]))  pts.set(p.id, {id:p.id, x:+p.x, y:+p.y, auto:!!p.auto});
+  for (const l of (s.lines||[]))   lns.set(l.id, {id:l.id, p1:l.p1, p2:l.p2});
+  for (const c of (s.circles||[])) crs.set(c.id, {id:c.id, center:c.center, r:+c.r});
+  for (const c of (s.constraints||[])){
+    const o = { id:c.id, type:c.type, entities:(c.entities||[]).slice() };
+    if (c.type==='fix'){ o.fx=+c.fx||0; o.fy=+c.fy||0; }
+    if (c.value!==undefined) o.value=+c.value;
+    cons.set(o.id, o);
+  }
+  syncCounters();
+  selection.clear(); pending = null;
+  solveAll(); updateUI();
+}
+function save(){
+  try{ localStorage.setItem('keystone.sketch', JSON.stringify(serialize())); }catch(err){}
+}
+function loadFromStorage(){
+  try{
+    const raw = localStorage.getItem('keystone.sketch');
+    if (raw){ restoreData(JSON.parse(raw)); return true; }
+  }catch(err){}
+  return false;
+}
+
+let history = [];
+let hIndex = -1;
+function commit(){
+  const snap = serialize();
+  if (hIndex>=0 && history[hIndex] && JSON.stringify(history[hIndex])===JSON.stringify(snap)){ save(); return; }
+  history = history.slice(0, hIndex+1);
+  history.push(snap);
+  hIndex = history.length-1;
+  if (history.length>120){ const drop = history.length-120; history.splice(0,drop); hIndex-=drop; }
+  save();
+}
+function undo(){
+  if (hIndex>0){ hIndex--; restoreData(history[hIndex]); }
+  else toast('Nothing to undo');
+}
+function redo(){
+  if (hIndex < history.length-1){ hIndex++; restoreData(history[hIndex]); }
+  else toast('Nothing to redo');
+}
+
+/* ---------- interaction state ---------- */
+let tool = 'select';
+let pending = null;      // {kind:'line'|'circle', x,y,pid}
+let dragging = null;
+let panning = null;
+let spaceDown = false;
+let hoverId = null;
+let lastMouse = { x: W/2, y: H/2 };
+const selection = new Set();
+
+function isEntity(id){ return pts.has(id)||lns.has(id)||crs.has(id); }
+
+/* ---------- hit testing ---------- */
+function segDist(px,py,ax,ay,bx,by){
+  const dx=bx-ax, dy=by-ay;
+  const l2 = dx*dx+dy*dy;
+  let t = l2>0 ? ((px-ax)*dx+(py-ay)*dy)/l2 : 0;
+  t = Math.max(0, Math.min(1,t));
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+}
+function snapPoint(wp){
+  const tol = 12/view.scale;
+  let best=null, bd=tol;
+  for (const p of pts.values()){
+    const d = Math.hypot(p.x-wp.x, p.y-wp.y);
+    if (d<bd){ bd=d; best=p; }
+  }
+  return best;
+}
+let constraintHits = new Map(); // cid -> {x,y,r} screen space, refreshed per frame
+function hitTest(sp){
+  let best=null, bd=8;
+  for (const p of pts.values()){
+    const s = worldToScreen(p.x,p.y);
+    const d = Math.hypot(s.x-sp.x, s.y-sp.y);
+    if (d<bd){ bd=d; best=p.id; }
+  }
+  if (best) return best;
+  for (const [cid,h] of constraintHits){
+    if (Math.hypot(h.x-sp.x, h.y-sp.y) <= h.r) return cid;
+  }
+  for (const l of lns.values()){
+    const a=pts.get(l.p1), b=pts.get(l.p2);
+    if (!a||!b) continue;
+    const A=worldToScreen(a.x,a.y), B=worldToScreen(b.x,b.y);
+    if (segDist(sp.x,sp.y,A.x,A.y,B.x,B.y) <= 6) return l.id;
+  }
+  for (const c of crs.values()){
+    const ct=pts.get(c.center); if (!ct) continue;
+    const S=worldToScreen(ct.x,ct.y);
+    const d=Math.abs(Math.hypot(sp.x-S.x, sp.y-S.y) - c.r*view.scale);
+    if (d<=6) return c.id;
+  }
+  return null;
+}
+
+/* ---------- entity operations ---------- */
+function deleteSelection(){
+  if (!selection.size) return;
+  const entIds = new Set([...selection].filter(isEntity));
+  const removed = new Set();
+  for (const c of [...cons.values()]){
+    if (selection.has(c.id) || c.entities.some(e=>entIds.has(e))){ cons.delete(c.id); removed.add(c.id); }
+  }
+  for (const id of entIds){
+    if (pts.has(id)) pts.delete(id);
+    else if (lns.has(id)) lns.delete(id);
+    else if (crs.has(id)) crs.delete(id);
+  }
+  // sweep auto-created points that lost their owners
+  const referenced = new Set();
+  for (const l of lns.values()){ referenced.add(l.p1); referenced.add(l.p2); }
+  for (const c of crs.values()) referenced.add(c.center);
+  const fixed = fixedPointsSet();
+  for (const p of [...pts.values()]){
+    if (p.auto && !referenced.has(p.id) && !fixed.has(p.id)){
+      pts.delete(p.id);
+      for (const c of [...cons.values()]) if (c.entities.includes(p.id)) cons.delete(c.id);
+    }
+  }
+  selection.clear();
+  solveAll(); commit(); updateUI();
+}
+
+/* ---------- constraint application ---------- */
+const REQUIRE_MSG = {
+  coincident:'Coincident needs exactly 2 points selected.',
+  horizontal:'Horizontal needs a line or 2 points selected.',
+  vertical:'Vertical needs a line or 2 points selected.',
+  parallel:'Parallel needs exactly 2 lines selected.',
+  perpendicular:'Perpendicular needs exactly 2 lines selected.',
+  equal:'Equal needs 2 lines or 2 circles selected.',
+  fix:'Fix needs exactly 1 point selected.',
+  distance:'Distance needs a line or 2 points selected.',
+  radius:'Radius needs exactly 1 circle selected.',
+  angle:'Angle needs exactly 2 lines selected.',
+  'point-on-object':'Point-on-object needs 1 point plus 1 line or circle.'
+};
+function readDimValue(){
+  const v = parseFloat(dimInput.value);
+  return isFinite(v) ? v : null;
+}
+function applyConstraint(type){
+  const sel = [...selection].filter(isEntity);
+  const ptsSel = sel.filter(id=>pts.has(id));
+  const lnsSel = sel.filter(id=>lns.has(id));
+  const crsSel = sel.filter(id=>crs.has(id));
+  let entities = null;
+  switch(type){
+    case 'coincident': if (ptsSel.length===2) entities = ptsSel; break;
+    case 'horizontal': case 'vertical':
+      if (lnsSel.length===1) entities = lnsSel;
+      else if (ptsSel.length===2) entities = ptsSel; break;
+    case 'parallel': case 'perpendicular': case 'angle':
+      if (lnsSel.length===2) entities = lnsSel; break;
+    case 'equal':
+      if (lnsSel.length===2) entities = lnsSel;
+      else if (crsSel.length===2) entities = crsSel; break;
+    case 'fix': if (ptsSel.length===1) entities = ptsSel; break;
+    case 'distance':
+      if (lnsSel.length===1) entities = lnsSel;
+      else if (ptsSel.length===2) entities = ptsSel; break;
+    case 'radius': if (crsSel.length===1) entities = crsSel; break;
+    case 'point-on-object':
+      if (ptsSel.length===1 && (lnsSel.length + crsSel.length)===1)
+        entities = [ptsSel[0], lnsSel[0]||crsSel[0]];
+      break;
+  }
+  if (!entities){ toast(REQUIRE_MSG[type] || 'Invalid selection.', true); return; }
+
+  const key = type+'|'+entities.slice().sort().join('|');
+  for (const c of cons.values()){
+    if (c.type+'|'+c.entities.slice().sort().join('|') === key){
+      toast('Constraint already applied.', true); return;
+    }
+  }
+  const c = { id: nextId('k'), type, entities: entities.slice() };
+  if (type==='fix'){ const p = pts.get(entities[0]); c.fx = p.x; c.fy = p.y; }
+  if (type==='distance'){
+    const [a,b] = distEndsOf(c);
+    const v = readDimValue();
+    c.value = v!=null ? Math.abs(v) : Math.hypot(a.x-b.x, a.y-b.y);
+    dimInput.value = formatNum(c.value);
+  }
+  if (type==='radius'){
+    const cc = crs.get(entities[0]);
+    const v = readDimValue();
+    c.value = v!=null ? Math.abs(v) : cc.r;
+    dimInput.value = formatNum(c.value);
+  }
+  if (type==='angle'){
+    const l1 = lns.get(entities[0]), l2 = lns.get(entities[1]);
+    const a=pts.get(l1.p1), b=pts.get(l1.p2), d0=pts.get(l2.p1), d1=pts.get(l2.p2);
+    const ux=b.x-a.x, uy=b.y-a.y, vx=d1.x-d0.x, vy=d1.y-d0.y;
+    const v = readDimValue();
+    c.value = v!=null ? v : Math.acos(Math.max(-1, Math.min(1, (ux*vx+uy*vy)/((Math.hypot(ux,uy)||1)*(Math.hypot(vx,vy)||1)))))*180/Math.PI;
+    dimInput.value = formatNum(c.value);
+  }
+  cons.set(c.id, c);
+  selection.clear(); selection.add(c.id);
+  solveAll(); commit(); updateUI();
+  const st = curStatus.state;
+  toast(`"${type}" constraint added — ${st==='over'?'conflict detected':st==='fully'?'sketch fully constrained':'solved'}`, st==='over');
+}
+
+/* dimension input -> retarget existing dimensional constraints */
+const DIM_TYPES = ['distance','radius','angle'];
+function dimTargets(){
+  const out = [];
+  for (const id of selection){
+    const c = cons.get(id);
+    if (c && DIM_TYPES.includes(c.type)) out.push(c);
+  }
+  if (out.length) return out;
+  const entSel = [...selection].filter(isEntity);
+  if (!entSel.length) return [];
+  const eset = new Set(entSel);
+  for (const c of cons.values()){
+    if (DIM_TYPES.includes(c.type) && c.entities.some(e=>eset.has(e))) out.push(c);
+  }
+  return out;
+}
+let dimCommitTimer = null;
+function onDimInput(){
+  const v = parseFloat(dimInput.value);
+  if (!isFinite(v)) return;
+  const targets = dimTargets();
+  if (!targets.length) return;
+  let changed = false;
+  for (const c of targets){
+    const nv = c.type==='angle' ? v : Math.abs(v);
+    if (c.value !== nv){ c.value = nv; changed = true; }
+  }
+  if (changed){ solveAll(); scheduleCommit(); }
+}
+function scheduleCommit(){
+  clearTimeout(dimCommitTimer);
+  dimCommitTimer = setTimeout(()=>commit(), 350);
+}
+dimInput.addEventListener('input', onDimInput);
+dimInput.addEventListener('change', ()=>{ onDimInput(); clearTimeout(dimCommitTimer); commit(); });
+
+/* ---------- dragging ---------- */
+function beginDrag(id, wp){
+  if (pts.has(id)){
+    const p = pts.get(id);
+    const ex = new Set(['px:'+id, 'py:'+id]);
+    dragging = { kind:'point', id, ex, ox: wp.x-p.x, oy: wp.y-p.y, moved:false };
+  } else if (lns.has(id)){
+    const l = lns.get(id);
+    const ex = new Set();
+    for (const pid of [l.p1, l.p2]) if (!fixedPointsSet().has(pid)){ ex.add('px:'+pid); ex.add('py:'+pid); }
+    dragging = { kind:'body', id, ex, startWp:{x:wp.x,y:wp.y},
+      starts: [l.p1,l.p2].map(pid=>({pid, x:pts.get(pid).x, y:pts.get(pid).y})), moved:false };
+  } else if (crs.has(id)){
+    dragging = { kind:'radius', id, ex:new Set(['r:'+id]), moved:false };
+  }
+}
+function onDragMove(wp){
+  if (!dragging) return;
+  if (dragging.kind==='point'){
+    const p = pts.get(dragging.id);
+    const nx = wp.x - dragging.ox, ny = wp.y - dragging.oy;
+    if (Math.hypot(nx-p.x, ny-p.y) > 1e-9) dragging.moved = true;
+    p.x = nx; p.y = ny;
+  } else if (dragging.kind==='body'){
+    const dx = wp.x - dragging.startWp.x, dy = wp.y - dragging.startWp.y;
+    if (Math.hypot(dx,dy) > 1e-9) dragging.moved = true;
+    const fixed = fixedPointsSet();
+    for (const s of dragging.starts){
+      if (fixed.has(s.pid)) continue;
+      const p = pts.get(s.pid);
+      p.x = s.x + dx; p.y = s.y + dy;
+    }
+  } else {
+    const c = crs.get(dragging.id);
+    const ct = pts.get(c.center);
+    const r = Math.hypot(wp.x-ct.x, wp.y-ct.y);
+    if (Math.abs(r-c.r) > 1e-9) dragging.moved = true;
+    c.r = Math.max(1e-6, r);
+  }
+  solveAll({ exclude: dragging.ex, maxIter: 120 });
+}
+function endDrag(){
+  if (!dragging) return;
+  const moved = dragging.moved;
+  dragging = null;
+  solveAll();
+  if (moved) commit();
+}
+
+/* ---------- mouse events ---------- */
+canvas.addEventListener('mousedown', e=>{
+  if (e.button===1 || (e.button===0 && spaceDown)){
+    e.preventDefault();
+    panning = { sx:e.clientX, sy:e.clientY, vx:view.x, vy:view.y };
+    updateCursor();
+    return;
+  }
+  if (e.button!==0) return;
+  const wp = screenToWorld(e.clientX, e.clientY);
+  if (tool==='select'){
+    const hit = hitTest({x:e.clientX, y:e.clientY});
+    if (hit){
+      if (e.shiftKey){
+        if (selection.has(hit)) selection.delete(hit); else selection.add(hit);
+      } else if (!selection.has(hit)){
+        selection.clear(); selection.add(hit);
+      }
+      beginDrag(hit, wp);
+    } else if (!e.shiftKey){
+      selection.clear();
+    }
+    updateUI();
+  } else if (tool==='point'){
+    createPoint(wp.x, wp.y, false);
+    solveAll(); commit(); updateUI();
+  } else if (tool==='line'){
+    const snap = snapPoint(wp);
+    if (!pending) pending = { kind:'line', x:wp.x, y:wp.y, pid: snap ? snap.id : null };
+    else {
+      let p1 = pending.pid ? pts.get(pending.pid) : createPoint(pending.x, pending.y, true);
+      let p2id = null;
+      if (snap && snap.id !== p1.id) p2id = snap.id;
+      else if (!snap) p2id = createPoint(wp.x, wp.y, true).id;
+      if (!p2id){ toast('Line endpoints coincide — cancelled.', true); pending = null; }
+      else {
+        const l = { id: nextId('l'), p1: p1.id, p2: p2id };
+        lns.set(l.id, l);
+        pending = null;
+        solveAll(); commit(); updateUI();
+      }
+    }
+  } else if (tool==='circle'){
+    const snap = snapPoint(wp);
+    if (!pending) pending = { kind:'circle', x:wp.x, y:wp.y, pid: snap ? snap.id : null };
+    else {
+      const center = pending.pid ? pts.get(pending.pid) : createPoint(pending.x, pending.y, true);
+      const r = Math.hypot(wp.x-center.x, wp.y-center.y);
+      if (r < 1e-9){ toast('Circle radius is zero — cancelled.', true); pending = null; }
+      else {
+        const c = { id: nextId('c'), center: center.id, r };
+        crs.set(c.id, c);
+        pending = null;
+        solveAll(); commit(); updateUI();
+      }
+    }
+  }
+});
+
+window.addEventListener('mousemove', e=>{
+  lastMouse = { x:e.clientX, y:e.clientY };
+  const wpt = screenToWorld(e.clientX, e.clientY);
+  coordsEl.textContent = `x ${wpt.x.toFixed(1)}  y ${wpt.y.toFixed(1)}`;
+  if (panning){
+    view.x = panning.vx - (e.clientX - panning.sx)/view.scale;
+    view.y = panning.vy - (e.clientY - panning.sy)/view.scale;
+    updateCursor();
+    return;
+  }
+  if (dragging){ onDragMove(wpt); updateCursor(); return; }
+  if (e.target === canvas){
+    hoverId = tool==='select' ? hitTest({x:e.clientX, y:e.clientY}) : null;
+  } else hoverId = null;
+  updateCursor();
+});
+
+window.addEventListener('mouseup', e=>{
+  if (panning && (e.button===1 || e.button===0)){ panning = null; updateCursor(); }
+  if (e.button===0) endDrag();
+  updateCursor();
+});
+
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const factor = Math.exp(-e.deltaY*0.0012);
+  const wp = screenToWorld(e.clientX, e.clientY);
+  view.scale = Math.max(0.02, Math.min(800, view.scale*factor));
+  view.x = wp.x - (e.clientX - W/2)/view.scale;
+  view.y = wp.y - (e.clientY - H/2)/view.scale;
+}, { passive:false });
+
+canvas.addEventListener('contextmenu', e=>e.preventDefault());
+
+canvas.addEventListener('dblclick', e=>{
+  const hit = hitTest({x:e.clientX, y:e.clientY});
+  if (hit && cons.has(hit)){
+    selection.clear(); selection.add(hit);
+    updateUI();
+    dimInput.focus(); dimInput.select();
+  }
+});
+
+/* ---------- keyboard ---------- */
+window.addEventListener('keydown', e=>{
+  const tag = e.target && e.target.tagName;
+  const inInput = tag==='INPUT' || tag==='TEXTAREA';
+  if (e.key==='Escape'){
+    if (inInput){ e.target.blur(); return; }
+    if (pending){ pending = null; }
+    else selection.clear();
+    updateUI();
+    return;
+  }
+  if (inInput) return;
+  if (e.key===' '){ spaceDown = true; e.preventDefault(); updateCursor(); return; }
+  if ((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z')){
+    e.preventDefault();
+    if (e.shiftKey) redo(); else undo();
+    return;
+  }
+  if ((e.ctrlKey||e.metaKey) && (e.key==='y'||e.key==='Y')){ e.preventDefault(); redo(); return; }
+  if (e.key==='Delete' || e.key==='Backspace'){ e.preventDefault(); deleteSelection(); }
+});
+window.addEventListener('keyup', e=>{
+  if (e.key===' '){ spaceDown = false; updateCursor(); }
+});
+
+/* ---------- UI wiring ---------- */
+function setTool(t){
+  tool = t; pending = null;
+  document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.tool===t)));
+  updateCursor();
+}
+document.querySelectorAll('[data-tool]').forEach(b=>{
+  b.addEventListener('click', ()=>{ setTool(b.dataset.tool); b.blur(); });
+});
+document.querySelectorAll('[data-constraint]').forEach(b=>{
+  b.addEventListener('click', ()=>{ applyConstraint(b.dataset.constraint); b.blur(); });
+});
+document.getElementById('undo').addEventListener('click', function(){ undo(); this.blur(); });
+document.getElementById('redo').addEventListener('click', function(){ redo(); this.blur(); });
+document.getElementById('clear').addEventListener('click', function(){
+  pts.clear(); lns.clear(); crs.clear(); cons.clear();
+  selection.clear(); pending = null; dragging = null;
+  view.x = 0; view.y = 0; view.scale = 1;
+  idCounters = { p:0, l:0, c:0, k:0 };
+  solveAll(); commit(); updateUI();
+  toast('Sketch cleared');
+  this.blur();
+});
+
+function formatNum(v){
+  if (!isFinite(v)) return '0';
+  if (Math.abs(v) < 1e-9) return '0';
+  if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
+  return String(Math.round(v*100)/100);
+}
+function updateUI(){
+  document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.tool===tool)));
+  let dimC = null;
+  for (const id of selection){
+    const c = cons.get(id);
+    if (c && DIM_TYPES.includes(c.type)){ dimC = c; break; }
+  }
+  if (dimC) dimInput.value = formatNum(dimC.value);
+  selInfo.textContent = selection.size ? `${selection.size} selected` : '';
+  refreshStatus();
+}
+
+let toastTimer = null;
+function toast(msg, isErr){
+  toastEl.textContent = msg;
+  toastEl.classList.toggle('err', !!isErr);
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>toastEl.classList.remove('show'), 2200);
+}
+function updateCursor(){
+  if (panning) canvas.style.cursor = 'grabbing';
+  else if (spaceDown) canvas.style.cursor = 'grab';
+  else if (dragging) canvas.style.cursor = 'grabbing';
+  else if (tool!=='select') canvas.style.cursor = 'crosshair';
+  else canvas.style.cursor = hoverId ? 'pointer' : 'default';
+}
+
+/* ============================================================
+   RENDERING
+   ============================================================ */
+function niceSpacing(minWorld){
+  const e = Math.floor(Math.log10(minWorld));
+  for (let exp=e-1; exp<=e+1; exp++){
+    for (const mm of [1,2,5,10]){
+      const v = mm*Math.pow(10,exp);
+      if (v >= minWorld - 1e-12) return v;
+    }
+  }
+  return Math.pow(10, e+1);
+}
+
+function drawGrid(){
+  const s = niceSpacing(9/view.scale);
+  const major = s*5;
+  const wxmin = view.x - W/(2*view.scale), wxmax = view.x + W/(2*view.scale);
+  const wymin = view.y - H/(2*view.scale), wymax = view.y + H/(2*view.scale);
+  const i0x = Math.ceil(wxmin/s), i1x = Math.floor(wxmax/s);
+  const i0y = Math.ceil(wymin/s), i1y = Math.floor(wymax/s);
+  const isMaj = i => ((i%5)+5)%5===0;
+
+  ctx.lineWidth = 1;
+  // minor pass
+  ctx.beginPath();
+  for (let i=i0x;i<=i1x;i++){ if (isMaj(i)) continue; const sx=(i*s-view.x)*view.scale+W/2; ctx.moveTo(sx,0); ctx.lineTo(sx,H); }
+  for (let i=i0y;i<=i1y;i++){ if (isMaj(i)) continue; const sy=(i*s-view.y)*view.scale+H/2; ctx.moveTo(0,sy); ctx.lineTo(W,sy); }
+  ctx.strokeStyle = 'rgba(148,163,184,0.06)'; ctx.stroke();
+  // major pass
+  ctx.beginPath();
+  for (let i=i0x;i<=i1x;i++){ if (!isMaj(i)) continue; const sx=(i*s-view.x)*view.scale+W/2; ctx.moveTo(sx,0); ctx.lineTo(sx,H); }
+  for (let i=i0y;i<=i1y;i++){ if (!isMaj(i)) continue; const sy=(i*s-view.y)*view.scale+H/2; ctx.moveTo(0,sy); ctx.lineTo(W,sy); }
+  ctx.strokeStyle = 'rgba(148,163,184,0.12)'; ctx.stroke();
+
+  // axes
+  const o = worldToScreen(0,0);
+  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = 'rgba(160,172,196,0.55)';
+  ctx.beginPath();
+  if (o.y>-2 && o.y<H+2){ ctx.moveTo(0,o.y); ctx.lineTo(W,o.y); }
+  if (o.x>-2 && o.x<W+2){ ctx.moveTo(o.x,0); ctx.lineTo(o.x,H); }
+  ctx.stroke();
+  // origin marker
+  if (o.x>-20 && o.x<W+20 && o.y>-20 && o.y<H+20){
+    ctx.fillStyle = 'rgba(200,212,232,0.85)';
+    ctx.beginPath(); ctx.arc(o.x,o.y,2.4,0,Math.PI*2); ctx.fill();
+  }
+  // axis letters
+  ctx.font = '10px '+MONO;
+  ctx.fillStyle = 'rgba(148,163,184,0.55)';
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  if (o.y>-2 && o.y<H+2) ctx.fillText('x', W-8, o.y-9);
+  ctx.textAlign='left';
+  if (o.x>-2 && o.x<W+2) ctx.fillText('y', o.x+8, 14);
+
+  // coordinate labels on major lines
+  if (major*view.scale >= 42){
+    ctx.font = '10px '+MONO;
+    ctx.fillStyle = 'rgba(148,163,184,0.45)';
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    for (let i=i0x;i<=i1x;i++){
+      if (!isMaj(i) || i===0) continue;
+      if (o.y<-10 || o.y>H+10) continue;
+      const sx=(i*s-view.x)*view.scale+W/2;
+      ctx.fillText(formatNum(i*s), sx, Math.min(Math.max(o.y+6,4), H-16));
+    }
+    ctx.textAlign='right'; ctx.textBaseline='middle';
+    for (let i=i0y;i<=i1y;i++){
+      if (!isMaj(i) || i===0) continue;
+      if (o.x<-10 || o.x>W+10) continue;
+      const sy=(i*s-view.y)*view.scale+H/2;
+      ctx.fillText(formatNum(i*s), Math.min(Math.max(o.x-6,26), W-6), sy);
+    }
+  }
+}
+
+function entityColor(id){
+  if (failingEnts.has(id)) return COL.fail;
+  if (curStatus.state==='fully') return COL.fully;
+  return COL.under;
+}
+function strokeSeg(a, b, color, width, dash){
+  const A = worldToScreen(a.x,a.y), B = worldToScreen(b.x,b.y);
+  ctx.save();
+  if (dash) ctx.setLineDash(dash);
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.stroke();
+  ctx.restore();
+}
+function drawEntities(){
+  for (const l of lns.values()){
+    const a = pts.get(l.p1), b = pts.get(l.p2);
+    if (!a||!b) continue;
+    strokeSeg(a, b, entityColor(l.id), 2);
+  }
+  for (const c of crs.values()){
+    const ct = pts.get(c.center); if (!ct) continue;
+    const S = worldToScreen(ct.x, ct.y);
+    ctx.strokeStyle = entityColor(c.id); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(S.x, S.y, Math.max(0.5,c.r*view.scale), 0, Math.PI*2); ctx.stroke();
+  }
+  const fixed = fixedPointsSet();
+  for (const p of pts.values()){
+    const S = worldToScreen(p.x, p.y);
+    ctx.fillStyle = entityColor(p.id);
+    ctx.beginPath(); ctx.arc(S.x, S.y, 3.3, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(10,13,18,0.9)'; ctx.lineWidth = 1; ctx.stroke();
+    if (fixed.has(p.id)){
+      ctx.strokeStyle = '#aab6c8'; ctx.lineWidth = 1.2;
+      ctx.strokeRect(S.x-5.5, S.y-5.5, 11, 11);
+    }
+  }
+  // hover / selection overlays
+  if (hoverId && !selection.has(hoverId) && isEntity(hoverId)) drawHighlight(hoverId, 'hover');
+  for (const id of selection) if (isEntity(id)) drawHighlight(id, 'sel');
+}
+function drawHighlight(id, kind){
+  const soft = kind==='sel' ? 'rgba(255,255,255,0.20)' : 'rgba(255,255,255,0.12)';
+  const core = kind==='sel' ? 'rgba(255,255,255,0.95)' : COL.hover;
+  if (pts.has(id)){
+    const p = pts.get(id), S = worldToScreen(p.x,p.y);
+    ctx.strokeStyle = core; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(S.x,S.y,7,0,Math.PI*2); ctx.stroke();
+  } else if (lns.has(id)){
+    const l = lns.get(id), a = pts.get(l.p1), b = pts.get(l.p2);
+    if (!a||!b) return;
+    strokeSeg(a,b,soft,7);
+    strokeSeg(a,b,core,1.4);
+  } else if (crs.has(id)){
+    const c = crs.get(id), ct = pts.get(c.center);
+    if (!ct) return;
+    const S = worldToScreen(ct.x,ct.y), r = c.r*view.scale;
+    ctx.strokeStyle = soft; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.arc(S.x,S.y,r,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = core; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(S.x,S.y,r,0,Math.PI*2); ctx.stroke();
+  }
+}
+
+/* ---------- constraint graphics ---------- */
+function badgeAnchor(c){
+  const mid = (a,b)=>({x:(a.x+b.x)/2, y:(a.y+b.y)/2});
+  switch(c.type){
+    case 'coincident': {
+      const a=pts.get(c.entities[0]), b=pts.get(c.entities[1]);
+      return (a&&b) ? mid(a,b) : null;
+    }
+    case 'horizontal': case 'vertical': {
+      const [a,b] = linePtsOf(c);
+      return (a&&b) ? mid(a,b) : null;
+    }
+    case 'parallel': case 'perpendicular': {
+      const l = lns.get(c.entities[0]); if (!l) return null;
+      const [a,b] = [pts.get(l.p1), pts.get(l.p2)];
+      return (a&&b) ? mid(a,b) : null;
+    }
+    case 'equal': {
+      if (lns.has(c.entities[0])){
+        const l = lns.get(c.entities[0]); if (!l) return null;
+        const [a,b]=[pts.get(l.p1), pts.get(l.p2)];
+        return (a&&b) ? mid(a,b) : null;
+      }
+      const cc = crs.get(c.entities[0]);
+      return cc ? pts.get(cc.center) : null;
+    }
+    case 'fix': return pts.get(c.entities[0]) || null;
+    case 'point-on-object': {
+      const p = pts.get(c.entities[0]); if (!p) return null;
+      if (lns.has(c.entities[1])){
+        const l = lns.get(c.entities[1]);
+        const a = pts.get(l.p1), b = pts.get(l.p2);
+        if (!a||!b) return null;
+        const ux=b.x-a.x, uy=b.y-a.y;
+        const L2 = ux*ux+uy*uy;
+        if (L2<1e-12) return p;
+        const t = ((p.x-a.x)*ux + (p.y-a.y)*uy)/L2;
+        return { x:a.x+ux*t, y:a.y+uy*t };
+      }
+      return p;
+    }
+  }
+  return null;
+}
+function badgeColor(c){
+  if (failingEnts.has(c.entities[0]) || c.entities.some(e=>failingEnts.has(e))) return COL.fail;
+  return DIM_TYPES.includes(c.type) ? COL.dim : COL.geom;
+}
+function drawGlyph(kind){
+  ctx.lineWidth = 1.4; ctx.lineCap='round';
+  ctx.beginPath();
+  switch(kind){
+    case 'coincident':
+      ctx.arc(0,0,4.1,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0,0,1.5,0,Math.PI*2); ctx.fill();
+      break;
+    case 'horizontal':
+      ctx.moveTo(-5,0); ctx.lineTo(5,0);
+      ctx.moveTo(-5,0); ctx.lineTo(-2.6,-2.2); ctx.moveTo(-5,0); ctx.lineTo(-2.6,2.2);
+      ctx.moveTo(5,0); ctx.lineTo(2.6,-2.2); ctx.moveTo(5,0); ctx.lineTo(2.6,2.2);
+      ctx.stroke();
+      break;
+    case 'vertical':
+      ctx.moveTo(0,-5); ctx.lineTo(0,5);
+      ctx.moveTo(0,-5); ctx.lineTo(-2.2,-2.6); ctx.moveTo(0,-5); ctx.lineTo(2.2,-2.6);
+      ctx.moveTo(0,5); ctx.lineTo(-2.2,2.6); ctx.moveTo(0,5); ctx.lineTo(2.2,2.6);
+      ctx.stroke();
+      break;
+    case 'parallel':
+      ctx.moveTo(-2.6,4.4); ctx.lineTo(-0.4,-4.4);
+      ctx.moveTo(1.6,4.4); ctx.lineTo(3.8,-4.4);
+      ctx.stroke();
+      break;
+    case 'perpendicular':
+      ctx.moveTo(-4.4,2.8); ctx.lineTo(4.4,2.8);
+      ctx.moveTo(0,2.8); ctx.lineTo(0,-4.4);
+      ctx.stroke();
+      break;
+    case 'equal':
+      ctx.moveTo(-4.4,-2.2); ctx.lineTo(4.4,-2.2);
+      ctx.moveTo(-4.4,2.2); ctx.lineTo(4.4,2.2);
+      ctx.stroke();
+      break;
+    case 'fix':
+      ctx.arc(0,0,2.5,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-4.6,0); ctx.lineTo(4.6,0);
+      ctx.moveTo(0,-4.6); ctx.lineTo(0,4.6);
+      ctx.stroke();
+      break;
+    case 'point-on-object':
+      ctx.arc(0,0,3.9,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0,-3.9,1.5,0,Math.PI*2); ctx.fill();
+      break;
+  }
+}
+function drawBadge(c, ax, ay, selected){
+  const bx = ax+14, by = ay-14;
+  const col = badgeColor(c);
+  ctx.strokeStyle = selected ? '#ffffff' : col;
+  ctx.lineWidth = selected ? 1.6 : 1;
+  ctx.globalAlpha = 0.55;
+  ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(bx,by,9.5,0,Math.PI*2);
+  ctx.fillStyle = '#0e131b'; ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.translate(bx,by);
+  ctx.strokeStyle = selected ? '#ffffff' : col;
+  ctx.fillStyle = selected ? '#ffffff' : col;
+  drawGlyph(c.type);
+  ctx.restore();
+  constraintHits.set(c.id, { x:bx, y:by, r:12 });
+}
+function drawLabelPill(x, y, text, color, selected){
+  ctx.font = '600 11px '+MONO;
+  const w = ctx.measureText(text).width;
+  const padX = 6, h = 17;
+  ctx.beginPath();
+  ctx.roundRect(x-w/2-padX, y-h/2, w+padX*2, h, 5);
+  ctx.fillStyle = 'rgba(10,14,20,0.93)'; ctx.fill();
+  ctx.strokeStyle = selected ? '#ffffff' : color; ctx.lineWidth = selected?1.5:1; ctx.stroke();
+  ctx.fillStyle = selected ? '#ffffff' : color;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text, x, y+0.5);
+  return { x, y, r: Math.max(w/2+padX, h/2)+4 };
+}
+function arrowHead(x, y, dx, dy, color){
+  const s=7.5, w=2.8;
+  ctx.beginPath();
+  ctx.moveTo(x,y);
+  ctx.lineTo(x-dx*s-dy*w, y-dy*s+dx*w);
+  ctx.lineTo(x-dx*s+dy*w, y-dy*s-dx*w);
+  ctx.closePath();
+  ctx.fillStyle = color; ctx.fill();
+}
+function drawDistanceDim(c, selected){
+  const [a,b] = distEndsOf(c);
+  if (!a||!b) return;
+  const A = worldToScreen(a.x,a.y), B = worldToScreen(b.x,b.y);
+  const col = badgeColor(c)===COL.fail ? COL.fail : COL.dim;
+  const dx=B.x-A.x, dy=B.y-A.y;
+  const len = Math.hypot(dx,dy);
+  if (len < 2){ const h = drawLabelPill(A.x, A.y-24, formatNum(c.value), col, selected); constraintHits.set(c.id,h); return; }
+  const nx=-dy/len, ny=dx/len, off=26;
+  const A2={x:A.x+nx*off, y:A.y+ny*off}, B2={x:B.x+nx*off, y:B.y+ny*off};
+  ctx.strokeStyle = selected?'rgba(255,255,255,.7)':'rgba(255,195,107,.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(A2.x,A2.y); ctx.moveTo(B.x,B.y); ctx.lineTo(B2.x,B2.y); ctx.stroke();
+  ctx.strokeStyle = selected?'#ffffff':col; ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.moveTo(A2.x,A2.y); ctx.lineTo(B2.x,B2.y); ctx.stroke();
+  const ux=dx/len, uy=dy/len;
+  arrowHead(A2.x,A2.y,-ux,-uy, selected?'#fff':col);
+  arrowHead(B2.x,B2.y, ux, uy, selected?'#fff':col);
+  const mx=(A2.x+B2.x)/2 + nx*12, my=(A2.y+B2.y)/2 + ny*12;
+  const h = drawLabelPill(mx, my, formatNum(c.value), col, selected);
+  constraintHits.set(c.id, h);
+}
+function drawRadiusDim(c, selected){
+  const cc = crs.get(c.entities[0]); if (!cc) return;
+  const ct = pts.get(cc.center); if (!ct) return;
+  const S = worldToScreen(ct.x, ct.y);
+  const col = badgeColor(c)===COL.fail ? COL.fail : COL.dim;
+  const ang = -Math.PI/4;
+  const r = cc.r*view.scale;
+  const E = { x:S.x+Math.cos(ang)*r, y:S.y+Math.sin(ang)*r };
+  const M = { x:S.x+Math.cos(ang)*r*0.55, y:S.y+Math.sin(ang)*r*0.55 };
+  ctx.strokeStyle = selected?'rgba(255,255,255,.7)':'rgba(255,195,107,.45)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(S.x,S.y); ctx.lineTo(E.x,E.y); ctx.stroke();
+  arrowHead(E.x, E.y, Math.cos(ang), Math.sin(ang), selected?'#fff':col);
+  const h = drawLabelPill(M.x, M.y-12, 'R'+formatNum(c.value), col, selected);
+  constraintHits.set(c.id, h);
+}
+function drawAngleDim(c, selected){
+  const l1 = lns.get(c.entities[0]), l2 = lns.get(c.entities[1]);
+  if (!l1||!l2) return;
+  const a=pts.get(l1.p1), b=pts.get(l1.p2), d0=pts.get(l2.p1), d1=pts.get(l2.p2);
+  if (!a||!b||!d0||!d1) return;
+  const A=worldToScreen(a.x,a.y), B=worldToScreen(b.x,b.y);
+  const C=worldToScreen(d0.x,d0.y), D=worldToScreen(d1.x,d1.y);
+  const col = badgeColor(c)===COL.fail ? COL.fail : COL.dim;
+  const d1x=B.x-A.x, d1y=B.y-A.y, d2x=D.x-C.x, d2y=D.y-C.y;
+  const n1=Math.hypot(d1x,d1y)||1, n2=Math.hypot(d2x,d2y)||1;
+  const den = d1x*d2y - d1y*d2x;
+  const hasInt = Math.abs(den) > 1e-9*n1*n2;
+  let cx, cy;
+  let a1, diff;
+  if (hasInt){
+    const t = ((C.x-A.x)*d2y - (C.y-A.y)*d2x)/den;
+    cx = A.x + d1x*t; cy = A.y + d1y*t;
+    if (!isFinite(cx)||Math.abs(cx)>1e6||Math.abs(cy)>1e6) return drawAngleLabelFallback(c, selected, col);
+    a1 = Math.atan2(d1y/n1, d1x/n1);
+    const a2 = Math.atan2(d2y/n2, d2x/n2);
+    diff = a2-a1;
+    while (diff> Math.PI) diff -= 2*Math.PI;
+    while (diff<-Math.PI) diff += 2*Math.PI;
+    const R = 34;
+    ctx.strokeStyle = selected?'#ffffff':col;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(cx, cy, R, a1, a1+diff, diff<0); ctx.stroke();
+    const mid = a1+diff/2;
+    const h = drawLabelPill(cx+Math.cos(mid)*(R+20), cy+Math.sin(mid)*(R+20), formatNum(c.value)+'°', col, selected);
+    constraintHits.set(c.id, h);
+  } else {
+    drawAngleLabelFallback(c, selected, col);
+  }
+}
+function drawAngleLabelFallback(c, selected, col){
+  const l1=lns.get(c.entities[0]), l2=lns.get(c.entities[1]);
+  const m1 = lineMid(l1), m2 = lineMid(l2);
+  if (!m1||!m2) return;
+  const P1=worldToScreen(m1.x,m1.y), P2=worldToScreen(m2.x,m2.y);
+  const h = drawLabelPill((P1.x+P2.x)/2, (P1.y+P2.y)/2-20, formatNum(c.value)+'°', col, selected);
+  constraintHits.set(c.id, h);
+}
+function lineMid(l){
+  const a=pts.get(l.p1), b=pts.get(l.p2);
+  return (a&&b) ? {x:(a.x+b.x)/2, y:(a.y+b.y)/2} : null;
+}
+function drawConstraintGraphics(){
+  constraintHits = new Map();
+  for (const c of cons.values()){
+    const selected = selection.has(c.id);
+    if (c.type==='distance') drawDistanceDim(c, selected);
+    else if (c.type==='radius') drawRadiusDim(c, selected);
+    else if (c.type==='angle') drawAngleDim(c, selected);
+    else {
+      const a = badgeAnchor(c);
+      if (!a) continue;
+      const S = worldToScreen(a.x, a.y);
+      if (S.x<-40||S.x>W+40||S.y<-40||S.y>H+40) continue;
+      drawBadge(c, S.x, S.y, selected);
+    }
+  }
+}
+
+/* ---------- preview & snap ---------- */
+function drawSnapMarker(p){
+  const S = worldToScreen(p.x, p.y);
+  ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(S.x, S.y, 9, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = '#ffd166';
+  ctx.beginPath(); ctx.arc(S.x, S.y, 2, 0, Math.PI*2); ctx.fill();
+}
+function drawPreview(){
+  if (tool==='line' || tool==='circle'){
+    const snap = snapPoint(screenToWorld(lastMouse.x, lastMouse.y));
+    if (snap) drawSnapMarker(snap);
+  }
+  if (!pending) return;
+  const cur = screenToWorld(lastMouse.x, lastMouse.y);
+  if (pending.kind==='line'){
+    const a = pending.pid ? pts.get(pending.pid) : {x:pending.x, y:pending.y};
+    const snap = snapPoint(cur);
+    const end = (snap && snap.id !== pending.pid) ? snap : cur;
+    strokeSeg(a, end, 'rgba(255,255,255,0.75)', 1.4, [6,5]);
+    const len = Math.hypot(end.x-a.x, end.y-a.y);
+    drawLabelPill(lastMouse.x+16, lastMouse.y-16, 'len '+formatNum(len), COL.dim, false);
+  } else {
+    const ctr = pending.pid ? pts.get(pending.pid) : {x:pending.x, y:pending.y};
+    const S = worldToScreen(ctr.x, ctr.y);
+    const r = Math.hypot(cur.x-ctr.x, cur.y-ctr.y)*view.scale;
+    ctx.save();
+    ctx.setLineDash([6,5]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(S.x, S.y, Math.max(0.5,r), 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+    drawLabelPill(lastMouse.x+16, lastMouse.y-16, 'r '+formatNum(r/view.scale), COL.dim, false);
+  }
+}
+
+/* ---------- main render ---------- */
+function render(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle = '#0c1016';
+  ctx.fillRect(0,0,W,H);
+  drawGrid();
+  drawEntities();
+  drawConstraintGraphics();
+  drawPreview();
+  requestAnimationFrame(render);
+}
+
+/* ---------- public API ---------- */
+window.__arena = {
+  getState(){
+    const fixed = fixedPointsSet();
+    return {
+      points: [...pts.values()].map(p=>({ id:p.id, x:p.x, y:p.y, fixed: fixed.has(p.id) })),
+      lines:  [...lns.values()].map(l=>({ id:l.id, p1:l.p1, p2:l.p2 })),
+      circles:[...crs.values()].map(c=>({ id:c.id, center:c.center, r:c.r })),
+      constraints: [...cons.values()].map(c=>{
+        const o = { id:c.id, type:c.type, entities:c.entities.slice() };
+        if (c.value!==undefined) o.value = c.value;
+        return o;
+      }),
+      dof: curStatus.dof,
+      status: curStatus.state,
+      maxError: curStatus.maxError
+    };
+  },
+  screenToWorld(clientX, clientY){ return screenToWorld(clientX, clientY); },
+  worldToScreen(x, y){ return worldToScreen(x, y); },
+  select(ids){
+    selection.clear();
+    for (const id of (ids||[])) if (pts.has(id)||lns.has(id)||crs.has(id)||cons.has(id)) selection.add(id);
+    updateUI();
+  },
+  solve(){
+    const r = solveAll();
+    updateUI();
+    return { converged: r.converged, maxError: r.maxError };
+  }
+};
+
+/* ---------- init ---------- */
+const loaded = loadFromStorage();
+solveAll();
+updateUI();
+history = [serialize()];
+hIndex = 0;
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

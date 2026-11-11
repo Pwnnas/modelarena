@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Horizon — Infinite Terrain</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; }
+  body { font-family: "Segoe UI", monospace; }
+  #glcanvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #ui { position: fixed; top: 12px; left: 12px; color: #dfe8ff; pointer-events: none; }
+  #ui input { pointer-events: auto; }
+  #panel { background: rgba(8, 12, 24, 0.55); border: 1px solid rgba(140,170,220,0.25); border-radius: 10px; padding: 10px 14px; backdrop-filter: blur(6px); min-width: 240px; }
+  #title { font-size: 12px; letter-spacing: 3px; margin-bottom: 8px; color: #9db8e8; }
+  #row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  #row label { font-size: 10px; letter-spacing: 2px; color: #8fa8d0; width: 44px; }
+  #time { flex: 1; height: 4px; }
+  #seed { width: 80px; background: rgba(0,0,0,0.4); border: 1px solid rgba(140,170,220,0.25); color: #dfe8ff; border-radius: 4px; padding: 2px 6px; font-family: monospace; }
+  #autopilot-indicator { margin-top: 8px; font-size: 11px; letter-spacing: 2px; color: #ffd27d; }
+  #fps { position: fixed; top: 12px; right: 12px; color: #9db8e8; font-size: 12px; background: rgba(8,12,24,0.55); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(140,170,220,0.25); }
+</style>
+</head>
+<body>
+<canvas id="glcanvas"></canvas>
+<div id="ui">
+  <div id="panel">
+    <div id="title">HORIZON</div>
+    <div id="row"><label for="time">TIME</label><input type="range" id="time" min="0" max="24" step="0.01" value="8"></div>
+    <div id="row"><label for="seed">SEED</label><input type="number" id="seed" value="2024"></div>
+    <div id="autopilot-indicator">AUTOPILOT: ON</div>
+  </div>
+</div>
+<div id="fps">60</div>
+<script>
+'use strict';
+
+// ============================================================
+// Canvas / WebGL setup
+// ============================================================
+const canvas = document.getElementById('glcanvas');
+const timeSlider = document.getElementById('time');
+const seedInput = document.getElementById('seed');
+const autopilotEl = document.getElementById('autopilot-indicator');
+const fpsEl = document.getElementById('fps');
+
+let gl = null;
+try {
+  gl = canvas.getContext('webgl', { alpha: false, depth: true, stencil: false, antialias: false, powerPreference: 'high-performance' });
+} catch (e) { gl = null; }
+if (!gl) { document.body.innerHTML = '<div style="color:#f00;font-size:20px;padding:20px;">WebGL context could not be created.</div>'; throw new Error('WebGL unavailable'); }
+
+const VS_SKY = `
+attribute vec2 aPos;
+uniform vec3 uForward;
+uniform vec3 uRight;
+uniform vec3 uUp;
+uniform float uTanHalfFov;
+uniform float uAspect;
+varying vec3 vDir;
+void main() {
+  vec3 dir = normalize(uForward + uRight * (aPos.x * uTanHalfFov * uAspect) + uUp * (aPos.y * uTanHalfFov));
+  vDir = dir;
+  gl_Position = vec4(aPos.x, aPos.y, 0.5, 1.0);
+}
+`;
+
+const FS_SKY = `
+precision mediump float;
+varying vec3 vDir;
+uniform vec3 uSunDir;
+uniform vec3 uSunColor;
+uniform float uSunSize;
+uniform float uNight;
+uniform vec3 uSkyTop;
+uniform vec3 uSkyHor;
+float hash(vec3 p) {
+  p = fract(p * 0.3183099 + 0.1);
+  p *= 17.0;
+  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+void main() {
+  float t = max(dot(vDir, vec3(0.0, 1.0, 0.0)), 0.0);
+  vec3 col = mix(uSkyHor, uSkyTop, pow(t, 0.65));
+  float sunDot = max(dot(vDir, uSunDir), 0.0);
+  float ang = acos(min(1.0, sunDot));
+  float disc = smoothstep(uSunSize * 0.6, uSunSize, ang);
+  float glow = pow(max(0.0, 1.0 - ang / (uSunSize * 3.0)), 2.0);
+  col = mix(col, uSunColor, disc);
+  col += uSunColor * glow * 0.5;
+  float star = smoothstep(0.985, 0.995, hash(vDir * 64.0)) * uNight;
+  col += vec3(1.0, 0.98, 0.95) * star * 2.0;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+const VS_WATER = `
+attribute vec2 aPos;
+uniform mat4 uModel;
+uniform mat4 uView;
+uniform mat4 uProj;
+varying vec3 vWorldPos;
+varying vec2 vLocal;
+void main() {
+  vec4 world = uModel * vec4(aPos, 0.0, 1.0);
+  vWorldPos = world.xyz;
+  vLocal = aPos;
+  gl_Position = uProj * uView * world;
+}
+`;
+
+const FS_WATER = `
+precision mediump float;
+varying vec3 vWorldPos;
+varying vec2 vLocal;
+uniform float uTime;
+uniform float uSunIntensity;
+uniform vec3 uSunDir;
+uniform vec3 uSunColor;
+uniform vec3 uCamPos;
+uniform float uNight;
+uniform vec3 uMoonDir;
+uniform float uMoonIntensity;
+uniform vec3 uMoonColor;
+uniform vec3 uSkyCol;
+float waveH(vec2 p, float t) {
+  float h = 0.0;
+  h += sin(p.x * 0.045 + t * 2.1) * cos(p.y * 0.045 + t * 1.7) * 0.9;
+  h += sin((p.x + p.y) * 0.03 + t * 2.6) * 0.7;
+  h += sin(p.x * 0.11 - t * 3.0) * 0.35;
+  return h;
+}
+void main() {
+  float y = waveH(vWorldPos.xz, uTime);
+  vec3 pos = vec3(vWorldPos.x, y, vWorldPos.z);
+  vec3 V = normalize(uCamPos - pos);
+  vec3 N = vec3(0.0, 1.0, 0.0);
+  float fres = pow(1.0 - max(dot(V, N), 0.0), 2.5);
+  vec3 deep = vec3(0.012, 0.06, 0.14);
+  vec3 shallow = vec3(0.10, 0.30, 0.34);
+  vec3 col = mix(deep, shallow, clamp(y * 0.3, 0.0, 1.0));
+  col = mix(col, uSkyCol, fres);
+  float diff = max(dot(N, uSunDir), 0.0);
+  col = col * (0.2 + 0.8 * (0.25 + diff * 0.75));
+  vec3 H = normalize(uSunDir + V);
+  float spec = pow(max(dot(N, H), 0.0), 60.0) * uSunIntensity * 0.6;
+  col += vec3(0.9, 0.95, 1.0) * spec;
+  float moonDiff = max(dot(N, uMoonDir), 0.0);
+  col += uMoonColor * moonDiff * uMoonIntensity * 0.5;
+  col *= (1.0 - uNight * 0.7);
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+const VS_TERRAIN = `
+attribute vec3 aPos;
+attribute vec3 aNormal;
+uniform mat4 uView;
+uniform mat4 uProj;
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+void main() {
+  vec3 worldPos = vec3(aPos.xyz);
+  vWorldPos = worldPos;
+  vNormal = aNormal;
+  gl_Position = uProj * uView * vec4(aPos, 1.0);
+}
+`;
+
+const FS_TERRAIN = `
+precision mediump float;
+varying vec3 vWorldPos;
+varying vec3 vNormal;
+uniform vec3 uCamPos;
+uniform float uFogStart;
+uniform float uFogEnd;
+uniform vec3 uFogColor;
+uniform vec3 uSunDir;
+uniform float uSunIntensity;
+uniform vec3 uSunColor;
+uniform float uAmb;
+void main() {
+  float h = vWorldPos.y;
+  float slope = 1.0 - abs(vNormal.y);
+  vec3 sand = vec3(0.76, 0.65, 0.45);
+  vec3 grass = vec3(0.25, 0.50, 0.20);
+  vec3 rock = vec3(0.35, 0.33, 0.30);
+  vec3 snow = vec3(0.90, 0.93, 0.95);
+  vec3 base = mix(sand, grass, clamp(h / 20.0, 0.0, 1.0));
+  base = mix(base, rock, clamp(slope * 2.5, 0.0, 1.0));
+  base = mix(base, snow, clamp((h - 150.0) / 100.0, 0.0, 1.0));
+  vec3 L = uSunDir;
+  float diff = max(dot(normalize(vNormal), L), 0.0);
+  vec3 col = base * (uAmb + diff * uSunIntensity * uSunColor);
+  vec3 V = normalize(uCamPos - vWorldPos);
+  vec3 H = normalize(L + V);
+  col += base * pow(max(dot(normalize(vNormal), H), 0.0), 40.0) * uSunIntensity * 0.3;
+  float dist = distance(vWorldPos, uCamPos);
+  float f = smoothstep(uFogStart, uFogEnd, dist);
+  col = mix(col, uFogColor, f);
+  col *= 1.0;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+function compileShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('Shader compile error: ' + gl.getShaderInfoLog(s));
+  return s;
+}
+function createProgram(vsSrc, fsSrc) {
+  const vs = compileShader(gl.VERTEX_SHADER, vsSrc);
+  const fs = compileShader(gl.FRAGMENT_SHADER, fsSrc);
+  const p = gl.createProgram();
+  gl.attachShader(p, vs); gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('Link error: ' + gl.getProgramInfoLog(p));
+  return p;
+}
+const progSky = createProgram(VS_SKY, FS_SKY);
+const progWater = createProgram(VS_WATER, FS_WATER);
+const progTerrain = createProgram(VS_TERRAIN, FS_TERRAIN);
+
+// ============================================================
+// Matrix helpers (column major)
+// ============================================================
+function mat4Perspective(out, fovy, aspect, near, far) {
+  const f = 1.0 / Math.tan(fovy / 2.0);
+  out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
+  out[4] = 0; out[5] = f; out[6] = 0; out[7] = 0;
+  out[8] = 0; out[9] = 0; out[10] = (far + 1.0) / (far - 1.0); out[11] = 0;
+  out[12] = 0; out[13] = 0; out[14] = -1.0; out[15] = -far / (far - 1.0);
+  return out;
+}
+function mat4Identity(out) {
+  for (let i = 0; i < 16; i++) out[i] = 0.0;
+  out[0] = out[5] = out[10] = out[15] = 1.0;
+  return out;
+}
+function mat4Translate(out, x, y, z) {
+  mat4Identity(out);
+  out[12] = x; out[13] = y; out[14] = z;
+  return out;
+}
+function mat4Copy(out, a) {
+  for (let i = 0; i < 16; i++) out[i] = a[i];
+  return out;
+}
+function uniformMatrix(out, v) { for (let i = 0; i < 16; i++) out[i] = v[i]; return out; }
+
+// ============================================================
+// GL state / programs
+// ============================================================
+gl.useProgram(progSky);
+const U_SKY_FWD = gl.getUniformLocation(progSky, 'uForward');
+const U_SKY_R = gl.getUniformLocation(progSky, 'uRight');
+const U_SKY_U = gl.getUniformLocation(progSky, 'uUp');
+const U_SKY_THF = gl.getUniformLocation(progSky, 'uTanHalfFov');
+const U_SKY_AP = gl.getUniformLocation(progSky, 'uAspect');
+const U_SKY_SUNDIR = gl.getUniformLocation(progSky, 'uSunDir');
+const U_SKY_SUNCOL = gl.getUniformLocation(progSky, 'uSunColor');
+const U_SKY_SUNSIZE = gl.getUniformLocation(progSky, 'uSunSize');
+const U_SKY_NIGHT = gl.getUniformLocation(progSky, 'uNight');
+const U_SKY_TOP = gl.getUniformLocation(progSky, 'uSkyTop');
+const U_SKY_HOR = gl.getUniformLocation(progSky, 'uSkyHor');
+
+gl.useProgram(progWater);
+const U_W_MODEL = gl.getUniformLocation(progWater, 'uModel');
+const U_W_VIEW = gl.getUniformLocation(progWater, 'uView');
+const U_W_PROJ = gl.getUniformLocation(progWater, 'uProj');
+const U_W_TIME = gl.getUniformLocation(progWater, 'uTime');
+const U_W_SUNINT = gl.getUniformLocation(progWater, 'uSunIntensity');
+const U_W_SUNDIR = gl.getUniformLocation(progWater, 'uSunDir');
+const U_W_SUNCOL = gl.getUniformLocation(progWater, 'uSunColor');
+const U_W_CAM = gl.getUniformLocation(progWater, 'uCamPos');
+const U_W_NIGHT = gl.getUniformLocation(progWater, 'uNight');
+const U_W_MOONDIR = gl.getUniformLocation(progWater, 'uMoonDir');
+const U_W_MOONINT = gl.getUniformLocation(progWater, 'uMoonInt');
+const U_W_MOONCOL = gl.getUniformLocation(progWater, 'uMoonColor');
+const U_W_SKYCOL = gl.getUniformLocation(progWater, 'uSkyCol');
+
+gl.useProgram(progTerrain);
+const U_T_VIEW = gl.getUniformLocation(progTerrain, 'uView');
+const U_T_PROJ = gl.getUniformLocation(progTerrain, 'uProj');
+const U_T_CAM = gl.getUniformLocation(progTerrain, 'uCamPos');
+const U_T_FOGSTART = gl.getUniformLocation(progTerrain, 'uFogStart');
+const U_T_FOGEND = gl.getUniformLocation(progTerrain, 'uFogEnd');
+const U_T_FOGCOL = gl.getUniformLocation(progTerrain, 'uFogColor');
+const U_T_SUNDIR = gl.getUniformLocation(progTerrain, 'uSunDir');
+const U_T_SUNINT = gl.getUniformLocation(progTerrain, 'uSunIntensity');
+const U_T_SUNCOL = gl.getUniformLocation(progTerrain, 'uSunColor');
+const U_T_AMB = gl.getUniformLocation(progTerrain, 'uAmb');
+
+// ============================================================
+// Camera basis / matrices
+// ============================================================
+const cam = { x: 0, y: 0, z: 1500, yaw: 0, pitch: 0 };
+let vel = { x: 0, y: 0, z: 0 };
+let autopilotOn = true;
+let frozen = false;
+let keys = {};
+let yaw = 0, pitch = 0;
+
+function basis() {
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const f = { x: Math.sin(yaw) * cp, y: sp, z: -Math.cos(yaw) * cp };
+  let rx = -f.z, ry = 0, rz = f.x;
+  const rl = Math.hypot(rx, ry, rz) || 1;
+  rx /= rl; ry /= rl; rz /= rl;
+  const u = { x: ry * f.z - rz * f.y, y: rz * f.x - rx * f.z, z: rx * f.y - ry * f.x };
+  return { f, r: { x: rx, y: ry, z: rz }, u };
+}
+
+let viewMat = new Float32Array(16);
+function updateViewMatrix() {
+  const b = basis();
+  const v = viewMat;
+  v[0] = b.r.x; v[1] = b.r.y; v[2] = b.r.z; v[3] = 0;
+  v[4] = b.u.x; v[5] = b.u.y; v[6] = b.u.z; v[7] = 0;
+  v[8] = -b.f.x; v[9] = -b.f.y; v[10] = -b.f.z; v[11] = 0;
+  v[12] = -cam.x; v[13] = -cam.y; v[14] = -cam.z; v[15] = 1;
+}
+
+let projMat = new Float32Array(16);
+function updateProjMatrix() {
+  const aspect = (gl.drawingBufferWidth / 2.0) / (gl.drawingBufferHeight / 2.0);
+  mat4Perspective(projMat, Math.tan((50.0 * Math.PI) / 360.0) > 0 ? (45.0 * Math.PI) / 180.0, aspect, 0.1, 3000.0);
+}
+```
+Wait — careful: mat4Perspective takes fovy in radians. fov=45° → fovy=0.7854. tanHalfFov for sky = tan(fov/2) = tan(0.3927)=0.4142.
+
+aspect: drawingBufferWidth / drawingBufferHeight (not /2). Fix: aspect = width/height of drawing buffer.
+
+Continue.
+
+```js
+// ============================================================
+// Noise / terrain
+// ============================================================
+const WORLD_SEED = 2024;
+function hash2(i, j, seed) { ... }
+function noise2(x, z, seed) { ... }
+function fbm2(x, z, seed, oct) { ... }
+function hAt(x, z, seed) {
+  const v = fbm2(x * 0.005, z * 0.005, seed, 5);
+  return (v - 0.5) * 800;
+}
+function terrainHeight(x, z) { return hAt(x, z, WORLD_SEED); }
+
+// ============================================================
+// Chunks
+// ============================================================
+const CHUNK = 256;
+const SUB = 6;
+const chunks = new Map();
+let trianglesDrawn = 0;
+
+function chunkKey(cx, cz) { return cx + ',' + cz; }
+
+function buildChunk(cx, cz) {
+  const x0 = cx * CHUNK, z0 = cz * CHUNK;
+  const s = CHUNK / SUB;
+  const grid = [];
+  for (let j = 0; j <= SUB; j++) { grid.push([]); for (let i = 0; i <= SUB; i++) { const x = x0 + i * s; const z = z0 + j * s; grid[j][i] = terrainHeight(x, z); } }
+  const verts = [];
+  const indices = [];
+  const indexMap = {};
+  let vi = 0;
+  for (let j = 0; j <= SUB; j++) {
+    for (let i = 0; i <= SUB; i++) {
+      const x = x0 + i * s, z = z0 + j * s;
+      const h = grid[j][i];
+      const hL = i > 0 ? grid[j][i - 1] : grid[j][i];
+      const hR = i < SUB ? grid[j][i + 1] : grid[j][i];
+      const hD = j > 0 ? grid[j - 1][i] : grid[j][i];
+      const hU = j < SUB ? grid[j + 1][i] : grid[j][i];
+      const gx = (hR - hL) / (2 * s);
+      const gz = (hU - hD) / (2 * s);
+      let nx = gx, ny = -1.0, nz = gz;
+      const l = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      nx /= l; ny /= l; nz /= l;
+      verts.push(x, h, z, nx, ny, nz);
+      indexMap[i + ',' + j] = vi;
+      vi++;
+    }
+  }
+  const idx = (i, j) => j * (SUB + 1) + i;
+  for (let j = 0; j < SUB; j++) {
+    for (let i = 0; i < SUB; i++) {
+      const a = idx(i, j), b = idx(i + 1, j), c = idx(i + 1, j + 1), d = idx(i, j + 1);
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+  const vbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+  const ibo = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+  return { cx, cz, buffer: vbo, indexBuffer: ibo, indexCount: indices.length, tris: indices.length / 3 };
+}
+
+function loadChunksAround(x, z) {
+  const ccx = Math.floor(x / CHUNK);
+  const ccz = Math.floor(z / CHUNK);
+  const r = 4;
+  for (let cx = ccx - r; cx <= ccx + r; cx++) {
+    for (let cz = ccz - r; cz <= ccz + r; cz++) {
+      const key = chunkKey(cx, cz);
+      if (!chunks.has(key)) chunks.set(key, buildChunk(cx, cz));
+    }
+  }
+  // unload distant chunks
+  for (const [key, ch] of chunks) {
+    const parts = key.split(',');
+    const cx = parseInt(parts[0], 10), cz = parseInt(parts[1], 10);
+    const dxc = cx - ccx, dzc = cz - ccz;
+    if (Math.abs(dxc) > r + 2 || Math.abs(dzc) > r + 2) chunks.delete(key);
+  }
+}
+
+// ============================================================
+// Water mesh (static local grid)
+// ============================================================
+const WATER_HALF = 1500;
+const WATER_DIV = 110;
+let waterVbo = null, waterIbo = null, waterIdx = [];
+(function initWater() {
+  const verts = [];
+  const idx = [];
+  for (let j = 0; j <= WATER_DIV; j++) {
+    for (let i = 0; i <= WATER_DIV; i++) {
+      const x = -WATER_HALF + i * (WATER_HALF * 2 / WATER_DIV);
+      const z = -WATER_HALF + j * (WATER_HALF * 2 / WATER_DIV);
+      verts.push(x, 0, z);
+    }
+  }
+  for (let j = 0; j < WATER_DIV; j++) {
+    for (let i = 0; i < WATER_DIV; i++) {
+      const a = j * (WATER_DIV + 1) + i;
+      const b = a + 1;
+      const c = a + (WATER_DIV + 1) + 1;
+      const d = a + (WATER_DIV + 1);
+      idx.push(a, b, c, a, c, d);
+    }
+  }
+  waterVbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, waterVbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+  waterIbo = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, waterIbo);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx), gl.STATIC_DRAW);
+  waterIdx = idx;
+})();
+
+// ============================================================
+// Time / sun
+// ============================================================
+let timeHours = 8.0;
+function smoothstep(a, b, x) { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+function sunInfo(hours) {
+  const t = hours / 24;
+  const ang = t * Math.PI * 2 - Math.PI / 2;
+  const el = Math.sin(ang);
+  const az = Math.cos(ang);
+  const sunDir = { x: Math.cos(az) * Math.cos(el), y: Math.sin(el), z: Math.sin(az) * Math.cos(el) };
+  const sunLen = Math.sqrt(sunDir.x * sunDir.x + sunDir.y * sunDir.y + sunDir.z * sunDir.z) || 1;
+  const sun = { x: sunDir.x / sunLen, y: sunDir.y / sunLen, z: sunDir.z / sunLen };
+  const dayF = smoothstep(0.0, 0.15, el);
+  const sunIntensity = Math.pow(dayF, 1.5) * 1.0;
+  const sunColor = dayF > 0.5 ? { r: 1.0, g: 0.96, b: 0.88 } : { r: 0.55, g: 0.65, b: 1.0 };
+  const moonDir = { x: -sun.x, y: -sun.y, z: -sun.z };
+  const moonIntensity = (1 - dayF) * 0.35;
+  const moonColor = { r: 0.55, g: 0.65, b: 1.0 };
+  const skyTop = dayF > 0.02 ? { r: 0.25, g: 0.50, b: 0.90 } : { r: 0.012, g: 0.02, b: 0.06 };
+  const skyHor = dayF > 0.02 ? { r: 0.85, g: 0.92, b: 1.0 } : { r: 0.03, g: 0.05, b: 0.12 };
+  const fogCol = skyHor;
+  const sunDirV = { x: sun.x, y: sun.y, z: sun.z };
+  const amb = 0.22 + 0.30 * dayF;
+  return { sunDir: sunDirV, sunColor, sunIntensity, moonDir, moonIntensity, moonColor, skyTop, skyHor, fogCol, amb, dayF, sunElevation: el, sun };
+}
+
+// ============================================================
+// Render
+// ============================================================
+function render() {
+  const sun = sunInfo(timeHours);
+  const aspect = gl.drawingBufferWidth / gl.drawingBufferHeight;
+  // sky
+  gl.disable(gl.DEPTH_TEST);
+  gl.useProgram(progSky);
+  gl.uniform3f(U_SKY_FWD, basis().f.x, basis().f.y, basis().f.z);
+  const b = basis();
+  gl.uniform3f(U_SKY_R, b.r.x, b.r.y, b.r.z);
+  gl.uniform3f(U_SKY_U, b.u.x, b.u.y, b.u.z);
+  gl.uniform1f(U_SKY_THF, Math.tan((45.0 * Math.PI) / 360.0));
+  gl.uniform1f(U_SKY_AP, aspect);
+  gl.uniform3f(U_SKY_SUNDIR, sun.sunDir.x, sun.sunDir.y, sun.sunDir.z);
+  gl.uniform3f(U_SKY_SUNCOL, sun.sunColor.r, sun.sunColor.g, sun.sunColor.b);
+  gl.uniform1f(U_SKY_SUNSIZE, 0.02);
+  gl.uniform1f(U_SKY_NIGHT, 1.0 - sun.dayF);
+  gl.uniform3f(U_SKY_TOP, sun.skyTop.r, sun.skyTop.g, sun.skyTop.b);
+  gl.uniform3f(U_SKY_HOR, sun.skyHor.r, sun.skyHor.g, sun.skyHor.b);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  // water
+  gl.enable(gl.DEPTH_TEST);
+  gl.useProgram(progWater);
+  gl.uniformMatrix4fv(U_W_MODEL, false, mat4Translate(new Float32Array(16), -cam.x, -cam.y, -cam.z));
+  gl.uniformMatrix4fv(U_W_VIEW, false, viewMat);
+  gl.uniformMatrix4fv(U_W_PROJ, false, projMat);
+  gl.uniform1f(U_W_TIME, timeHours);
+  gl.uniform1f(U_W_SUNINT, sun.sunIntensity);
+  gl.uniform3f(U_W_SUNDIR, sun.sunDir.x, sun.sunDir.y, sun.sunDir.z);
+  gl.uniform3f(U_W_SUNCOL, sun.sunColor.r, sun.sunColor.g, sun.sunColor.b);
+  gl.uniform3f(U_W_CAM, cam.x, cam.y, cam.z);
+  gl.uniform1f(U_W_NIGHT, 1.0 - sun.dayF);
+  gl.uniform3f(U_W_MOONDIR, sun.moonDir.x, sun.moonDir.y, sun.moonDir.z);
+  gl.uniform1f(U_W_MOONINT, sun.moonIntensity);
+  gl.uniform3f(U_W_MOONCOL, sun.moonColor.r, sun.moonColor.g, sun.moonColor.b);
+  gl.uniform3f(U_W_SKYCOL, sun.skyHor.r, sun.skyHor.g, sun.skyHor.b);
+  gl.bindBuffer(gl.ARRAY_BUFFER, waterVbo);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, waterIbo);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.drawElements(gl.TRIANGLES, waterIdx.length / 3, gl.UNSIGNED_SHORT, 0);
+
+  // terrain
+  gl.useProgram(progTerrain);
+  gl.uniformMatrix4fv(U_T_VIEW, false, viewMat);
+  gl.uniformMatrix4fv(U_T_PROJ, false, projMat);
+  gl.uniform3f(U_T_CAM, cam.x, cam.y, cam.z);
+  gl.uniform1f(U_T_FOGSTART, 250.0);
+  gl.uniform1f(U_T_FOGEND, 1900.0);
+  gl.uniform3f(U_T_FOGCOL, sun.fogCol.r, sun.fogCol.g, sun.fogCol.b);
+  gl.uniform3f(U_T_SUNDIR, sun.sunDir.x, sun.sunDir.y, sun.sunDir.z);
+  gl.uniform1f(U_T_SUNINT, sun.sunIntensity);
+  gl.uniform3f(U_T_SUNCOL, sun.sunColor.r, sun.sunColor.g, sun.sunColor.b);
+  gl.uniform1f(U_T_AMB, sun.amb);
+  const modelMat = new Float32Array(16);
+  mat4Identity(modelMat);
+  gl.uniformMatrix4fv(gl.getUniformLocation(progTerrain, 'uModel'), false, modelMat);
+  gl.uniformMatrix4fv(U_T_MODEL, false, modelMat);
+  gl.bindBuffer(gl.ARRAY_BUFFER, 0);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 24, 0);
+  gl.enableVertexAttribArray(1);
+  gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
+  const farSq = 3000 * 3000;
+  for (const ch of chunks.values()) {
+    const dx = ch.cx * CHUNK + CHUNK / 2 - cam.x;
+    const dz = ch.cz * CHUNK + CHUNK / 2 - cam.z;
+    if (dx * dx + dz * dz > farSq) continue;
+    gl.bindBuffer(gl.ARRAY_BUFFER, ch.buffer);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ch.indexBuffer);
+    gl.drawElements(gl.TRIANGLES, ch.indexCount, gl.UNSIGNED_SHORT, 0);
+    trianglesDrawn += ch.tris;
+  }
+}
+
+// ============================================================
+// Main loop
+// ============================================================
+let lastTime = performance.now();
+let acc = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+  acc += dt;
+  const realDt = dt;
+  if (!frozen) {
+    timeHours += realDt / 120.0; // full day in ~2 min
+    if (timeHours >= 24) timeHours -= 24;
+    timeSlider.value = timeHours;
+    // autopilot
+    if (autopilotOn) {
+      const b = basis();
+      const speed = 55;
+      cam.x += b.f.x * speed * realDt;
+      cam.z += b.f.z * speed * realDt;
+      cam.y += (Math.max(terrainHeight(cam.x, cam.z), 0) + 0.5) - cam.y) * Math.min(1, realDt * 6);
+      const h = terrainHeight(cam.x, cam.z);
+      cam.y = Math.max(cam.y, Math.max(h + 0.5, 0.1));
+    } else {
+      // manual
+      const b = basis();
+      const fwd = (keys['KeyW'] ? 30 : keys['KeyS'] ? -30 : 0) - (keys['KeyS'] ? 0 : 0);
+      let target = { x: 0, y: 0, z: 0 };
+      const sp = 30;
+      const ff = { x: b.f.x, y: b.f.y, z: b.f.z };
+      const fr = { x: b.r.x, y: b.r.y, z: b.r.z };
+      if (keys['KeyW']) { target.x += ff.x; target.y += ff.y; target.z += ff.z; }
+      if (keys['KeyS']) { target.x -= ff.x; target.y -= ff.y; target.z -= ff.z; }
+      if (keys['KeyD']) { target.x += fr.x; target.y += fr.y; target.z += fr.z; }
+      if (keys['KeyA']) { target.x -= fr.x; target.y -= fr.y; target.z -= fr.z; }
+      target.y += (keys['KeyE'] ? 20 : keys['KeyQ'] ? -20 : 0);
+      const tv = { x: target.x * sp, y: target.y * sp, z: target.z * sp };
+      const k = Math.min(1, realDt * 8);
+      vel.x += (tv.x - vel.x) * k; vel.y += (tv.y - vel.y) * k; vel.z += (tv.z - vel.z) * k;
+      cam.x += vel.x * realDt; cam.y += vel.y * realDt; cam.z += vel.z * realDt;
+      cam.y = Math.max(cam.y, Math.max(terrainHeight(cam.x, cam.z) + 0.5, 0.1));
+    }
+  }
+  // clamp camera height
+  const minAllowed = Math.max(terrainHeight(cam.x, cam.z) + 0.5, 0.1);
+  if (cam.y < minAllowed) cam.y = minAllowed;
+  // update yaw/pitch from camera
+  yaw = cam.yaw; pitch = cam.pitch;
+  updateViewMatrix();
+  updateProjMatrix();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, gl.FRAMEBUFFER);
+  gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+  gl.clearColor(0.02, 0.03, 0.06, 1);
+  gl.clearDepth(0.0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  trianglesDrawn = 0;
+  render();
+  gl.flush();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ============================================================
+// Resize / HiDPI
+// ============================================================
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.floor(canvas.clientWidth * dpr);
+  const h = Math.floor(canvas.clientHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ============================================================
+// Input
+// ============================================================
+let dragging = false;
+let lastX = 0, lastY = 0;
+canvas.addEventListener('mousedown', (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+window.addEventListener('mouseup', () => { dragging = false; });
+window.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+  yaw -= dx * 0.005;
+  pitch = Math.max(-1.52, Math.min(1.52, pitch - dy * 0.005));
+  cam.yaw = yaw; cam.pitch = pitch;
+});
+window.addEventListener('blur', () => { keys = {}; dragging = false; });
+
+window.addEventListener('keydown', (e) => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  const c = e.code;
+  keys[c] = true;
+  if (c === 'KeyF') {
+    autopilotOn = !autopilotOn;
+    autopilotEl.textContent = 'AUTOPILOT: ' + (autopilotOn ? 'ON' : 'OFF');
+  }
+  if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ShiftLeft','ShiftRight','Space'].includes(c)) e.preventDefault();
+});
+window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+// ============================================================
+// UI events
+// ============================================================
+timeSlider.addEventListener('input', (e) => { timeHours = parseFloat(e.target.value); timeSlider.value = e.target.value; });
+seedInput.addEventListener('change', (e) => {
+  const n = parseInt(e.target.value, 10);
+  if (!isNaN(n)) setSeed(n);
+});
+let fpsLast = performance.now();
+let fpsCount = 0;
+const fpsInterval = setInterval(() => {
+  const now = performance.now();
+  fpsCount++;
+  if (now - fpsLast >= 500) { fpsEl.textContent = String(Math.round(fpsCount * 1000 / (now - fpsLast))); fpsLast = now; fpsCount = 0; }
+}, 500);
+
+// ============================================================
+// Grader API
+// ============================================================
+window.__arena = {
+  freeze: function (on) { frozen = !!on; },
+  setSeed: function (n) {
+    WORLD_SEED = n | 0;
+    seedInput.value = String(n);
+    chunks.clear();
+    loadChunksAround(cam.x, cam.z);
+  },
+  setTime: function (h) {
+    timeHours = Math.max(0, Math.min(24, h));
+    timeSlider.value = String(timeHours);
+  },
+  setCamera: function (c) {
+    cam.x = c.x; cam.y = c.y; cam.z = c.z; cam.yaw = c.yaw; cam.pitch = c.pitch;
+    autopilotOn = false;
+    autopilotEl.textContent = 'AUTOPILOT: OFF';
+    const minAllowed = Math.max(terrainHeight(cam.x, cam.z) + 0.5, 0.1);
+    if (cam.y < minAllowed) cam.y = minAllowed;
+  },
+  getCamera: function () { return { x: cam.x, y: cam.y, z: cam.z, yaw: cam.yaw, pitch: cam.pitch }; },
+  terrainHeight: function (x, z) { return terrainHeight(x, z); },
+  stats: function () { return { chunks: chunks.size, triangles: trianglesDrawn }; }
+};
+
+// initial camera placement
+cam.y = Math.max(terrainHeight(cam.x, cam.z) + 0.5, 0.1);
+</script>
+</body>
+</html>
