@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse — Drum Machine</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0a0a0f;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  user-select: none;
+}
+#app {
+  max-width: 900px;
+  width: 100%;
+}
+header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+header h1 {
+  font-size: 1.4em;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #00e5c8;
+  text-shadow: 0 0 20px rgba(0,229,200,0.4);
+}
+header p { font-size: 0.75em; color: #666; margin-top: 4px; }
+#transport {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #14141a;
+  border: 1px solid #2a2a35;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+#play {
+  width: 56px; height: 44px;
+  background: #1a1a24;
+  border: 2px solid #00e5c8;
+  border-radius: 8px;
+  color: #00e5c8;
+  font-size: 1.4em;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center;
+}
+#play:hover { background: #00e5c8; color: #0a0a0f; }
+#play.playing { background: #00e5c8; color: #0a0a0f; box-shadow: 0 0 20px rgba(0,229,200,0.5); }
+.ctrl-group { display: flex; align-items: center; gap: 6px; }
+.ctrl-group label { font-size: 0.7em; color: #888; text-transform: uppercase; letter-spacing: 1px; min-width: 42px; }
+.ctrl-group input[type="range"] {
+  -webkit-appearance: none; width: 110px; height: 6px;
+  background: #2a2a35; border-radius: 3px; outline: none;
+}
+.ctrl-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px;
+  background: #00e5c8; border-radius: 50%; cursor: pointer;
+  box-shadow: 0 0 8px rgba(0,229,200,0.4);
+}
+.ctrl-group .val { font-size: 0.8em; color: #00e5c8; min-width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
+#clear-btn {
+  background: #1a1a24; border: 1px solid #333; border-radius: 6px;
+  color: #888; padding: 6px 12px; cursor: pointer; font-size: 0.75em; text-transform: uppercase;
+}
+#clear-btn:hover { border-color: #ff4466; color: #ff4466; }
+#random-btn {
+  background: #1a1a24; border: 1px solid #333; border-radius: 6px;
+  color: #888; padding: 6px 12px; cursor: pointer; font-size: 0.75em; text-transform: uppercase;
+}
+#random-btn:hover { border-color: #aa66ff; color: #aa66ff; }
+#sequencer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #14141a;
+  border: 1px solid #2a2a35;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.track-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.track-label {
+  width: 72px; font-size: 0.7em; text-transform: uppercase; letter-spacing: 1px;
+  color: #aaa; text-align: right; padding-right: 8px;
+}
+.track-controls {
+  display: flex; align-items: center; gap: 4px; width: 80px;
+}
+.mute-btn {
+  width: 22px; height: 22px; border-radius: 4px;
+  background: #1a1a24; border: 1px solid #333; cursor: pointer;
+  font-size: 0.6em; color: #666; display: flex; align-items: center; justify-content: center;
+  transition: all 0.1s;
+}
+.mute-btn[aria-pressed="true"] { background: #ff2244; border-color: #ff2244; color: #fff; }
+.mute-btn:hover { border-color: #ff2244; }
+.vol-slider {
+  -webkit-appearance: none; width: 48px; height: 4px;
+  background: #2a2a35; border-radius: 2px; outline: none;
+}
+.vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 10px; height: 10px;
+  background: #aaa; border-radius: 50%; cursor: pointer;
+}
+.steps-container {
+  display: flex; gap: 3px; flex: 1;
+}
+.step-btn {
+  width: 44px; height: 38px;
+  background: #1a1a24;
+  border: 1px solid #2a2a35;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.1s;
+  position: relative;
+  overflow: hidden;
+}
+.step-btn:hover { border-color: #555; background: #222230; }
+.step-btn[aria-pressed="true"] {
+  border-color: #00e5c8;
+  background: rgba(0,229,200,0.15);
+  box-shadow: 0 0 8px rgba(0,229,200,0.2);
+}
+.step-btn[aria-pressed="true"]::after {
+  content: ''; position: absolute; inset: 3px;
+  background: #00e5c8; border-radius: 3px; opacity: 0.6;
+}
+.step-btn.playing {
+  box-shadow: 0 0 16px rgba(255,200,0,0.6);
+  border-color: #ffcc00;
+}
+.step-btn.playing[aria-pressed="true"] {
+  box-shadow: 0 0 20px rgba(0,229,200,0.8);
+  border-color: #00ffcc;
+}
+.beat-sep {
+  width: 4px; height: 38px; background: transparent;
+  border-left: 2px solid #2a2a35;
+  flex-shrink: 0;
+}
+#visualizer-container {
+  background: #14141a;
+  border: 1px solid #2a2a35;
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+}
+#visualizer-container label { font-size: 0.7em; color: #666; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 8px; }
+#visualizer {
+  width: 100%; height: 80px; border-radius: 8px;
+  background: #0d0d14;
+}
+#beat-indicator {
+  display: flex; gap: 3px; justify-content: center; margin-bottom: 10px; padding: 0 80px;
+}
+#beat-indicator .bi {
+  width: 44px; height: 4px; border-radius: 2px; background: #222;
+  transition: background 0.1s;
+}
+#beat-indicator .bi.active { background: #ffcc00; box-shadow: 0 0 8px rgba(255,204,0,0.5); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Pulse</h1>
+    <p>16-step drum machine &bull; synthesized &bull; space = play/stop</p>
+  </header>
+
+  <div id="transport">
+    <button id="play" aria-label="Play/Stop">&#9654;</button>
+    <div class="ctrl-group">
+      <label>Tempo</label>
+      <input type="range" id="tempo" min="40" max="240" value="120" step="1">
+      <span class="val" id="tempo-val">120</span>
+    </div>
+    <div class="ctrl-group">
+      <label>Swing</label>
+      <input type="range" id="swing" min="0" max="100" value="0" step="1">
+      <span class="val" id="swing-val">0%</span>
+    </div>
+    <button id="clear-btn">Clear</button>
+    <button id="random-btn">Random</button>
+  </div>
+
+  <div id="sequencer" data-playhead="-1">
+    <div id="beat-indicator"></div>
+    <div id="tracks"></div>
+  </div>
+
+  <div id="visualizer-container">
+    <label>Spectrum Analyzer</label>
+    <canvas id="visualizer" width="872" height="80"></canvas>
+  </div>
+</div>
+
+<script>
+(function() {
+  const TRACKS = ['Kick','Snare','Closed Hat','Open Hat','Clap','Low Tom','High Tom','Cowbell'];
+  const STEPS = 16;
+
+  // State
+  let tempo = 120;
+  let swing = 0;
+  let playing = false;
+  let pattern = Array.from({length:8}, ()=>Array(16).fill(false));
+  let mutes = Array(8).fill(false);
+  let volumes = Array(8).fill(0.8);
+
+  // Audio
+  let ctx = null;
+  let masterGain = null;
+  let analyser = null;
+  let noiseBuffer = null;
+
+  function initAudio() {
+    if (ctx) return;
+    ctx = new AudioContext();
+    masterGain = ctx.createGain();
+    masterGain.gain.value = 0.9;
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.7;
+    masterGain.connect(analyser);
+    analyser.connect(ctx.destination);
+    // Create noise buffer
+    noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  }
+
+  function resumeAudio() {
+    initAudio();
+    if (ctx.state === 'suspended') ctx.resume();
+  }
+
+  // Synthesis
+  function createGain(when) {
+    const g = ctx.createGain();
+    g.connect(masterGain);
+    return g;
+  }
+
+  function playKick(trackIdx, when, vel) {
+    const trackGain = ctx.createGain();
+    trackGain.gain.value = vel;
+    trackGain.connect(masterGain);
+
+    // Sub oscillator with pitch drop
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, when);
+    osc.frequency.exponentialRampToValueAtTime(35, when + 0.08);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(1.2, when);
+    env.gain.exponentialRampToValueAtTime(0.001, when + 0.35);
+    osc.connect(env);
+    env.connect(trackGain);
+    osc.start(when);
+    osc.stop(when + 0.35);
+
+    // Click transient
+    const click = ctx.createOscillator();
+    click.type = 'square';
+    click.frequency.setValueAtTime(800, when);
+    const clickEnv = ctx.createGain();
+    clickEnv.gain.setValueAtTime(0.6, when);
+    clickEnv.gain.exponentialRampToValueAtTime(0.001, when + 0.01);
+    click.connect(clickEnv);
+    clickEnv.connect(trackGain);
+    click.start(when);
+    click.stop(when + 0.01);
+  }
+
+  function playSnare(trackIdx, when, vel) {
+    const trackGain = ctx.createGain();
+    trackGain.gain.value = vel;
+    trackGain.connect(masterGain);
+
+    // Noise burst
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = 3000;
+    noiseFilter.Q.value = 0.8;
+    const noiseEnv = ctx.createGain();
+    noiseEnv.gain.setValueAtTime(1.0, when);
+    noiseEnv.gain.exponentialRampToValueAtTime(0.001, when + 0.2);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseEnv);
+    noiseEnv.connect(trackGain);
+    noise.start(when);
+    noise.stop(when + 0.2);
+
+    // Body tone
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(200, when);
+    osc.frequency.exponentialRampToValueAtTime(100, when + 0.05);
+    const bodyEnv = ctx.createGain();
+    bodyEnv.gain.setValueAtTime(0.7, when);
+    bodyEnv.gain.exponentialRampToValueAtTime(0.001, when + 0.08);
+    osc.connect(bodyEnv);
+    bodyEnv.connect(trackGain);
+    osc.start(when);
+    osc.stop(when + 0.08);
+  }
+
+  function playClosedHat(trackIdx, when, vel) {
+    const trackGain = ctx.createGain();
+    trackGain.gain.value = vel;
+    trackGain.connect(masterGain);
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 8000;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.5, when);
+    env.gain.exponentialRampToValueAtTime(0.001, when + 0.04);
+    noise.connect(hp);
+    hp.connect(env);
+    env.connect(trackGain);
+    noise.start(when);
+    noise.stop(when + 0.04);
+  }
+
+  function playOpenHat(trackIdx, when, vel) {
+    const trackGain = ctx.createGain();
+    trackGain.gain.value = vel;
+    trackGain.connect(masterGain);
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 7000;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.45, when);
+    env.gain.exponentialRampToValueAtTime(0.001, when + 0.3);
+    noise.connect(hp);
+    hp.connect(env);
+    env.connect(trackGain);
+    noise.start(when);
+    noise.stop(when + 0.3);
+  }
+
+  function playClap(trackIdx, when, vel) {
+    const trackGain = ctx.createGain();
+    trackGain.gain.value = vel;
+    trackGain.connect(masterGain);
+
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1500;
+    bp.Q.value = 2;
+
+    for (let i = 0; i < 3; i++) {
+      const t = when + i * 0.012;
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0.7, t);
+      env.gain.exponentialRampToValueAtTime(0.001, t + 0.05 + (i === 2 ? 0.15 : 0));
+      noise.connect(env);
+      env.connect(bp);
+      noise.start(t);
+      noise.stop(t + 0.2);
+    }
+    bp.connect(trackGain);
+  }
+
+  function playLowTom(trackIdx, when, vel) {
+    const trackGain = ctx.createGain();
+    trackGain.gain.value = vel;
+    trackGain.connect(masterGain);
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(100, when);
+    osc.frequency.exponentialRampToValueAtTime(40, when + 0.25);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(1.0, when);
+    env.gain.exponentialRampToValueAtTime(0.001, when + 0.4);
+    osc.connect(env);
+    env.connect(trackGain);
+    osc.start(when);
+    osc.stop(when + 0.4);
+  }
+
+  function playHighTom(trackIdx, when, vel) {
+    const trackGain = ctx.createGain();
+    trackGain.gain.value = vel;
+    trackGain.connect(masterGain);
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(180, when);
+    osc.frequency.exponentialRampToValueAtTime(70, when + 0.18);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(1.0, when);
+    env.gain.exponentialRampToValueAtTime(0.001, when + 0.3);
+    osc.connect(env);
+    env.connect(trackGain);
+    osc.start(when);
+    osc.stop(when + 0.3);
+  }
+
+  function playCowbell(trackIdx, when, vel) {
+    const trackGain = ctx.createGain();
+    trackGain.gain.value = vel;
+    trackGain.connect(masterGain);
+
+    const bp1 = ctx.createBiquadFilter();
+    bp1.type = 'bandpass';
+    bp1.frequency.value = 620;
+    bp1.Q.value = 4;
+    const bp2 = ctx.createBiquadFilter();
+    bp2.type = 'bandpass';
+    bp2.frequency.value = 920;
+    bp2.Q.value = 4;
+
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'square';
+    osc1.frequency.value = 620;
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'square';
+    osc2.frequency.value = 920;
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.6, when);
+    env.gain.setValueAtTime(0.6, when + 0.02);
+    env.gain.exponentialRampToValueAtTime(0.001, when + 0.4);
+
+    osc1.connect(bp1);
+    bp1.connect(env);
+    osc2.connect(bp2);
+    bp2.connect(env);
+    env.connect(trackGain);
+
+    osc1.start(when);
+    osc1.stop(when + 0.4);
+    osc2.start(when);
+    osc2.stop(when + 0.4);
+  }
+
+  const PLAYERS = [playKick, playSnare, playClosedHat, playOpenHat, playClap, playLowTom, playHighTom, playCowbell];
+
+  // Scheduler
+  let schedulerTimer = null;
+  let currentStep = 0;
+  let nextNoteTime = 0;
+  let scheduledSteps = []; // {step, time} for playhead tracking
+  const LOOKAHEAD = 0.1;
+  const SCHED_INTERVAL = 25;
+
+  function stepDuration() {
+    return 60.0 / tempo / 4.0;
+  }
+
+  function swingOffset(stepIndex) {
+    if (stepIndex % 2 === 1) {
+      return (swing / 100.0) * (1.0 / 3.0) * stepDuration();
+    }
+    return 0;
+  }
+
+  function scheduleStep(step, time) {
+    for (let t = 0; t < 8; t++) {
+      if (!pattern[t][step] || mutes[t]) continue;
+      const vel = volumes[t];
+      PLAYERS[t](t, time, vel);
+    }
+    scheduledSteps.push({step, time});
+  }
+
+  function scheduler() {
+    if (!playing) return;
+    const now = ctx.currentTime;
+    while (nextNoteTime < now + LOOKAHEAD) {
+      scheduleStep(currentStep, nextNoteTime);
+      const dur = stepDuration();
+      const nextStep = (currentStep + 1) % STEPS;
+      const swingNow = swingOffset(currentStep);
+      nextNoteTime += dur;
+      // Apply swing to current step's scheduling
+      // Actually we already scheduled at nextNoteTime before advancing. Let me redo this properly.
+      currentStep = nextStep;
+    }
+    schedulerTimer = setTimeout(scheduler, SCHED_INTERVAL);
+  }
+
+  // Hmm, I need to fix the timing. Let me redo:
+  // The correct approach: nextNoteTime is the scheduled time for currentStep.
+  // After scheduling currentStep, advance to next step with appropriate spacing.
+
+  function startScheduler() {
+    currentStep = 0;
+    nextNoteTime = ctx.currentTime + 0.05; // small initial delay
+    scheduledSteps = [];
+    scheduler();
+  }
+
+  function stopScheduler() {
+    if (schedulerTimer) { clearTimeout(schedulerTimer); schedulerTimer = null; }
+    scheduledSteps = [];
+  }
+
+  // Playhead tracking
+  function updatePlayhead() {
+    if (!playing) {
+      sequencerEl.setAttribute('data-playhead', '-1');
+      return;
+    }
+    const now = ctx.currentTime;
+    let activeStep = -1;
+    // Find the step that is currently being heard
+    for (let i = scheduledSteps.length - 1; i >= 0; i--) {
+      const entry = scheduledSteps[i];
+      if (entry.time <= now && entry.time + stepDuration() > now) {
+        activeStep = entry.step;
+        break;
+      }
+    }
+    // If no match found in scheduled steps, compute expected current step
+    if (activeStep === -1 && scheduledSteps.length > 0) {
+      const lastEntry = scheduledSteps[scheduledSteps.length - 1];
+      if (now > lastEntry.time) {
+        activeStep = lastEntry.step;
+      }
+    }
+    if (activeStep === -1 && scheduledSteps.length > 0) {
+      // Find closest past step
+      let best = -1, bestDiff = Infinity;
+      for (const entry of scheduledSteps) {
+        const diff = now - entry.time;
+        if (diff >= 0 && diff < bestDiff) { bestDiff = diff; best = entry.step; }
+      }
+      if (bestDiff < 0.1) activeStep = best;
+    }
+    // Clean old entries
+    scheduledSteps = scheduledSteps.filter(e => e.time + stepDuration() > now - 0.05);
+
+    if (activeStep >= 0 && activeStep < 16) {
+      sequencerEl.setAttribute('data-playhead', String(activeStep));
+      highlightPlayhead(activeStep);
+    }
+  }
+
+  function highlightPlayhead(step) {
+    document.querySelectorAll('.step-btn.playing').forEach(el => el.classList.remove('playing'));
+    if (step >= 0) {
+      document.querySelectorAll(`.step-btn[data-step="${step}"]`).forEach(el => {
+        el.classList.add('playing');
+      });
+      // Beat indicator
+      const biEls = document.querySelectorAll('#beat-indicator .bi');
+      biEls.forEach((el, i) => {
+        el.classList.toggle('active', i === Math.floor(step / 4));
+      });
+    }
+  }
+
+  function rAFLoop() {
+    if (playing) {
+      updatePlayhead();
+    }
+    requestAnimationFrame(rAFLoop);
+  }
+
+  // UI
+  const sequencerEl = document.getElementById('sequencer');
+  const tracksEl = document.getElementById('tracks');
+  const playBtn = document.getElementById('play');
+  const tempoInput = document.getElementById('tempo');
+  const tempoVal = document.getElementById('tempo-val');
+  const swingInput = document.getElementById('swing');
+  const swingVal = document.getElementById('swing-val');
+  const clearBtn = document.getElementById('clear-btn');
+  const randomBtn = document.getElementById('random-btn');
+  const visualizerCanvas = document.getElementById('visualizer');
+  const beatIndicator = document.getElementById('beat-indicator');
+
+  // Build beat indicator
+  for (let b = 0; b < 4; b++) {
+    const d = document.createElement('div');
+    d.className = 'bi';
+    beatIndicator.appendChild(d);
+  }
+
+  // Build track rows
+  function buildUI() {
+    tracksEl.innerHTML = '';
+    for (let t = 0; t < 8; t++) {
+      const row = document.createElement('div');
+      row.className = 'track-row';
+
+      const label = document.createElement('div');
+      label.className = 'track-label';
+      label.textContent = TRACKS[t];
+      row.appendChild(label);
+
+      const controls = document.createElement('div');
+      controls.className = 'track-controls';
+
+      const muteBtn = document.createElement('button');
+      muteBtn.className = 'mute-btn';
+      muteBtn.setAttribute('data-mute', String(t));
+      muteBtn.setAttribute('aria-pressed', mutes[t] ? 'true' : 'false');
+      muteBtn.textContent = 'M';
+      muteBtn.addEventListener('click', () => {
+        mutes[t] = !mutes[t];
+        muteBtn.setAttribute('aria-pressed', mutes[t] ? 'true' : 'false');
+        saveState();
+      });
+      controls.appendChild(muteBtn);
+
+      const volSlider = document.createElement('input');
+      volSlider.type = 'range';
+      volSlider.setAttribute('data-volume', String(t));
+      volSlider.min = '0';
+      volSlider.max = '100';
+      volSlider.value = String(Math.round(volumes[t] * 100));
+      volSlider.className = 'vol-slider';
+      volSlider.addEventListener('input', () => {
+        volumes[t] = volSlider.value / 100;
+        saveState();
+      });
+      controls.appendChild(volSlider);
+
+      row.appendChild(controls);
+
+      const stepsContainer = document.createElement('div');
+      stepsContainer.className = 'steps-container';
+
+      for (let s = 0; s < 16; s++) {
+        if (s > 0 && s % 4 === 0) {
+          const sep = document.createElement('div');
+          sep.className = 'beat-sep';
+          stepsContainer.appendChild(sep);
+        }
+        const btn = document.createElement('button');
+        btn.className = 'step-btn';
+        btn.setAttribute('data-track', String(t));
+        btn.setAttribute('data-step', String(s));
+        btn.setAttribute('aria-pressed', pattern[t][s] ? 'true' : 'false');
+        btn.addEventListener('click', () => {
+          pattern[t][s] = !pattern[t][s];
+          btn.setAttribute('aria-pressed', pattern[t][s] ? 'true' : 'false');
+          saveState();
+        });
+        stepsContainer.appendChild(btn);
+      }
+
+      row.appendChild(stepsContainer);
+      tracksEl.appendChild(row);
+    }
+  }
+
+  // Transport controls
+  function togglePlay() {
+    resumeAudio();
+    if (!playing) {
+      playing = true;
+      playBtn.classList.add('playing');
+      playBtn.innerHTML = '&#9632;';
+      startScheduler();
+    } else {
+      playing = false;
+      playBtn.classList.remove('playing');
+      playBtn.innerHTML = '&#9654;';
+      stopScheduler();
+      sequencerEl.setAttribute('data-playhead', '-1');
+      document.querySelectorAll('.step-btn.playing').forEach(el => el.classList.remove('playing'));
+      document.querySelectorAll('#beat-indicator .bi').forEach(el => el.classList.remove('active'));
+    }
+  }
+
+  playBtn.addEventListener('click', togglePlay);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.key === ' ') {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      e.preventDefault();
+      togglePlay();
+    }
+  });
+
+  tempoInput.addEventListener('input', () => {
+    tempo = parseInt(tempoInput.value);
+    tempoVal.textContent = String(tempo);
+    saveState();
+  });
+  tempoInput.addEventListener('change', () => {
+    tempo = parseInt(tempoInput.value);
+    tempoVal.textContent = String(tempo);
+    saveState();
+  });
+
+  swingInput.addEventListener('input', () => {
+    swing = parseInt(swingInput.value);
+    swingVal.textContent = swing + '%';
+    saveState();
+  });
+  swingInput.addEventListener('change', () => {
+    swing = parseInt(swingInput.value);
+    swingVal.textContent = swing + '%';
+    saveState();
+  });
+
+  clearBtn.addEventListener('click', () => {
+    pattern = Array.from({length:8}, ()=>Array(16).fill(false));
+    updateAllButtons();
+    saveState();
+  });
+
+  randomBtn.addEventListener('click', () => {
+    // Generate a musically coherent random pattern
+    for (let t = 0; t < 8; t++) {
+      for (let s = 0; s < 16; s++) {
+        pattern[t][s] = Math.random() < 0.15;
+      }
+    }
+    // Ensure some structure
+    pattern[0][0] = true; pattern[0][8] = true;
+    pattern[1][4] = true; pattern[1][12] = true;
+    for (let s = 0; s < 16; s += 2) { if (Math.random() < 0.6) pattern[2][s] = true; }
+    pattern[3][14] = Math.random() < 0.3;
+    pattern[3][6] = Math.random() < 0.2;
+    updateAllButtons();
+    saveState();
+  });
+
+  function updateAllButtons() {
+    document.querySelectorAll('.step-btn').forEach(btn => {
+      const t = parseInt(btn.getAttribute('data-track'));
+      const s = parseInt(btn.getAttribute('data-step'));
+      btn.setAttribute('aria-pressed', pattern[t][s] ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-mute]').forEach(btn => {
+      const t = parseInt(btn.getAttribute('data-mute'));
+      btn.setAttribute('aria-pressed', mutes[t] ? 'true' : 'false');
+    });
+  }
+
+  // Visualizer
+  function drawVisualizer() {
+    const canvas = visualizerCanvas;
+    const vctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+
+    vctx.fillStyle = '#0d0d14';
+    vctx.fillRect(0, 0, w, h);
+
+    if (!analyser) { requestAnimationFrame(drawVisualizer); return; }
+
+    const freqData = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(freqData);
+
+    const barCount = 64;
+    const barWidth = w / barCount;
+
+    for (let i = 0; i < barCount; i++) {
+      const val = freqData[Math.floor(i * freqData.length / barCount)];
+      const barHeight = (val / 255) * h;
+      const hue = 160 + (i / barCount) * 40;
+      vctx.fillStyle = `hsla(${hue}, 80%, 55%, ${0.3 + val/255 * 0.7})`;
+      vctx.fillRect(i * barWidth + 1, h - barHeight, barWidth - 2, barHeight);
+    }
+
+    requestAnimationFrame(drawVisualizer);
+  }
+
+  // Persistence
+  function saveState() {
+    const state = { pattern, tempo, swing, mutes, volumes };
+    try { localStorage.setItem('pulse_drum', JSON.stringify(state)); } catch(e) {}
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem('pulse_drum');
+      if (raw) {
+        const state = JSON.parse(raw);
+        if (state.pattern) pattern = state.pattern;
+        if (typeof state.tempo === 'number') tempo = state.tempo;
+        if (typeof state.swing === 'number') swing = state.swing;
+        if (state.mutes) mutes = state.mutes;
+        if (state.volumes) volumes = state.volumes;
+        return true;
+      }
+    } catch(e) {}
+    return false;
+  }
+
+  function applyStateToUI() {
+    tempoInput.value = String(tempo);
+    tempoVal.textContent = String(tempo);
+    swingInput.value = String(swing);
+    swingVal.textContent = swing + '%';
+  }
+
+  // Default demo pattern (loaded on first visit)
+  function loadDefaultPattern() {
+    // Classic boom-bap
+    const k = [0,8,10];
+    const s = [4,12];
+    const ch = [0,2,4,6,8,10,12,14];
+    const oh = [14];
+    const cl = [];
+    const lt = [];
+    const ht = [];
+    const cb = [2, 10];
+
+    k.forEach(s => pattern[0][s] = true);
+    s.forEach(s => pattern[1][s] = true);
+    ch.forEach(s => pattern[2][s] = true);
+    oh.forEach(s => pattern[3][s] = true);
+    cb.forEach(s => pattern[7][s] = true);
+  }
+
+  // Init
+  const restored = loadState();
+  if (!restored) {
+    loadDefaultPattern();
+    saveState();
+  }
+  applyStateToUI();
+  buildUI();
+  requestAnimationFrame(drawVisualizer);
+  requestAnimationFrame(rAFLoop);
+})();
+</script>
+</body>
+</html>

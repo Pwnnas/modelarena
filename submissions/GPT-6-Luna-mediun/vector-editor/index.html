@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vectorly — Vector Design</title>
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #202533;
+    --muted: #7c8494;
+    --line: #e7e9ef;
+    --panel: #fff;
+    --canvas: #f5f6fa;
+    --accent: #695cf2;
+    --accent-soft: #efedff;
+    --shadow: 0 1px 2px rgba(27, 34, 52, .06), 0 5px 18px rgba(27, 34, 52, .04);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    color: var(--ink);
+    background: #f7f8fb;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button, input { font: inherit; }
+  button { color: inherit; }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-width: 760px;
+  }
+
+  .topbar {
+    height: 58px;
+    flex: 0 0 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 17px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    z-index: 2;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 210px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -.45px;
+  }
+
+  .brand-mark {
+    width: 27px;
+    height: 27px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    color: white;
+    background: linear-gradient(145deg, #8175ff, #5f52e9);
+    box-shadow: 0 3px 8px rgba(105, 92, 242, .24);
+  }
+
+  .brand-mark svg { width: 17px; height: 17px; }
+  .brand-sub { color: #a0a5b1; font-weight: 500; margin-left: 1px; }
+
+  .top-center {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .doc-name {
+    color: #495062;
+    font-weight: 600;
+    padding: 7px 10px;
+    border-radius: 7px;
+    background: #f7f7fa;
+  }
+
+  .saved-indicator { display: inline-flex; align-items: center; gap: 6px; }
+  .saved-dot { width: 6px; height: 6px; background: #52bf8b; border-radius: 50%; }
+
+  .top-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 9px;
+    min-width: 210px;
+  }
+
+  .icon-button, .export-button {
+    height: 34px;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, transform .15s;
+  }
+
+  .icon-button {
+    width: 34px;
+    display: grid;
+    place-items: center;
+    color: #5e6575;
+  }
+
+  .icon-button:hover, .export-button:hover { background: #f8f8fc; border-color: #d4d7e1; }
+  .icon-button:active, .export-button:active { transform: translateY(1px); }
+  .icon-button:disabled { opacity: .38; cursor: default; }
+
+  .icon-button svg { width: 16px; height: 16px; }
+
+  .zoom-readout {
+    min-width: 49px;
+    text-align: center;
+    color: #5e6575;
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+  }
+
+  .export-button {
+    padding: 0 13px;
+    margin-left: 4px;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 2px 5px rgba(105, 92, 242, .18);
+  }
+
+  .export-button:hover { background: #5c4fe3; border-color: #5c4fe3; }
+
+  .workspace {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+  }
+
+  .tool-rail {
+    width: 57px;
+    flex: 0 0 57px;
+    padding: 13px 9px;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 7px;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    z-index: 1;
+  }
+
+  .tool-button {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    color: #737b8b;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition: color .14s, background .14s, border-color .14s;
+  }
+
+  .tool-button svg { width: 19px; height: 19px; }
+  .tool-button:hover { color: #393f50; background: #f5f5fa; }
+  .tool-button.active {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-color: #e3e0ff;
+  }
+
+  .tool-divider { width: 25px; height: 1px; background: var(--line); margin: 3px 0; }
+  .tool-hint {
+    position: absolute;
+    left: 45px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 5px 7px;
+    color: white;
+    background: #282d3b;
+    border-radius: 5px;
+    font-size: 10px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .12s;
+    z-index: 5;
+  }
+  .tool-button:hover .tool-hint { opacity: 1; }
+
+  .stage-area {
+    flex: 1;
+    min-width: 600px;
+    min-height: 400px;
+    position: relative;
+    overflow: hidden;
+    background-color: var(--canvas);
+    background-image:
+      radial-gradient(circle, #d9dce5 1px, transparent 1.2px);
+    background-size: 20px 20px;
+    background-position: 10px 10px;
+  }
+
+  #stage {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 600px;
+    min-height: 400px;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .stage-tip {
+    position: absolute;
+    left: 50%;
+    bottom: 17px;
+    transform: translateX(-50%);
+    pointer-events: none;
+    color: #8a90a0;
+    background: rgba(255,255,255,.8);
+    border: 1px solid rgba(228,230,237,.85);
+    border-radius: 7px;
+    padding: 6px 10px;
+    font-size: 11px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(29, 36, 55, .04);
+  }
+
+  .stage-tip kbd {
+    color: #666d7d;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 4px;
+    border: 1px solid #dfe1e8;
+    background: white;
+    border-radius: 3px;
+  }
+
+  .properties {
+    width: 270px;
+    flex: 0 0 270px;
+    padding: 18px 17px 20px;
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    overflow-y: auto;
+  }
+
+  .panel-title {
+    margin: 0 0 4px;
+    font-size: 13px;
+    letter-spacing: -.15px;
+    font-weight: 700;
+  }
+
+  .panel-subtitle {
+    margin: 0;
+    color: #9298a6;
+    font-size: 11px;
+  }
+
+  .panel-section { padding: 18px 0 17px; border-bottom: 1px solid #eff0f4; }
+  .section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    color: #656c7b;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+  }
+
+  .selection-badge {
+    max-width: 115px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #898f9e;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .dimension-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px 8px;
+  }
+
+  .field-label {
+    display: block;
+    margin-bottom: 5px;
+    color: #858b99;
+    font-size: 10px;
+  }
+
+  .number-field, .color-field {
+    width: 100%;
+    height: 32px;
+    border: 1px solid #e4e6ec;
+    border-radius: 6px;
+    background: #fff;
+    outline: none;
+    transition: border-color .14s, box-shadow .14s;
+  }
+
+  .number-field {
+    padding: 0 8px;
+    color: #363c4b;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .number-field:focus, .color-field:focus {
+    border-color: #a9a1ff;
+    box-shadow: 0 0 0 2px rgba(105, 92, 242, .10);
+  }
+
+  .number-field:disabled, .color-field:disabled { background: #f7f7f9; color: #a6aab4; }
+
+  .color-row { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+  .color-row:last-child { margin-bottom: 0; }
+  .color-name { width: 38px; color: #777e8d; font-size: 11px; }
+  .color-field { width: 34px; height: 29px; padding: 3px; cursor: pointer; }
+  .color-value { color: #747b89; font-size: 11px; font-variant-numeric: tabular-nums; }
+
+  .stroke-row { display: flex; align-items: center; gap: 9px; }
+  .stroke-row .number-field { width: 80px; }
+  .unit { color: #9096a3; font-size: 11px; }
+
+  .empty-state {
+    margin-top: 18px;
+    padding: 12px 11px;
+    color: #8e94a2;
+    background: #f8f8fb;
+    border: 1px solid #eff0f4;
+    border-radius: 7px;
+    line-height: 1.55;
+    font-size: 11px;
+  }
+
+  .empty-state strong { color: #697082; font-weight: 600; }
+  .kbd-list { display: grid; gap: 9px; }
+  .kbd-row { display: flex; align-items: center; justify-content: space-between; color: #7d8492; font-size: 11px; }
+  .kbd-row kbd {
+    min-width: 22px;
+    text-align: center;
+    color: #6e7482;
+    background: #f7f7fa;
+    border: 1px solid #e6e8ee;
+    border-radius: 4px;
+    padding: 2px 5px;
+    font-family: inherit;
+    font-size: 10px;
+  }
+
+  @media (max-width: 980px) {
+    .properties { width: 245px; flex-basis: 245px; padding-left: 14px; padding-right: 14px; }
+    .brand, .top-actions { min-width: 165px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand" aria-label="Vectorly">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M5 18.5 11.9 5l7.1 13.5H5Z" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="12" cy="14" r="2.2" fill="white"/>
+        </svg>
+      </span>
+      <span>Vectorly</span><span class="brand-sub">Studio</span>
+    </div>
+
+    <div class="top-center">
+      <span class="doc-name">Untitled design</span>
+      <span class="saved-indicator"><span class="saved-dot"></span><span id="save-status">Saved</span></span>
+    </div>
+
+    <div class="top-actions">
+      <button class="icon-button" id="undo-button" type="button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
+        <svg viewBox="0 0 20 20" fill="none"><path d="M7.5 6.2 4.2 9.4l3.3 3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 9.4h6.1a4.2 4.2 0 1 1 0 8.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+      <button class="icon-button" id="redo-button" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
+        <svg viewBox="0 0 20 20" fill="none"><path d="m12.5 6.2 3.3 3.2-3.3 3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.5 9.4H9.4a4.2 4.2 0 1 0 0 8.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+      <button class="icon-button" id="zoom-out" type="button" title="Zoom out" aria-label="Zoom out">
+        <svg viewBox="0 0 20 20" fill="none"><circle cx="8.6" cy="8.6" r="5.4" stroke="currentColor" stroke-width="1.5"/><path d="m12.6 12.6 4 4M6 8.6h5.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <span class="zoom-readout" id="zoom-level">100%</span>
+      <button class="icon-button" id="zoom-in" type="button" title="Zoom in" aria-label="Zoom in">
+        <svg viewBox="0 0 20 20" fill="none"><circle cx="8.6" cy="8.6" r="5.4" stroke="currentColor" stroke-width="1.5"/><path d="m12.6 12.6 4 4M8.6 6v5.2M6 8.6h5.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <button class="export-button" id="export-svg" type="button">Export SVG</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <nav class="tool-rail" aria-label="Tools">
+      <button class="tool-button active" data-tool="select" type="button" title="Select (V)" aria-label="Select tool">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5v15l4.3-4.1 2.5 5.5 2.3-1-2.5-5.4 6-.4L6 3.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+        <span class="tool-hint">Select <b>V</b></span>
+      </button>
+      <button class="tool-button" data-tool="rect" type="button" title="Rectangle (R)" aria-label="Rectangle tool">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="14" rx="1.5" stroke="currentColor" stroke-width="1.7"/></svg>
+        <span class="tool-hint">Rectangle <b>R</b></span>
+      </button>
+      <button class="tool-button" data-tool="ellipse" type="button" title="Ellipse (E)" aria-label="Ellipse tool">
+        <svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="12" rx="8" ry="6.7" stroke="currentColor" stroke-width="1.7"/></svg>
+        <span class="tool-hint">Ellipse <b>E</b></span>
+      </button>
+      <button class="tool-button" data-tool="line" type="button" title="Line (L)" aria-label="Line tool">
+        <svg viewBox="0 0 24 24" fill="none"><path d="m5 19 14-14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="5" cy="19" r="1.4" fill="currentColor"/><circle cx="19" cy="5" r="1.4" fill="currentColor"/></svg>
+        <span class="tool-hint">Line <b>L</b></span>
+      </button>
+      <div class="tool-divider"></div>
+      <button class="tool-button" id="reset-view" type="button" title="Reset view" aria-label="Reset view">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4.5 10a7.5 7.5 0 1 1 .7 5.3M4.5 4.7V10h5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8v4l2.6 1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+    </nav>
+
+    <section class="stage-area" id="stage-area" aria-label="Drawing canvas">
+      <svg id="stage" xmlns="http://www.w3.org/2000/svg" role="application" aria-label="Vector drawing stage"></svg>
+      <div class="stage-tip"><kbd>Space</kbd> + drag to pan &nbsp;·&nbsp; <kbd>⌘</kbd>/<kbd>Ctrl</kbd> + scroll to zoom</div>
+    </section>
+
+    <aside class="properties" aria-label="Properties">
+      <h1 class="panel-title">Properties</h1>
+      <p class="panel-subtitle">Precise control for your design</p>
+
+      <section class="panel-section">
+        <div class="section-heading"><span>Position &amp; size</span><span class="selection-badge" id="selection-count">Nothing selected</span></div>
+        <div class="dimension-grid">
+          <label><span class="field-label">X</span><input class="number-field" id="prop-x" type="number" step="1" disabled></label>
+          <label><span class="field-label">Y</span><input class="number-field" id="prop-y" type="number" step="1" disabled></label>
+          <label><span class="field-label">Width</span><input class="number-field" id="prop-width" type="number" min="0" step="1" disabled></label>
+          <label><span class="field-label">Height</span><input class="number-field" id="prop-height" type="number" min="0" step="1" disabled></label>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-heading"><span>Appearance</span></div>
+        <div class="color-row">
+          <span class="color-name">Fill</span>
+          <input class="color-field" id="fill-color" type="color" value="#7668ee" aria-label="Fill color">
+          <span class="color-value" id="fill-value">#7668EE</span>
+        </div>
+        <div class="color-row">
+          <span class="color-name">Stroke</span>
+          <input class="color-field" id="stroke-color" type="color" value="#5147b8" aria-label="Stroke color">
+          <span class="color-value" id="stroke-value">#5147B8</span>
+        </div>
+        <div class="stroke-row" style="margin-top:12px">
+          <span class="color-name">Weight</span>
+          <input class="number-field" id="stroke-width" type="number" min="0" max="100" step="0.5" value="2" aria-label="Stroke width">
+          <span class="unit">px</span>
+        </div>
+      </section>
+
+      <div class="empty-state" id="empty-state">
+        <strong>Start with a shape.</strong><br>
+        Choose a tool and drag anywhere on the canvas. Select a shape to edit its properties.
+      </div>
+
+      <section class="panel-section" style="border-bottom:0">
+        <div class="section-heading"><span>Quick keys</span></div>
+        <div class="kbd-list">
+          <div class="kbd-row"><span>Duplicate selection</span><kbd>⌘ D</kbd></div>
+          <div class="kbd-row"><span>Undo / redo</span><kbd>⌘ Z</kbd></div>
+          <div class="kbd-row"><span>Nudge selection</span><kbd>↑ ↓ ← →</kbd></div>
+          <div class="kbd-row"><span>Bring forward</span><kbd>]</kbd></div>
+        </div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const stage = document.getElementById("stage");
+  const stageArea = document.getElementById("stage-area");
+  const toolButtons = Array.from(document.querySelectorAll("[data-tool]"));
+  const fillInput = document.getElementById("fill-color");
+  const strokeInput = document.getElementById("stroke-color");
+  const strokeWidthInput = document.getElementById("stroke-width");
+  const properties = {
+    x: document.getElementById("prop-x"),
+    y: document.getElementById("prop-y"),
+    width: document.getElementById("prop-width"),
+    height: document.getElementById("prop-height")
+  };
+
+  const STORAGE_KEY = "vectorly-drawing-v1";
+  const defaultStyle = { fill: "#7668ee", stroke: "#5147b8", strokeWidth: 2 };
+  let shapes = [];
+  let selected = new Set();
+  let currentStyle = { ...defaultStyle };
+  let activeTool = "select";
+  let zoom = 1;
+  let panX = 0;
+  let panY = 0;
+  let nextId = 1;
+  let interaction = null;
+  let spaceDown = false;
+  let undoStack = [];
+  let redoStack = [];
+  let saveTimer = null;
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function getSnapshot() {
+    return {
+      shapes: clone(shapes),
+      selected: Array.from(selected),
+      style: clone(currentStyle)
+    };
+  }
+
+  function snapshotKey(snapshot) {
+    return JSON.stringify({ shapes: snapshot.shapes, style: snapshot.style });
+  }
+
+  function pushUndo(before) {
+    if (snapshotKey(before) === snapshotKey(getSnapshot())) return;
+    undoStack.push(before);
+    if (undoStack.length > 150) undoStack.shift();
+    redoStack = [];
+    updateHistoryButtons();
+  }
+
+  function applySnapshot(snapshot) {
+    shapes = clone(snapshot.shapes || []);
+    selected = new Set(snapshot.selected || []);
+    currentStyle = { ...defaultStyle, ...(snapshot.style || {}) };
+    const greatest = shapes.reduce((max, shape) => Math.max(max, Number(String(shape.id).replace(/\D/g, "")) || 0), 0);
+    nextId = Math.max(nextId, greatest + 1);
+    render();
+    saveDocument();
+    updateHistoryButtons();
+  }
+
+  function undo() {
+    if (!undoStack.length) return;
+    redoStack.push(getSnapshot());
+    applySnapshot(undoStack.pop());
+  }
+
+  function redo() {
+    if (!redoStack.length) return;
+    undoStack.push(getSnapshot());
+    applySnapshot(redoStack.pop());
+    updateHistoryButtons();
+  }
+
+  function updateHistoryButtons() {
+    document.getElementById("undo-button").disabled = !undoStack.length;
+    document.getElementById("redo-button").disabled = !redoStack.length;
+  }
+
+  function scheduleSaveStatus() {
+    const status = document.getElementById("save-status");
+    status.textContent = "Saving…";
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { status.textContent = "Saved"; }, 250);
+  }
+
+  function saveDocument() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        shapes,
+        currentStyle,
+        nextId
+      }));
+      scheduleSaveStatus();
+    } catch (_) {
+      document.getElementById("save-status").textContent = "Not saved";
+    }
+  }
+
+  function loadDocument() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (Array.isArray(data.shapes)) shapes = data.shapes;
+      if (data.currentStyle && typeof data.currentStyle === "object") {
+        currentStyle = { ...defaultStyle, ...data.currentStyle };
+      }
+      if (Number.isFinite(data.nextId)) nextId = Math.max(1, data.nextId);
+      const greatest = shapes.reduce((max, shape) => Math.max(max, Number(String(shape.id).replace(/\D/g, "")) || 0), 0);
+      nextId = Math.max(nextId, greatest + 1);
+    } catch (_) {
+      shapes = [];
+      currentStyle = { ...defaultStyle };
+    }
+  }
+
+  function setTool(tool) {
+    activeTool = tool;
+    toolButtons.forEach(button => button.classList.toggle("active", button.dataset.tool === tool));
+    stage.style.cursor = tool === "select" ? "default" : "crosshair";
+  }
+
+  function getViewportSize() {
+    const rect = stage.getBoundingClientRect();
+    return { width: Math.max(1, rect.width), height: Math.max(1, rect.height) };
+  }
+
+  function updateViewBox() {
+    const size = getViewportSize();
+    stage.setAttribute("viewBox", `${panX} ${panY} ${size.width / zoom} ${size.height / zoom}`);
+    stage.setAttribute("preserveAspectRatio", "none");
+    document.getElementById("zoom-level").textContent = `${Math.round(zoom * 100)}%`;
+  }
+
+  function pointFromEvent(event) {
+    const matrix = stage.getScreenCTM();
+    if (!matrix) return { x: 0, y: 0 };
+    const point = stage.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    const result = point.matrixTransform(matrix.inverse());
+    return { x: result.x, y: result.y };
+  }
+
+  function getBounds(shape) {
+    if (shape.type === "line") {
+      return {
+        x: Math.min(shape.x1, shape.x2),
+        y: Math.min(shape.y1, shape.y2),
+        width: Math.abs(shape.x2 - shape.x1),
+        height: Math.abs(shape.y2 - shape.y1)
+      };
+    }
+    return { x: shape.x, y: shape.y, width: shape.width, height: shape.height };
+  }
+
+  function createSvgElement(name, attrs = {}) {
+    const element = document.createElementNS("http://www.w3.org/2000/svg", name);
+    for (const [key, value] of Object.entries(attrs)) {
+      if (value !== undefined && value !== null) element.setAttribute(key, String(value));
+    }
+    return element;
+  }
+
+  function shapeElement(shape) {
+    let element;
+    if (shape.type === "rect") {
+      element = createSvgElement("rect", {
+        x: shape.x, y: shape.y, width: shape.width, height: shape.height
+      });
+    } else if (shape.type === "ellipse") {
+      element = createSvgElement("ellipse", {
+        cx: shape.x + shape.width / 2,
+        cy: shape.y + shape.height / 2,
+        rx: shape.width / 2,
+        ry: shape.height / 2
+      });
+    } else {
+      element = createSvgElement("line", {
+        x1: shape.x1, y1: shape.y1, x2: shape.x2, y2: shape.y2
+      });
+    }
+
+    element.setAttribute("data-shape", shape.type);
+    element.setAttribute("data-id", shape.id);
+    if (selected.has(shape.id)) element.setAttribute("data-selected", "true");
+    element.setAttribute("fill", shape.type === "line" ? "none" : (shape.fill || defaultStyle.fill));
+    element.setAttribute("stroke", shape.stroke || defaultStyle.stroke);
+    element.setAttribute("stroke-width", String(Number(shape.strokeWidth ?? defaultStyle.strokeWidth)));
+    element.setAttribute("stroke-linecap", "round");
+    element.setAttribute("vector-effect", "non-scaling-stroke");
+    if (shape.type === "line") element.setAttribute("pointer-events", "stroke");
+    return element;
+  }
+
+  function selectedShapes() {
+    return shapes.filter(shape => selected.has(shape.id));
+  }
+
+  function updateProperties() {
+    const chosen = selectedShapes();
+    const count = chosen.length;
+    document.getElementById("selection-count").textContent =
+      count === 0 ? "Nothing selected" : `${count} selected`;
+    document.getElementById("empty-state").style.display = count === 0 ? "block" : "none";
+
+    const geometryInputs = Object.values(properties);
+    geometryInputs.forEach(input => { input.disabled = count === 0; });
+
+    if (count > 0) {
+      const bounds = getBounds(chosen[0]);
+      const values = { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
+      for (const [key, input] of Object.entries(properties)) {
+        if (document.activeElement !== input) input.value = formatNumber(values[key]);
+      }
+      if (document.activeElement !== fillInput) fillInput.value = chosen[0].fill || defaultStyle.fill;
+      if (document.activeElement !== strokeInput) strokeInput.value = chosen[0].stroke || defaultStyle.stroke;
+      if (document.activeElement !== strokeWidthInput) strokeWidthInput.value = Number(chosen[0].strokeWidth ?? defaultStyle.strokeWidth);
+      currentStyle = {
+        fill: chosen[0].fill || defaultStyle.fill,
+        stroke: chosen[0].stroke || defaultStyle.stroke,
+        strokeWidth: Number(chosen[0].strokeWidth ?? defaultStyle.strokeWidth)
+      };
+    } else {
+      for (const input of geometryInputs) {
+        if (document.activeElement !== input) input.value = "";
+      }
+      if (document.activeElement !== fillInput) fillInput.value = currentStyle.fill;
+      if (document.activeElement !== strokeInput) strokeInput.value = currentStyle.stroke;
+      if (document.activeElement !== strokeWidthInput) strokeWidthInput.value = currentStyle.strokeWidth;
+    }
+    document.getElementById("fill-value").textContent = fillInput.value.toUpperCase();
+    document.getElementById("stroke-value").textContent = strokeInput.value.toUpperCase();
+  }
+
+  function formatNumber(number) {
+    if (!Number.isFinite(number)) return "0";
+    return String(Math.round(number * 100) / 100);
+  }
+
+  function addSelectionChrome() {
+    const chosen = selectedShapes();
+    if (!chosen.length) return;
+    const boundsList = chosen.map(getBounds);
+    const minX = Math.min(...boundsList.map(b => b.x));
+    const minY = Math.min(...boundsList.map(b => b.y));
+    const maxX = Math.max(...boundsList.map(b => b.x + b.width));
+    const maxY = Math.max(...boundsList.map(b => b.y + b.height));
+    const width = maxX - minX;
+    const height = maxY - minY;
+
+    const outline = createSvgElement("rect", {
+      x: minX, y: minY, width, height,
+      fill: "none", stroke: "#695cf2", "stroke-width": 1,
+      "stroke-dasharray": "4 3", "vector-effect": "non-scaling-stroke",
+      "pointer-events": "none"
+    });
+    outline.setAttribute("data-selection-outline", "true");
+    stage.appendChild(outline);
+
+    if (chosen.length !== 1) return;
+    const size = 8 / zoom;
+    const half = size / 2;
+    const locations = {
+      nw: [minX, minY], n: [minX + width / 2, minY], ne: [maxX, minY],
+      e: [maxX, minY + height / 2], se: [maxX, maxY], s: [minX + width / 2, maxY],
+      sw: [minX, maxY], w: [minX, minY + height / 2]
+    };
+    for (const [name, [x, y]] of Object.entries(locations)) {
+      const handle = createSvgElement("rect", {
+        x: x - half, y: y - half, width: size, height: size,
+        fill: "#fff", stroke: "#695cf2", "stroke-width": 1.25,
+        "vector-effect": "non-scaling-stroke",
+        "data-handle": name,
+        "data-id": chosen[0].id,
+        "pointer-events": "all"
+      });
+      handle.style.cursor = ({
+        nw: "nwse-resize", se: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize",
+        n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize"
+      })[name];
+      stage.appendChild(handle);
+    }
+  }
+
+  function render() {
+    updateViewBox();
+    stage.replaceChildren();
+    for (const shape of shapes) stage.appendChild(shapeElement(shape));
+
+    if (interaction?.preview) stage.appendChild(interaction.preview);
+    if (interaction?.marqueeRect) stage.appendChild(interaction.marqueeRect);
+    addSelectionChrome();
+    updateProperties();
+    saveDocument();
+  }
+
+  function newId() {
+    return `shape-${nextId++}`;
+  }
+
+  function normalizeRect(start, end, constrain) {
+    let dx = end.x - start.x;
+    let dy = end.y - start.y;
+    if (constrain) {
+      const side = Math.max(Math.abs(dx), Math.abs(dy));
+      dx = (dx < 0 ? -1 : 1) * side;
+      dy = (dy < 0 ? -1 : 1) * side;
+    }
+    const x2 = start.x + dx;
+    const y2 = start.y + dy;
+    return {
+      x: Math.min(start.x, x2),
+      y: Math.min(start.y, y2),
+      width: Math.abs(dx),
+      height: Math.abs(dy)
+    };
+  }
+
+  function constrainLine(start, end) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const length = Math.hypot(dx, dy);
+    const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+    return { x: start.x + Math.cos(angle) * length, y: start.y + Math.sin(angle) * length };
+  }
+
+  function stylePreview(element, type) {
+    element.setAttribute("fill", type === "line" ? "none" : interaction.style.fill);
+    element.setAttribute("stroke", interaction.style.stroke);
+    element.setAttribute("stroke-width", String(interaction.style.strokeWidth));
+    element.setAttribute("stroke-dasharray", "5 3");
+    element.setAttribute("opacity", ".78");
+    element.setAttribute("vector-effect", "non-scaling-stroke");
+    element.setAttribute("pointer-events", "none");
+  }
+
+  function updatePreview(point, shift) {
+    const it = interaction;
+    let end = point;
+    if (it.type === "line" && shift) end = constrainLine(it.start, point);
+    if (it.type === "rect" || it.type === "ellipse") {
+      const box = normalizeRect(it.start, point, shift);
+      if (it.type === "rect") {
+        it.preview.setAttribute("x", box.x);
+        it.preview.setAttribute("y", box.y);
+        it.preview.setAttribute("width", box.width);
+        it.preview.setAttribute("height", box.height);
+      } else {
+        it.preview.setAttribute("cx", box.x + box.width / 2);
+        it.preview.setAttribute("cy", box.y + box.height / 2);
+        it.preview.setAttribute("rx", box.width / 2);
+        it.preview.setAttribute("ry", box.height / 2);
+      }
+    } else {
+      it.preview.setAttribute("x1", it.start.x);
+      it.preview.setAttribute("y1", it.start.y);
+      it.preview.setAttribute("x2", end.x);
+      it.preview.setAttribute("y2", end.y);
+    }
+    it.currentEnd = end;
+    render();
+  }
+
+  function createShapeFromDrag(it, end) {
+    const common = {
+      id: newId(),
+      type: it.type,
+      fill: it.style.fill,
+      stroke: it.style.stroke,
+      strokeWidth: it.style.strokeWidth
+    };
+    if (it.type === "line") {
+      return { ...common, x1: it.start.x, y1: it.start.y, x2: end.x, y2: end.y };
+    }
+    return { ...common, ...normalizeRect(it.start, end, it.shift) };
+  }
+
+  function setSelection(ids, syncStyle = true) {
+    selected = new Set(ids);
+    if (syncStyle && selected.size) {
+      const first = shapes.find(shape => selected.has(shape.id));
+      if (first) currentStyle = {
+        fill: first.fill || defaultStyle.fill,
+        stroke: first.stroke || defaultStyle.stroke,
+        strokeWidth: Number(first.strokeWidth ?? defaultStyle.strokeWidth)
+      };
+    }
+    render();
+  }
+
+  function selectedByClick(shape, shift) {
+    if (shift) {
+      const next = new Set(selected);
+      if (next.has(shape.id)) next.delete(shape.id);
+      else next.add(shape.id);
+      setSelection(next);
+      return next.has(shape.id);
+    }
+    if (!selected.has(shape.id) || selected.size !== 1) setSelection([shape.id]);
+    return true;
+  }
+
+  function handleMouseDown(event) {
+    if (event.button !== 0 && event.button !== 1) return;
+    const point = pointFromEvent(event);
+    const target = event.target;
+    const handleElement = target.closest?.("[data-handle]");
+    const shapeElementHit = target.closest?.("[data-shape]");
+    const isPanning = event.button === 1 || (event.button === 0 && spaceDown);
+
+    if (isPanning) {
+      event.preventDefault();
+      interaction = { kind: "pan", clientX: event.clientX, clientY: event.clientY, panX, panY };
+      stage.style.cursor = "grabbing";
+      return;
+    }
+    if (event.button !== 0) return;
+
+    if (activeTool !== "select") {
+      event.preventDefault();
+      const type = activeTool;
+      const preview = createSvgElement(type === "rect" ? "rect" : type === "ellipse" ? "ellipse" : "line");
+      interaction = {
+        kind: "draw",
+        type,
+        start: point,
+        currentEnd: point,
+        style: { ...currentStyle },
+        shift: event.shiftKey,
+        preview
+      };
+      stylePreview(preview, type);
+      render();
+      return;
+    }
+
+    if (handleElement) {
+      const shape = shapes.find(item => item.id === handleElement.getAttribute("data-id"));
+      if (!shape) return;
+      event.preventDefault();
+      const before = getSnapshot();
+      interaction = {
+        kind: "resize",
+        handle: handleElement.getAttribute("data-handle"),
+        id: shape.id,
+        startPoint: point,
+        startShape: clone(shape),
+        startBounds: getBounds(shape),
+        before
+      };
+      return;
+    }
+
+    if (shapeElementHit) {
+      const id = shapeElementHit.getAttribute("data-id");
+      const shape = shapes.find(item => item.id === id);
+      if (!shape) return;
+      const wasSelected = selectedByClick(shape, event.shiftKey);
+      if (!wasSelected || event.shiftKey) return;
+      interaction = {
+        kind: "move",
+        ids: Array.from(selected),
+        startPoint: point,
+        originals: shapes.filter(item => selected.has(item.id)).map(clone),
+        before: getSnapshot()
+      };
+      return;
+    }
+
+    const startSelection = new Set(selected);
+    if (!event.shiftKey) setSelection([]);
+    const marqueeRect = createSvgElement("rect", {
+      fill: "rgba(105,92,242,.08)",
+      stroke: "#695cf2",
+      "stroke-width": 1,
+      "stroke-dasharray": "4 3",
+      "vector-effect": "non-scaling-stroke",
+      "pointer-events": "none"
+    });
+    interaction = {
+      kind: "marquee",
+      start: point,
+      current: point,
+      baseSelection: event.shiftKey ? startSelection : new Set(),
+      marqueeRect,
+      dragged: false
+    };
+    event.preventDefault();
+    render();
+  }
+
+  function mapShapeToBounds(shape, oldBounds, newBounds) {
+    const mapX = value => oldBounds.width === 0
+      ? value + (newBounds.x - oldBounds.x)
+      : newBounds.x + ((value - oldBounds.x) / oldBounds.width) * newBounds.width;
+    const mapY = value => oldBounds.height === 0
+      ? value + (newBounds.y - oldBounds.y)
+      : newBounds.y + ((value - oldBounds.y) / oldBounds.height) * newBounds.height;
+
+    if (shape.type === "line") {
+      return { ...shape, x1: mapX(shape.x1), y1: mapY(shape.y1), x2: mapX(shape.x2), y2: mapY(shape.y2) };
+    }
+    return { ...shape, x: newBounds.x, y: newBounds.y, width: newBounds.width, height: newBounds.height };
+  }
+
+  function resizeBounds(it, point, shift) {
+    const b = it.startBounds;
+    let left = b.x, right = b.x + b.width, top = b.y, bottom = b.y + b.height;
+    const handle = it.handle;
+    if (handle.includes("w")) left = point.x;
+    if (handle.includes("e")) right = point.x;
+    if (handle.includes("n")) top = point.y;
+    if (handle.includes("s")) bottom = point.y;
+
+    if (shift && (it.startShape.type !== "line")) {
+      const ratio = b.height > 0 ? b.width / b.height : 1;
+      const isCorner = handle.length === 2;
+      if (isCorner) {
+        let w = Math.abs(right - left);
+        let h = Math.abs(bottom - top);
+        if ((w / Math.max(b.width, 1e-6)) >= (h / Math.max(b.height, 1e-6))) h = w / ratio;
+        else w = h * ratio;
+        const leftSide = handle.includes("w");
+        const topSide = handle.includes("n");
+        if (leftSide) left = right - w; else right = left + w;
+        if (topSide) top = bottom - h; else bottom = top + h;
+      } else if (handle === "n" || handle === "s") {
+        const h = Math.abs(bottom - top);
+        const w = h * ratio;
+        const centerX = b.x + b.width / 2;
+        left = centerX - w / 2;
+        right = centerX + w / 2;
+      } else {
+        const w = Math.abs(right - left);
+        const h = w / ratio;
+        const centerY = b.y + b.height / 2;
+        top = centerY - h / 2;
+        bottom = centerY + h / 2;
+      }
+    }
+    return {
+      x: Math.min(left, right),
+      y: Math.min(top, bottom),
+      width: Math.abs(right - left),
+      height: Math.abs(bottom - top)
+    };
+  }
+
+  function handleMouseMove(event) {
+    if (!interaction) return;
+    const point = pointFromEvent(event);
+    const it = interaction;
+
+    if (it.kind === "pan") {
+      const dx = event.clientX - it.clientX;
+      const dy = event.clientY - it.clientY;
+      panX = it.panX - dx / zoom;
+      panY = it.panY - dy / zoom;
+      render();
+      return;
+    }
+
+    if (it.kind === "draw") {
+      it.shift = event.shiftKey;
+      updatePreview(point, event.shiftKey);
+      return;
+    }
+
+    if (it.kind === "move") {
+      const dx = point.x - it.startPoint.x;
+      const dy = point.y - it.startPoint.y;
+      for (const original of it.originals) {
+        const shape = shapes.find(item => item.id === original.id);
+        if (!shape) continue;
+        Object.assign(shape, original);
+        if (shape.type === "line") {
+          shape.x1 += dx; shape.x2 += dx; shape.y1 += dy; shape.y2 += dy;
+        } else {
+          shape.x += dx; shape.y += dy;
+        }
+      }
+      render();
+      return;
+    }
+
+    if (it.kind === "resize") {
+      const shape = shapes.find(item => item.id === it.id);
+      if (!shape) return;
+      const newBounds = resizeBounds(it, point, event.shiftKey);
+      Object.assign(shape, mapShapeToBounds(it.startShape, it.startBounds, newBounds));
+      render();
+      return;
+    }
+
+    if (it.kind === "marquee") {
+      it.current = point;
+      it.dragged = Math.hypot(point.x - it.start.x, point.y - it.start.y) * zoom >= 3;
+      const box = {
+        x: Math.min(it.start.x, point.x),
+        y: Math.min(it.start.y, point.y),
+        width: Math.abs(point.x - it.start.x),
+        height: Math.abs(point.y - it.start.y)
+      };
+      it.marqueeRect.setAttribute("x", box.x);
+      it.marqueeRect.setAttribute("y", box.y);
+      it.marqueeRect.setAttribute("width", box.width);
+      it.marqueeRect.setAttribute("height", box.height);
+      render();
+    }
+  }
+
+  function intersects(a, b) {
+    return a.x <= b.x + b.width && a.x + a.width >= b.x &&
+      a.y <= b.y + b.height && a.y + a.height >= b.y;
+  }
+
+  function handleMouseUp(event) {
+    if (!interaction) return;
+    const it = interaction;
+    const point = pointFromEvent(event);
+    interaction = null;
+
+    if (it.kind === "draw") {
+      let end = point;
+      if (it.type === "line" && event.shiftKey) end = constrainLine(it.start, point);
+      if (it.type !== "line" && event.shiftKey) it.shift = true;
+      const distance = Math.hypot(end.x - it.start.x, end.y - it.start.y) * zoom;
+      if (distance >= 3) {
+        const shape = createShapeFromDrag(it, end);
+        shapes.push(shape);
+        selected = new Set([shape.id]);
+        currentStyle = { ...it.style };
+        pushUndo(it.before || { shapes: shapes.slice(0, -1), selected: [], style: it.style });
+        // Use the true state from immediately before creation.
+        const createdSnapshot = getSnapshot();
+        const before = clone(createdSnapshot);
+        before.shapes = before.shapes.filter(item => item.id !== shape.id);
+        before.selected = [];
+        before.style = { ...it.style };
+        undoStack.pop();
+        undoStack.push(before);
+        if (undoStack.length > 150) undoStack.shift();
+      }
+      setTool("select");
+      render();
+      updateHistoryButtons();
+      return;
+    }
+
+    if (it.kind === "move" || it.kind === "resize") {
+      pushUndo(it.before);
+      render();
+      return;
+    }
+
+    if (it.kind === "marquee") {
+      if (it.dragged) {
+        const box = {
+          x: Math.min(it.start.x, point.x),
+          y: Math.min(it.start.y, point.y),
+          width: Math.abs(point.x - it.start.x),
+          height: Math.abs(point.y - it.start.y)
+        };
+        const matches = shapes.filter(shape => intersects(getBounds(shape), box)).map(shape => shape.id);
+        setSelection(new Set([...it.baseSelection, ...matches]));
+      } else if (!it.baseSelection.size) {
+        setSelection([]);
+      } else {
+        setSelection(it.baseSelection);
+      }
+      return;
+    }
+
+    if (it.kind === "pan") {
+      stage.style.cursor = activeTool === "select" ? "default" : "crosshair";
+      return;
+    }
+  }
+
+  function applyStyle(property, value) {
+    const before = getSnapshot();
+    if (property === "strokeWidth") {
+      value = Math.max(0, Math.min(100, Number(value) || 0));
+      currentStyle.strokeWidth = value;
+    } else {
+      currentStyle[property] = value;
+    }
+    for (const shape of selectedShapes()) shape[property] = value;
+    render();
+    pushUndo(before);
+    saveDocument();
+  }
+
+  function updateGeometryFromField(key, rawValue) {
+    if (!selected.size) return;
+    const value = Number(rawValue);
+    if (!Number.isFinite(value)) return;
+    const before = getSnapshot();
+    const first = selectedShapes()[0];
+    const firstBounds = getBounds(first);
+    const target = { ...firstBounds, [key]: key === "width" || key === "height" ? Math.max(0, value) : value };
+
+    for (const shape of selectedShapes()) {
+      const old = getBounds(shape);
+      let newBounds;
+      if (key === "x" || key === "y") {
+        const dx = key === "x" ? target.x - firstBounds.x : 0;
+        const dy = key === "y" ? target.y - firstBounds.y : target.y - firstBounds.y;
+        newBounds = { ...old, x: old.x + dx, y: old.y + dy };
+        if (key === "y") newBounds.x = old.x;
+      } else {
+        const ratio = key === "width"
+          ? (firstBounds.width === 0 ? 1 : target.width / firstBounds.width)
+          : (firstBounds.height === 0 ? 1 : target.height / firstBounds.height);
+        newBounds = { ...old };
+        if (key === "width") newBounds.width = Math.max(0, old.width * ratio);
+        else newBounds.height = Math.max(0, old.height * ratio);
+      }
+      Object.assign(shape, mapShapeToBounds(shape, old, newBounds));
+    }
+    render();
+    pushUndo(before);
+    saveDocument();
+  }
+
+  fillInput.addEventListener("input", () => applyStyle("fill", fillInput.value));
+  strokeInput.addEventListener("input", () => applyStyle("stroke", strokeInput.value));
+  strokeWidthInput.addEventListener("input", () => applyStyle("strokeWidth", strokeWidthInput.value));
+
+  for (const [key, input] of Object.entries(properties)) {
+    input.addEventListener("input", () => updateGeometryFromField(key, input.value));
+  }
+
+  toolButtons.forEach(button => {
+    button.addEventListener("click", () => setTool(button.dataset.tool));
+  });
+
+  stage.addEventListener("mousedown", handleMouseDown);
+  document.addEventListener("mousemove", handleMouseMove);
+  document.addEventListener("mouseup", handleMouseUp);
+
+  stage.addEventListener("wheel", event => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    const rect = stage.getBoundingClientRect();
+    const screenX = event.clientX - rect.left;
+    const screenY = event.clientY - rect.top;
+    const before = pointFromEvent(event);
+    const factor = Math.exp(-event.deltaY * 0.012);
+    const nextZoom = Math.max(0.1, Math.min(8, zoom * factor));
+    if (nextZoom === zoom) return;
+    zoom = nextZoom;
+    panX = before.x - screenX / zoom;
+    panY = before.y - screenY / zoom;
+    render();
+  }, { passive: false });
+
+  function zoomAtCenter(nextZoom) {
+    const rect = stage.getBoundingClientRect();
+    const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    const before = pointFromEvent({ clientX: center.x, clientY: center.y });
+    zoom = Math.max(0.1, Math.min(8, nextZoom));
+    panX = before.x - rect.width / (2 * zoom);
+    panY = before.y - rect.height / (2 * zoom);
+    render();
+  }
+
+  document.getElementById("zoom-in").addEventListener("click", () => zoomAtCenter(zoom * 1.2));
+  document.getElementById("zoom-out").addEventListener("click", () => zoomAtCenter(zoom / 1.2));
+  document.getElementById("reset-view").addEventListener("click", () => {
+    zoom = 1; panX = 0; panY = 0; render();
+  });
+
+  document.getElementById("undo-button").addEventListener("click", undo);
+  document.getElementById("redo-button").addEventListener("click", redo);
+
+  function duplicateSelection() {
+    const originals = selectedShapes();
+    if (!originals.length) return;
+    const before = getSnapshot();
+    const copies = originals.map(original => {
+      const copy = clone(original);
+      copy.id = newId();
+      if (copy.type === "line") {
+        copy.x1 += 10; copy.x2 += 10; copy.y1 += 10; copy.y2 += 10;
+      } else {
+        copy.x += 10; copy.y += 10;
+      }
+      return copy;
+    });
+    shapes.push(...copies);
+    selected = new Set(copies.map(shape => shape.id));
+    render();
+    pushUndo(before);
+  }
+
+  function deleteSelection() {
+    if (!selected.size) return;
+    const before = getSnapshot();
+    shapes = shapes.filter(shape => !selected.has(shape.id));
+    selected.clear();
+    render();
+    pushUndo(before);
+  }
+
+  function nudge(dx, dy) {
+    if (!selected.size) return;
+    const before = getSnapshot();
+    for (const shape of selectedShapes()) {
+      if (shape.type === "line") {
+        shape.x1 += dx; shape.x2 += dx; shape.y1 += dy; shape.y2 += dy;
+      } else {
+        shape.x += dx; shape.y += dy;
+      }
+    }
+    render();
+    pushUndo(before);
+  }
+
+  function reorderSelection(direction) {
+    if (!selected.size) return;
+    const before = getSnapshot();
+    if (direction > 0) {
+      for (let i = shapes.length - 2; i >= 0; i--) {
+        if (selected.has(shapes[i].id) && !selected.has(shapes[i + 1].id)) {
+          [shapes[i], shapes[i + 1]] = [shapes[i + 1], shapes[i]];
+        }
+      }
+    } else {
+      for (let i = 1; i < shapes.length; i++) {
+        if (selected.has(shapes[i].id) && !selected.has(shapes[i - 1].id)) {
+          [shapes[i], shapes[i - 1]] = [shapes[i - 1], shapes[i]];
+        }
+      }
+    }
+    render();
+    pushUndo(before);
+  }
+
+  function isTypingTarget(target) {
+    return target instanceof HTMLElement &&
+      (target.matches("input, textarea, select") || target.isContentEditable);
+  }
+
+  document.addEventListener("keydown", event => {
+    if (event.code === "Space" && !isTypingTarget(event.target)) {
+      spaceDown = true;
+      if (!interaction) stage.style.cursor = "grab";
+      event.preventDefault();
+      return;
+    }
+    if (isTypingTarget(event.target)) return;
+
+    const key = event.key.toLowerCase();
+    const mod = event.ctrlKey || event.metaKey;
+
+    if (mod && key === "z") {
+      event.preventDefault();
+      if (event.shiftKey) redo(); else undo();
+      return;
+    }
+    if (mod && key === "y") {
+      event.preventDefault();
+      redo();
+      return;
+    }
+    if (mod && key === "a") {
+      event.preventDefault();
+      setSelection(shapes.map(shape => shape.id));
+      return;
+    }
+    if (mod && key === "d") {
+      event.preventDefault();
+      duplicateSelection();
+      return;
+    }
+    if (key === "delete" || key === "backspace") {
+      event.preventDefault();
+      deleteSelection();
+      return;
+    }
+    if (key === "arrowleft") { event.preventDefault(); nudge(event.shiftKey ? -10 : -1, 0); return; }
+    if (key === "arrowright") { event.preventDefault(); nudge(event.shiftKey ? 10 : 1, 0); return; }
+    if (key === "arrowup") { event.preventDefault(); nudge(0, event.shiftKey ? -10 : -1); return; }
+    if (key === "arrowdown") { event.preventDefault(); nudge(0, event.shiftKey ? 10 : 1); return; }
+    if (key === "]") { event.preventDefault(); reorderSelection(1); return; }
+    if (key === "[") { event.preventDefault(); reorderSelection(-1); return; }
+
+    if (!mod && !event.altKey) {
+      if (key === "v") setTool("select");
+      else if (key === "r") setTool("rect");
+      else if (key === "e") setTool("ellipse");
+      else if (key === "l") setTool("line");
+    }
+  });
+
+  document.addEventListener("keyup", event => {
+    if (event.code === "Space") {
+      spaceDown = false;
+      if (!interaction) stage.style.cursor = activeTool === "select" ? "default" : "crosshair";
+    }
+  });
+
+  window.addEventListener("blur", () => {
+    spaceDown = false;
+    if (interaction) {
+      interaction = null;
+      render();
+    }
+    stage.style.cursor = activeTool === "select" ? "default" : "crosshair";
+  });
+
+  window.addEventListener("resize", () => render());
+
+  function exportSvg() {
+    const allBounds = shapes.map(getBounds);
+    let minX = 0, minY = 0, maxX = 800, maxY = 600;
+    if (allBounds.length) {
+      minX = Math.min(...allBounds.map(b => b.x));
+      minY = Math.min(...allBounds.map(b => b.y));
+      maxX = Math.max(...allBounds.map(b => b.x + b.width));
+      maxY = Math.max(...allBounds.map(b => b.y + b.height));
+      const pad = Math.max(8, ...shapes.map(shape => Number(shape.strokeWidth || 0) / 2 + 4));
+      minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+    }
+    const width = Math.max(1, maxX - minX);
+    const height = Math.max(1, maxY - minY);
+    const children = shapes.map(shape => {
+      if (shape.type === "rect") {
+        return `<rect x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}" fill="${shape.fill || defaultStyle.fill}" stroke="${shape.stroke || defaultStyle.stroke}" stroke-width="${Number(shape.strokeWidth ?? defaultStyle.strokeWidth)}" stroke-linecap="round"/>`;
+      }
+      if (shape.type === "ellipse") {
+        return `<ellipse cx="${shape.x + shape.width / 2}" cy="${shape.y + shape.height / 2}" rx="${shape.width / 2}" ry="${shape.height / 2}" fill="${shape.fill || defaultStyle.fill}" stroke="${shape.stroke || defaultStyle.stroke}" stroke-width="${Number(shape.strokeWidth ?? defaultStyle.strokeWidth)}" stroke-linecap="round"/>`;
+      }
+      return `<line x1="${shape.x1}" y1="${shape.y1}" x2="${shape.x2}" y2="${shape.y2}" fill="none" stroke="${shape.stroke || defaultStyle.stroke}" stroke-width="${Number(shape.strokeWidth ?? defaultStyle.strokeWidth)}" stroke-linecap="round"/>`;
+    }).join("");
+    const svgText = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${minX} ${minY} ${width} ${height}">${children}</svg>`;
+    const blob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "drawing.svg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  document.getElementById("export-svg").addEventListener("click", exportSvg);
+
+  loadDocument();
+  updateHistoryButtons();
+  render();
+})();
+</script>
+</body>
+</html>

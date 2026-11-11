@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vectorly</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;user-select:none}
+#app{display:flex;flex-direction:column;height:100%}
+#toolbar{height:48px;background:#1a1a2e;display:flex;align-items:center;padding:0 12px;gap:4px;flex-shrink:0;z-index:10}
+.tool-btn{width:36px;height:36px;border:none;background:transparent;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#aab;transition:background .15s,color .15s}
+.tool-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+.tool-btn.active{background:#4A90D9;color:#fff}
+.tool-btn svg{pointer-events:none}
+.toolbar-sep{width:1px;height:24px;background:rgba(255,255,255,.15);margin:0 8px}
+.toolbar-spacer{flex:1}
+#zoom-level{color:#aab;font-size:12px;min-width:40px;text-align:center}
+#export-svg{background:#4A90D9;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:background .15s}
+#export-svg:hover{background:#3a7bc8}
+#undo-btn,#redo-btn{width:32px;height:32px;border:none;background:transparent;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#aab;transition:background .15s,color .15s}
+#undo-btn:hover,#redo-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+#undo-btn:disabled,#redo-btn:disabled{opacity:.3;cursor:default}
+#main{display:flex;flex:1;overflow:hidden}
+#stage-container{flex:1;position:relative;min-width:600px;min-height:400px;background:#e8e8ec;background-image:radial-gradient(circle,#ccc 1px,transparent 1px);background-size:20px 20px;overflow:hidden}
+#stage{width:100%;height:100%;display:block;cursor:crosshair}
+#stage.tool-select{cursor:default}
+#stage.tool-pan{cursor:grab}
+#stage.tool-panning{cursor:grabbing}
+#properties{width:260px;background:#fff;border-left:1px solid #ddd;padding:16px;overflow-y:auto;flex-shrink:0}
+#properties h3{font-size:13px;font-weight:600;color:#555;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
+.prop-row{display:flex;align-items:center;margin-bottom:10px;gap:8px}
+.prop-row label{font-size:12px;color:#777;width:44px;flex-shrink:0;font-weight:500}
+.prop-row input{flex:1;height:30px;border:1px solid #ddd;border-radius:4px;padding:0 8px;font-size:12px;color:#333;outline:none;transition:border-color .15s}
+.prop-row input:focus{border-color:#4A90D9}
+.prop-row input[type="color"]{padding:2px;width:40px;height:30px;cursor:pointer}
+.prop-row input[type="number"]{-moz-appearance:textfield}
+.prop-row input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none}
+.prop-row input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none}
+#props-info{font-size:11px;color:#999;margin-top:12px;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <button data-tool="select" class="tool-btn active" title="Select (V)">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 4l7 17 2-7 7-2z" fill="currentColor"/></svg>
+    </button>
+    <button data-tool="rect" class="tool-btn" title="Rectangle (R)">
+      <svg viewBox="0 0 24 24" width="18" height="18"><rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" rx="1"/></svg>
+    </button>
+    <button data-tool="ellipse" class="tool-btn" title="Ellipse (E)">
+      <svg viewBox="0 0 24 24" width="18" height="18"><ellipse cx="12" cy="12" rx="8" ry="8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    </button>
+    <button data-tool="line" class="tool-btn" title="Line (L)">
+      <svg viewBox="0 0 24 24" width="18" height="18"><line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <div class="toolbar-sep"></div>
+    <button id="undo-btn" title="Undo (Ctrl+Z)">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 4V1L7 6l5 5V8c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z" fill="currentColor"/></svg>
+    </button>
+    <button id="redo-btn" title="Redo (Ctrl+Shift+Z)">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 4V1l5 5-5 5V8c-3.3 0-6 2.7-6 6s2.7 6 6 6 6-2.7 6-6h2c0 4.4-3.6 8-8 8s-8-3.6-8-8 3.6-8 8-8z" fill="currentColor"/></svg>
+    </button>
+    <div class="toolbar-sep"></div>
+    <span id="zoom-level">100%</span>
+    <div class="toolbar-spacer"></div>
+    <button id="export-svg">Export SVG</button>
+  </div>
+  <div id="main">
+    <div id="stage-container">
+      <svg id="stage">
+        <g id="viewport">
+          <g id="shapes-layer"></g>
+          <g id="preview-layer"></g>
+          <g id="selection-layer"></g>
+        </g>
+      </svg>
+    </div>
+    <div id="properties">
+      <h3>Properties</h3>
+      <div class="prop-row"><label>X</label><input type="number" id="prop-x" step="1"></div>
+      <div class="prop-row"><label>Y</label><input type="number" id="prop-y" step="1"></div>
+      <div class="prop-row"><label>W</label><input type="number" id="prop-w" step="1"></div>
+      <div class="prop-row"><label>H</label><input type="number" id="prop-h" step="1"></div>
+      <div class="prop-row"><label>Fill</label><input type="color" id="fill-color"></div>
+      <div class="prop-row"><label>Stroke</label><input type="color" id="stroke-color"></div>
+      <div class="prop-row"><label>Width</label><input type="number" id="stroke-width" min="0" max="200" step="1"></div>
+      <div id="props-info">Select a shape to edit its properties.</div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+"use strict";
+
+// === State ===
+let shapes = [];
+let selectedIds = new Set();
+let tool = 'select';
+let zoom = 1;
+let panX = 0, panY = 0;
+let currentStyle = { fill: '#4A90D9', stroke: '#2C3E50', strokeWidth: 2 };
+let undoStack = [];
+let redoStack = [];
+let idCounter = 0;
+let spaceDown = false;
+
+// Interaction state
+let isDragging = false;
+let dragType = null;
+let dragStart = { x: 0, y: 0 };
+let dragStartWorld = { x: 0, y: 0 };
+let dragCurrent = { x: 0, y: 0 };
+let dragCurrentWorld = { x: 0, y: 0 };
+let dragShape = null;
+let resizeHandle = null;
+let resizeOriginals = {};
+let marqueeActive = false;
+let moveOriginals = {};
+let undoPushed = false;
+let lastNudgeTime = 0;
+let lastNudgeKey = '';
+
+// DOM references
+const stage = document.getElementById('stage');
+const viewport = document.getElementById('viewport');
+const shapesLayer = document.getElementById('shapes-layer');
+const previewLayer = document.getElementById('preview-layer');
+const selectionLayer = document.getElementById('selection-layer');
+const stageContainer = document.getElementById('stage-container');
+const zoomLevelEl = document.getElementById('zoom-level');
+const undoBtn = document.getElementById('undo-btn');
+const redoBtn = document.getElementById('redo-btn');
+const exportBtn = document.getElementById('export-svg');
+const propX = document.getElementById('prop-x');
+const propY = document.getElementById('prop-y');
+const propW = document.getElementById('prop-w');
+const propH = document.getElementById('prop-h');
+const fillColor = document.getElementById('fill-color');
+const strokeColor = document.getElementById('stroke-color');
+const strokeWidth = document.getElementById('stroke-width');
+const propsInfo = document.getElementById('props-info');
+const toolBtns = document.querySelectorAll('[data-tool]');
+
+// === Utility ===
+function screenToWorld(sx, sy) {
+  const rect = stage.getBoundingClientRect();
+  const mx = sx - rect.left;
+  const my = sy - rect.top;
+  return { x: (mx - panX) / zoom, y: (my - panY) / zoom };
+}
+
+function worldToScreen(wx, wy) {
+  return { x: wx * zoom + panX, y: wy * zoom + panY };
+}
+
+function getShapeBBox(s) {
+  if (s.type === 'line') {
+    const x = Math.min(s.x1, s.x2);
+    const y = Math.min(s.y1, s.y2);
+    const w = Math.abs(s.x2 - s.x1);
+    const h = Math.abs(s.y2 - s.y1);
+    return { x, y, w, h };
+  }
+  return { x: s.x, y: s.y, w: s.width, h: s.height };
+}
+
+function getShapeCenter(s) {
+  const b = getShapeBBox(s);
+  return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+}
+
+function bboxIntersects(a, b) {
+  return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+}
+
+function dist(x1, y1, x2, y2) {
+  return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+}
+
+function deepCopy(arr) {
+  return JSON.parse(JSON.stringify(arr));
+}
+
+function genId() {
+  return 'shape_' + (++idCounter);
+}
+
+// === Persistence ===
+function save() {
+  try {
+    localStorage.setItem('vectorly_doc', JSON.stringify({ shapes, idCounter, currentStyle }));
+  } catch(e) {}
+}
+
+function load() {
+  try {
+    const data = JSON.parse(localStorage.getItem('vectorly_doc'));
+    if (data) {
+      shapes = data.shapes || [];
+      idCounter = data.idCounter || 0;
+      currentStyle = data.currentStyle || currentStyle;
+    }
+  } catch(e) {}
+}
+
+// === Undo/Redo ===
+function pushUndo() {
+  undoStack.push(deepCopy(shapes));
+  if (undoStack.length > 100) undoStack.shift();
+  redoStack = [];
+  updateUndoRedoButtons();
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  redoStack.push(deepCopy(shapes));
+  shapes = undoStack.pop();
+  // Clean up selection
+  const validIds = new Set(shapes.map(s => s.id));
+  selectedIds = new Set([...selectedIds].filter(id => validIds.has(id)));
+  render();
+  save();
+  updateUndoRedoButtons();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  undoStack.push(deepCopy(shapes));
+  shapes = redoStack.pop();
+  const validIds = new Set(shapes.map(s => s.id));
+  selectedIds = new Set([...selectedIds].filter(id => validIds.has(id)));
+  render();
+  save();
+  updateUndoRedoButtons();
+}
+
+function updateUndoRedoButtons() {
+  undoBtn.disabled = undoStack.length === 0;
+  redoBtn.disabled = redoStack.length === 0;
+}
+
+// === Rendering ===
+function render() {
+  renderShapes();
+  renderSelection();
+  updateProperties();
+  updateUndoRedoButtons();
+}
+
+function renderShapes() {
+  shapesLayer.innerHTML = '';
+  for (const s of shapes) {
+    const el = createShapeElement(s, false);
+    shapesLayer.appendChild(el);
+  }
+}
+
+function createShapeElement(s, isPreview) {
+  let el;
+  if (s.type === 'rect') {
+    el = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    el.setAttribute('x', s.x);
+    el.setAttribute('y', s.y);
+    el.setAttribute('width', s.width);
+    el.setAttribute('height', s.height);
+  } else if (s.type === 'ellipse') {
+    el = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    el.setAttribute('cx', s.x + s.width / 2);
+    el.setAttribute('cy', s.y + s.height / 2);
+    el.setAttribute('rx', s.width / 2);
+    el.setAttribute('ry', s.height / 2);
+  } else if (s.type === 'line') {
+    el = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    el.setAttribute('x1', s.x1);
+    el.setAttribute('y1', s.y1);
+    el.setAttribute('x2', s.x2);
+    el.setAttribute('y2', s.y2);
+  } else return null;
+
+  el.setAttribute('fill', s.fill || 'none');
+  el.setAttribute('stroke', s.stroke || 'none');
+  el.setAttribute('stroke-width', s.strokeWidth || 0);
+
+  if (!isPreview) {
+    el.setAttribute('data-shape', s.type);
+    el.setAttribute('data-id', s.id);
+    if (selectedIds.has(s.id)) {
+      el.setAttribute('data-selected', 'true');
+    }
+  }
+  return el;
+}
+
+function renderSelection() {
+  selectionLayer.innerHTML = '';
+  if (selectedIds.size === 0) return;
+
+  // Draw selection outline for each selected shape
+  for (const id of selectedIds) {
+    const s = shapes.find(sh => sh.id === id);
+    if (!s) continue;
+    const b = getShapeBBox(s);
+    const outline = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    const pad = 2 / zoom;
+    outline.setAttribute('x', b.x - pad);
+    outline.setAttribute('y', b.y - pad);
+    outline.setAttribute('width', b.w + pad * 2);
+    outline.setAttribute('height', b.h + pad * 2);
+    outline.setAttribute('fill', 'none');
+    outline.setAttribute('stroke', '#4A90D9');
+    outline.setAttribute('stroke-width', 1.5 / zoom);
+    outline.setAttribute('stroke-dasharray', `${4/zoom} ${3/zoom}`);
+    selectionLayer.appendChild(outline);
+  }
+
+  // Draw resize handles for single selection
+  if (selectedIds.size === 1) {
+    const s = shapes.find(sh => sh.id === [...selectedIds][0]);
+    if (s) drawHandles(s);
+  }
+}
+
+function drawHandles(s) {
+  const b = getShapeBBox(s);
+  const hs = 8 / zoom;
+  const handles = [
+    { id: 'nw', x: b.x, y: b.y },
+    { id: 'n', x: b.x + b.w / 2, y: b.y },
+    { id: 'ne', x: b.x + b.w, y: b.y },
+    { id: 'e', x: b.x + b.w, y: b.y + b.h / 2 },
+    { id: 'se', x: b.x + b.w, y: b.y + b.h },
+    { id: 's', x: b.x + b.w / 2, y: b.y + b.h },
+    { id: 'sw', x: b.x, y: b.y + b.h },
+    { id: 'w', x: b.x, y: b.y + b.h / 2 }
+  ];
+
+  for (const h of handles) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    el.setAttribute('x', h.x - hs / 2);
+    el.setAttribute('y', h.y - hs / 2);
+    el.setAttribute('width', hs);
+    el.setAttribute('height', hs);
+    el.setAttribute('fill', '#fff');
+    el.setAttribute('stroke', '#4A90D9');
+    el.setAttribute('stroke-width', 1.5 / zoom);
+    el.setAttribute('data-handle', h.id);
+    el.style.cursor = getHandleCursor(h.id);
+    selectionLayer.appendChild(el);
+  }
+}
+
+function getHandleCursor(id) {
+  const map = {
+    nw: 'nwse-resize', n: 'ns-resize', ne: 'nesw-resize', e: 'ew-resize',
+    se: 'nwse-resize', s: 'ns-resize', sw: 'nesw-resize', w: 'ew-resize'
+  };
+  return map[id] || 'default';
+}
+
+function renderPreview(shape) {
+  previewLayer.innerHTML = '';
+  if (!shape) return;
+  const el = createShapeElement(shape, true);
+  if (el) {
+    el.setAttribute('opacity', '0.5');
+    el.setAttribute('stroke-dasharray', '4 3');
+    previewLayer.appendChild(el);
+  }
+}
+
+function renderMarquee(x1, y1, x2, y2) {
+  previewLayer.innerHTML = '';
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  const rx = Math.min(x1, x2);
+  const ry = Math.min(y1, y2);
+  const rw = Math.abs(x2 - x1);
+  const rh = Math.abs(y2 - y1);
+  rect.setAttribute('x', rx);
+  rect.setAttribute('y', ry);
+  rect.setAttribute('width', rw);
+  rect.setAttribute('height', rh);
+  rect.setAttribute('fill', 'rgba(74,144,217,0.1)');
+  rect.setAttribute('stroke', '#4A90D9');
+  rect.setAttribute('stroke-width', 1 / zoom);
+  previewLayer.appendChild(rect);
+}
+
+function updateViewport() {
+  viewport.setAttribute('transform', `translate(${panX},${panY}) scale(${zoom})`);
+  zoomLevelEl.textContent = Math.round(zoom * 100) + '%';
+}
+
+// === Properties Panel ===
+function updateProperties() {
+  const sel = shapes.find(s => selectedIds.has(s.id));
+  if (sel) {
+    const b = getShapeBBox(sel);
+    propX.value = Math.round(b.x);
+    propY.value = Math.round(b.y);
+    propW.value = Math.round(b.w);
+    propH.value = Math.round(b.h);
+    fillColor.value = sel.fill || '#000000';
+    strokeColor.value = sel.stroke || '#000000';
+    strokeWidth.value = sel.strokeWidth || 0;
+    propsInfo.textContent = selectedIds.size > 1 ? `${selectedIds.size} shapes selected` : `1 shape selected`;
+  } else {
+    propX.value = '';
+    propY.value = '';
+    propW.value = '';
+    propH.value = '';
+    fillColor.value = currentStyle.fill;
+    strokeColor.value = currentStyle.stroke;
+    strokeWidth.value = currentStyle.strokeWidth;
+    propsInfo.textContent = 'Select a shape to edit its properties.';
+  }
+}
+
+function applyStyleToSelection(fill, stroke, sw) {
+  if (selectedIds.size === 0) return;
+  pushUndo();
+  for (const s of shapes) {
+    if (selectedIds.has(s.id)) {
+      if (fill !== undefined) s.fill = fill;
+      if (stroke !== undefined) s.stroke = stroke;
+      if (sw !== undefined) s.strokeWidth = sw;
+    }
+  }
+  currentStyle = { fill, stroke, strokeWidth: sw };
+  render();
+  save();
+}
+
+function applyPropChange() {
+  if (selectedIds.size === 0) return;
+  pushUndo();
+  for (const s of shapes) {
+    if (!selectedIds.has(s.id)) continue;
+    const nx = parseFloat(propX.value);
+    const ny = parseFloat(propY.value);
+    const nw = parseFloat(propW.value);
+    const nh = parseFloat(propH.value);
+    if (s.type === 'line') {
+      const b = getShapeBBox(s);
+      const ox = s.x1 - b.x, oy = s.y1 - b.y;
+      const px = s.x2 - b.x, py = s.y2 - b.y;
+      const nbx = isNaN(nx) ? b.x : nx;
+      const nby = isNaN(ny) ? b.y : ny;
+      const nbw = isNaN(nw) ? b.w : nw;
+      const nbh = isNaN(nh) ? b.h : nh;
+      s.x1 = nbx + ox / b.w * nbw;
+      s.y1 = nby + oy / b.h * nbh;
+      s.x2 = nbx + px / b.w * nbw;
+      s.y2 = nby + py / b.h * nbh;
+    } else {
+      if (!isNaN(nx)) s.x = nx;
+      if (!isNaN(ny)) s.y = ny;
+      if (!isNaN(nw)) s.width = Math.max(1, nw);
+      if (!isNaN(nh)) s.height = Math.max(1, nh);
+    }
+  }
+  render();
+  save();
+}
+
+// === Tool ===
+function setTool(t) {
+  tool = t;
+  toolBtns.forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-tool') === t);
+  });
+  updateCursor();
+}
+
+function updateCursor() {
+  if (spaceDown) {
+    stage.classList.add('tool-pan');
+    stage.classList.remove('tool-select');
+  } else {
+    stage.classList.remove('tool-pan');
+    if (tool === 'select') {
+      stage.classList.add('tool-select');
+    } else {
+      stage.classList.remove('tool-select');
+    }
+  }
+}
+
+// === Hit Testing ===
+function hitTest(wx, wy) {
+  // Iterate in reverse (top-most first)
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    const s = shapes[i];
+    const b = getShapeBBox(s);
+    const pad = (s.strokeWidth || 0) / 2 + 3 / zoom;
+    if (wx >= b.x - pad && wx <= b.x + b.w + pad && wy >= b.y - pad && wy <= b.y + b.h + pad) {
+      // For lines, check distance to line segment
+      if (s.type === 'line') {
+        const d = distToSegment(wx, wy, s.x1, s.y1, s.x2, s.y2);
+        if (d < pad + 3 / zoom) return s;
+      } else {
+        return s;
+      }
+    }
+  }
+  return null;
+}
+
+function distToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return dist(px, py, x1, y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return dist(px, py, x1 + t * dx, y1 + t * dy);
+}
+
+// === Mouse Handlers ===
+function onMouseDown(e) {
+  if (e.button === 1) {
+    // Middle click - pan
+    e.preventDefault();
+    isDragging = true;
+    dragType = 'pan';
+    dragStart = { x: e.clientX, y: e.clientY };
+    stage.classList.add('tool-panning');
+    return;
+  }
+
+  if (spaceDown) {
+    e.preventDefault();
+    isDragging = true;
+    dragType = 'pan';
+    dragStart = { x: e.clientX, y: e.clientY };
+    stage.classList.add('tool-panning');
+    return;
+  }
+
+  if (e.button !== 0) return;
+
+  const w = screenToWorld(e.clientX, e.clientY);
+  dragStart = { x: e.clientX, y: e.clientY };
+  dragStartWorld = w;
+  dragCurrent = { x: e.clientX, y: e.clientY };
+  dragCurrentWorld = w;
+  undoPushed = false;
+
+  if (tool === 'select') {
+    // Check if clicking a handle
+    const handleEl = e.target.closest('[data-handle]');
+    if (handleEl && selectedIds.size === 1) {
+      const hId = handleEl.getAttribute('data-handle');
+      const s = shapes.find(sh => selectedIds.has(sh.id));
+      if (s) {
+        isDragging = true;
+        dragType = 'resize';
+        resizeHandle = hId;
+        resizeOriginals = {};
+        for (const sid of selectedIds) {
+          resizeOriginals[sid] = deepCopy(shapes.find(sh => sh.id === sid));
+        }
+        pushUndo();
+        undoPushed = true;
+        return;
+      }
+    }
+
+    // Hit test
+    const hit = hitTest(w.x, w.y);
+    if (hit) {
+      if (e.shiftKey) {
+        // Toggle selection
+        if (selectedIds.has(hit.id)) {
+          selectedIds.delete(hit.id);
+        } else {
+          selectedIds.add(hit.id);
+        }
+        render();
+      } else {
+        if (!selectedIds.has(hit.id)) {
+          selectedIds = new Set([hit.id]);
+          render();
+        }
+        // Start move
+        isDragging = true;
+        dragType = 'move';
+        moveOriginals = {};
+        for (const sid of selectedIds) {
+          const s = shapes.find(sh => sh.id === sid);
+          if (s) moveOriginals[sid] = deepCopy(s);
+        }
+      }
+    } else {
+      // Marquee or clear
+      if (e.shiftKey) {
+        // Do nothing
+      } else {
+        selectedIds = new Set();
+        render();
+      }
+      isDragging = true;
+      dragType = 'marquee';
+    }
+  } else {
+    // Drawing tool
+    isDragging = true;
+    dragType = 'draw';
+  }
+}
+
+function onMouseMove(e) {
+  if (!isDragging) return;
+
+  const w = screenToWorld(e.clientX, e.clientY);
+  dragCurrent = { x: e.clientX, y: e.clientY };
+  dragCurrentWorld = w;
+
+  if (dragType === 'pan') {
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    panX += dx;
+    panY += dy;
+    dragStart = { x: e.clientX, y: e.clientY };
+    updateViewport();
+    renderSelection();
+    return;
+  }
+
+  if (dragType === 'draw') {
+    const sx = dragStartWorld.x;
+    const sy = dragStartWorld.y;
+    const cx = w.x;
+    const cy = w.y;
+    let dx = cx - sx;
+    let dy = cy - sy;
+
+    if (tool === 'rect' || tool === 'ellipse') {
+      if (e.shiftKey) {
+        const side = Math.max(Math.abs(dx), Math.abs(dy));
+        dx = side * Math.sign(dx || 1);
+        dy = side * Math.sign(dy || 1);
+      }
+      const x = Math.min(sx, sx + dx);
+      const y = Math.min(sy, sy + dy);
+      const shape = {
+        type: tool,
+        x, y,
+        width: Math.abs(dx),
+        height: Math.abs(dy),
+        fill: currentStyle.fill,
+        stroke: currentStyle.stroke,
+        strokeWidth: currentStyle.strokeWidth
+      };
+      renderPreview(shape);
+    } else if (tool === 'line') {
+      let ex = sx + dx;
+      let ey = sy + dy;
+      if (e.shiftKey) {
+        const angle = Math.atan2(dy, dx);
+        const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+        const d = Math.sqrt(dx * dx + dy * dy);
+        ex = sx + d * Math.cos(snapped);
+        ey = sy + d * Math.sin(snapped);
+      }
+      const shape = {
+        type: 'line',
+        x1: sx, y1: sy,
+        x2: ex, y2: ey,
+        fill: 'none',
+        stroke: currentStyle.stroke,
+        strokeWidth: currentStyle.strokeWidth
+      };
+      renderPreview(shape);
+    }
+    return;
+  }
+
+  if (dragType === 'move') {
+    const dx = w.x - dragStartWorld.x;
+    const dy = w.y - dragStartWorld.y;
+    if (!undoPushed && (Math.abs(e.clientX - dragStart.x) > 3 || Math.abs(e.clientY - dragStart.y) > 3)) {
+      pushUndo();
+      undoPushed = true;
+    }
+    if (!undoPushed) return;
+
+    for (const sid of selectedIds) {
+      const s = shapes.find(sh => sh.id === sid);
+      const orig = moveOriginals[sid];
+      if (!s || !orig) continue;
+      if (s.type === 'line') {
+        s.x1 = orig.x1 + dx;
+        s.y1 = orig.y1 + dy;
+        s.x2 = orig.x2 + dx;
+        s.y2 = orig.y2 + dy;
+      } else {
+        s.x = orig.x + dx;
+        s.y = orig.y + dy;
+      }
+    }
+    renderShapes();
+    renderSelection();
+    return;
+  }
+
+  if (dragType === 'resize') {
+    const s = shapes.find(sh => selectedIds.has(sh.id));
+    if (!s) return;
+    const orig = resizeOriginals[s.id];
+    if (!orig) return;
+
+    const b = getShapeBBox(orig);
+    const dx = w.x - dragStartWorld.x;
+    const dy = w.y - dragStartWorld.y;
+
+    let nx = b.x, ny = b.y, nw = b.w, nh = b.h;
+
+    if (resizeHandle.includes('w')) { nx = b.x + dx; nw = b.w - dx; }
+    if (resizeHandle.includes('e')) { nw = b.w + dx; }
+    if (resizeHandle.includes('n')) { ny = b.y + dy; nh = b.h - dy; }
+    if (resizeHandle.includes('s')) { nh = b.h + dy; }
+
+    // Shift: maintain aspect ratio
+    if (e.shiftKey && b.w > 0 && b.h > 0) {
+      const ratio = b.w / b.h;
+      if (resizeHandle === 'nw' || resizeHandle === 'ne' || resizeHandle === 'sw' || resizeHandle === 'se') {
+        if (Math.abs(nw / ratio) > Math.abs(nh)) {
+          nh = nw / ratio;
+        } else {
+          nw = nh * ratio;
+        }
+      }
+    }
+
+    if (nw < 0) { nx = b.x + b.w + nw; nw = -nw; }
+    if (nh < 0) { ny = b.y + b.h + nh; nh = -nh; }
+    nw = Math.max(1, nw);
+    nh = Math.max(1, nh);
+
+    if (s.type === 'line') {
+      const ox1 = orig.x1 - b.x, oy1 = orig.y1 - b.y;
+      const ox2 = orig.x2 - b.x, oy2 = orig.y2 - b.y;
+      s.x1 = nx + (b.w > 0 ? ox1 / b.w * nw : 0);
+      s.y1 = ny + (b.h > 0 ? oy1 / b.h * nh : 0);
+      s.x2 = nx + (b.w > 0 ? ox2 / b.w * nw : 0);
+      s.y2 = ny + (b.h > 0 ? oy2 / b.h * nh : 0);
+    } else {
+      s.x = nx;
+      s.y = ny;
+      s.width = nw;
+      s.height = nh;
+    }
+    renderShapes();
+    renderSelection();
+    updateProperties();
+    return;
+  }
+
+  if (dragType === 'marquee') {
+    renderMarquee(dragStartWorld.x, dragStartWorld.y, w.x, w.y);
+    return;
+  }
+}
+
+function onMouseUp(e) {
+  if (!isDragging) return;
+
+  if (dragType === 'pan') {
+    stage.classList.remove('tool-panning');
+    isDragging = false;
+    dragType = null;
+    return;
+  }
+
+  if (dragType === 'draw') {
+    const w = screenToWorld(e.clientX, e.clientY);
+    const sx = dragStartWorld.x;
+    const sy = dragStartWorld.y;
+    let dx = w.x - sx;
+    let dy = w.y - sy;
+
+    // Check minimum drag distance in screen pixels
+    const screenDist = dist(e.clientX, e.clientY, dragStart.x, dragStart.y);
+    if (screenDist < 3) {
+      previewLayer.innerHTML = '';
+      isDragging = false;
+      dragType = null;
+      return;
+    }
+
+    if (tool === 'rect' || tool === 'ellipse') {
+      if (e.shiftKey) {
+        const side = Math.max(Math.abs(dx), Math.abs(dy));
+        dx = side * Math.sign(dx || 1);
+        dy = side * Math.sign(dy || 1);
+      }
+      const x = Math.min(sx, sx + dx);
+      const y = Math.min(sy, sy + dy);
+      const width = Math.abs(dx);
+      const height = Math.abs(dy);
+      if (width < 1 && height < 1) {
+        previewLayer.innerHTML = '';
+        isDragging = false;
+        dragType = null;
+        return;
+      }
+      pushUndo();
+      const shape = {
+        id: genId(),
+        type: tool,
+        x, y, width, height,
+        fill: currentStyle.fill,
+        stroke: currentStyle.stroke,
+        strokeWidth: currentStyle.strokeWidth
+      };
+      shapes.push(shape);
+      selectedIds = new Set([shape.id]);
+      setTool('select');
+      render();
+      save();
+    } else if (tool === 'line') {
+      let ex = sx + dx;
+      let ey = sy + dy;
+      if (e.shiftKey) {
+        const angle = Math.atan2(dy, dx);
+        const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+        const d = Math.sqrt(dx * dx + dy * dy);
+        ex = sx + d * Math.cos(snapped);
+        ey = sy + d * Math.sin(snapped);
+      }
+      pushUndo();
+      const shape = {
+        id: genId(),
+        type: 'line',
+        x1: sx, y1: sy,
+        x2: ex, y2: ey,
+        fill: 'none',
+        stroke: currentStyle.stroke,
+        strokeWidth: currentStyle.strokeWidth
+      };
+      shapes.push(shape);
+      selectedIds = new Set([shape.id]);
+      setTool('select');
+      render();
+      save();
+    }
+
+    previewLayer.innerHTML = '';
+    isDragging = false;
+    dragType = null;
+    return;
+  }
+
+  if (dragType === 'move') {
+    if (undoPushed) {
+      save();
+    }
+    isDragging = false;
+    dragType = null;
+    return;
+  }
+
+  if (dragType === 'resize') {
+    save();
+    isDragging = false;
+    dragType = null;
+    return;
+  }
+
+  if (dragType === 'marquee') {
+    const w = screenToWorld(e.clientX, e.clientY);
+    const screenDist = dist(e.clientX, e.clientY, dragStart.x, dragStart.y);
+    if (screenDist >= 3) {
+      const mx1 = Math.min(dragStartWorld.x, w.x);
+      const my1 = Math.min(dragStartWorld.y, w.y);
+      const mx2 = Math.max(dragStartWorld.x, w.x);
+      const my2 = Math.max(dragStartWorld.y, w.y);
+      const marquee = { x: mx1, y: my1, w: mx2 - mx1, h: my2 - my1 };
+      const newSel = new Set();
+      for (const s of shapes) {
+        const b = getShapeBBox(s);
+        if (bboxIntersects(marquee, b)) newSel.add(s.id);
+      }
+      selectedIds = newSel;
+      render();
+    }
+    previewLayer.innerHTML = '';
+    isDragging = false;
+    dragType = null;
+    return;
+  }
+
+  isDragging = false;
+  dragType = null;
+}
+
+// === Keyboard ===
+function onKeyDown(e) {
+  // Don't process if typing in an input
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
+
+  const ctrl = e.ctrlKey || e.metaKey;
+
+  // Tool shortcuts
+  if (!ctrl) {
+    if (e.key === 'v' || e.key === 'V') { setTool('select'); return; }
+    if (e.key === 'r' || e.key === 'R') { setTool('rect'); return; }
+    if (e.key === 'e' || e.key === 'E') { setTool('ellipse'); return; }
+    if (e.key === 'l' || e.key === 'L') { setTool('line'); return; }
+  }
+
+  // Undo
+  if (ctrl && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+    e.preventDefault();
+    undo();
+    return;
+  }
+
+  // Redo
+  if (ctrl && ((e.key === 'z' || e.key === 'Z') && e.shiftKey || e.key === 'y' || e.key === 'Y')) {
+    e.preventDefault();
+    redo();
+    return;
+  }
+
+  // Select all
+  if (ctrl && (e.key === 'a' || e.key === 'A')) {
+    e.preventDefault();
+    selectedIds = new Set(shapes.map(s => s.id));
+    render();
+    return;
+  }
+
+  // Duplicate
+  if (ctrl && (e.key === 'd' || e.key === 'D')) {
+    e.preventDefault();
+    if (selectedIds.size === 0) return;
+    pushUndo();
+    const newIds = new Set();
+    for (const sid of selectedIds) {
+      const s = shapes.find(sh => sh.id === sid);
+      if (!s) continue;
+      const copy = deepCopy(s);
+      copy.id = genId();
+      if (copy.type === 'line') {
+        copy.x1 += 10;
+        copy.y1 += 10;
+        copy.x2 += 10;
+        copy.y2 += 10;
+      } else {
+        copy.x += 10;
+        copy.y += 10;
+      }
+      shapes.push(copy);
+      newIds.add(copy.id);
+    }
+    selectedIds = newIds;
+    render();
+    save();
+    return;
+  }
+
+  // Delete
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault();
+    if (selectedIds.size === 0) return;
+    pushUndo();
+    shapes = shapes.filter(s => !selectedIds.has(s.id));
+    selectedIds.clear();
+    render();
+    save();
+    return;
+  }
+
+  // Nudge
+  if (e.key.startsWith('Arrow') && selectedIds.size > 0) {
+    e.preventDefault();
+    const step = e.shiftKey ? 10 : 1;
+    let dx = 0, dy = 0;
+    if (e.key === 'ArrowLeft') dx = -step;
+    if (e.key === 'ArrowRight') dx = step;
+    if (e.key === 'ArrowUp') dy = -step;
+    if (e.key === 'ArrowDown') dy = step;
+
+    const now = Date.now();
+    if (now - lastNudgeTime > 500 || e.key !== lastNudgeKey) {
+      pushUndo();
+    }
+    lastNudgeTime = now;
+    lastNudgeKey = e.key;
+
+    for (const sid of selectedIds) {
+      const s = shapes.find(sh => sh.id === sid);
+      if (!s) continue;
+      if (s.type === 'line') {
+        s.x1 += dx; s.y1 += dy;
+        s.x2 += dx; s.y2 += dy;
+      } else {
+        s.x += dx;
+        s.y += dy;
+      }
+    }
+    render();
+    save();
+    return;
+  }
+
+  // Z-order
+  if (e.key === ']' && selectedIds.size > 0) {
+    e.preventDefault();
+    pushUndo();
+    // Bring forward: move each selected shape one position forward
+    for (const sid of selectedIds) {
+      const idx = shapes.findIndex(s => s.id === sid);
+      if (idx >= 0 && idx < shapes.length - 1) {
+        [shapes[idx], shapes[idx + 1]] = [shapes[idx + 1], shapes[idx]];
+      }
+    }
+    render();
+    save();
+    return;
+  }
+
+  if (e.key === '[' && selectedIds.size > 0) {
+    e.preventDefault();
+    pushUndo();
+    for (const sid of selectedIds) {
+      const idx = shapes.findIndex(s => s.id === sid);
+      if (idx > 0) {
+        [shapes[idx], shapes[idx - 1]] = [shapes[idx - 1], shapes[idx]];
+      }
+    }
+    render();
+    save();
+    return;
+  }
+
+  // Space for pan
+  if (e.key === ' ') {
+    e.preventDefault();
+    spaceDown = true;
+    updateCursor();
+  }
+}
+
+function onKeyUp(e) {
+  if (e.key === ' ') {
+    spaceDown = false;
+    updateCursor();
+  }
+}
+
+// === Zoom ===
+function onWheel(e) {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  const newZoom = Math.max(0.1, Math.min(8, zoom * delta));
+  if (newZoom === zoom) return;
+
+  const rect = stage.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  // Zoom around cursor
+  const wx = (mx - panX) / zoom;
+  const wy = (my - panY) / zoom;
+
+  zoom = newZoom;
+  panX = mx - wx * zoom;
+  panY = my - wy * zoom;
+
+  updateViewport();
+  renderSelection();
+}
+
+// === Export ===
+function exportSVG() {
+  const bboxes = shapes.map(s => getShapeBBox(s));
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const b of bboxes) {
+    minX = Math.min(minX, b.x);
+    minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + b.w);
+    maxY = Math.max(maxY, b.y + b.h);
+  }
+  if (minX === Infinity) { minX = 0; minY = 0; maxX = 100; maxY = 100; }
+  const pad = 10;
+  minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+  const w = maxX - minX;
+  const h = maxY - minY;
+
+  let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${w} ${h}" width="${w}" height="${h}">\n`;
+  for (const s of shapes) {
+    const el = createShapeElement(s, false);
+    // Remove data attributes for clean export
+    el.removeAttribute('data-shape');
+    el.removeAttribute('data-id');
+    el.removeAttribute('data-selected');
+    svgContent += '  ' + el.outerHTML + '\n';
+  }
+  svgContent += '</svg>';
+
+  const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'drawing.svg';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// === Style Input Handlers ===
+function onStyleInput() {
+  const f = fillColor.value;
+  const s = strokeColor.value;
+  const sw = parseFloat(strokeWidth.value) || 0;
+  currentStyle = { fill: f, stroke: s, strokeWidth: sw };
+  if (selectedIds.size > 0) {
+    applyStyleToSelection(f, s, sw);
+  } else {
+    save();
+  }
+}
+
+// === Event Listeners ===
+stage.addEventListener('mousedown', onMouseDown);
+document.addEventListener('mousemove', onMouseMove);
+document.addEventListener('mouseup', onMouseUp);
+document.addEventListener('keydown', onKeyDown);
+document.addEventListener('keyup', onKeyUp);
+stage.addEventListener('wheel', onWheel, { passive: false });
+stage.addEventListener('contextmenu', e => e.preventDefault());
+
+exportBtn.addEventListener('click', exportSVG);
+undoBtn.addEventListener('click', undo);
+redoBtn.addEventListener('click', redo);
+
+toolBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    setTool(btn.getAttribute('data-tool'));
+  });
+});
+
+// Style inputs
+fillColor.addEventListener('input', onStyleInput);
+strokeColor.addEventListener('input', onStyleInput);
+strokeWidth.addEventListener('input', onStyleInput);
+fillColor.addEventListener('change', onStyleInput);
+strokeColor.addEventListener('change', onStyleInput);
+strokeWidth.addEventListener('change', onStyleInput);
+
+// Property inputs
+[propX, propY, propW, propH].forEach(inp => {
+  inp.addEventListener('change', applyPropChange);
+  inp.addEventListener('input', applyPropChange);
+});
+
+// Resize handler
+window.addEventListener('resize', () => {
+  updateViewport();
+  renderSelection();
+});
+
+// === Init ===
+function init() {
+  load();
+  updateViewport();
+  render();
+  updateCursor();
+  updateUndoRedoButtons();
+}
+
+init();
+})();
+</script>
+</body>
+</html>

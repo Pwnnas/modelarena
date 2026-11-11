@@ -1,0 +1,1787 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1a2332">
+  <title>Harbor — Workspace settings</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --navy: #1a2332;
+      --navy-soft: #27364a;
+      --teal: #2d8b8b;
+      --teal-dark: #206d6d;
+      --seafoam: #a8dadc;
+      --cream: #f1faee;
+      --canvas: #f5f8f6;
+      --surface: #ffffff;
+      --ink: #1a2332;
+      --muted: #586575;
+      --line: #d9e2e2;
+      --soft-teal: #e8f4f2;
+      --danger: #a83737;
+      --danger-soft: #fff0ef;
+      --success: #17634f;
+      --success-soft: #e9f5ef;
+      --shadow: 0 14px 40px rgba(26, 35, 50, 0.08);
+      font-family: "DejaVu Sans", Arial, sans-serif;
+      color: var(--ink);
+      background: var(--canvas);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      font-family: "DejaVu Sans", Arial, sans-serif;
+      color: var(--ink);
+      background: var(--canvas);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    button, input {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:focus-visible, input:focus-visible, a:focus-visible {
+      outline: 3px solid #55b9b5;
+      outline-offset: 3px;
+    }
+
+    .app-shell {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      width: 248px;
+      padding: 25px 16px 18px;
+      color: var(--cream);
+      background: var(--navy);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin: 0 8px 34px;
+      color: #fff;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.7px;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      color: var(--navy);
+      background: var(--seafoam);
+      border-radius: 11px;
+    }
+
+    .workspace-label {
+      margin: 0 10px 10px;
+      color: #b8c4d0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+    }
+
+    .workspace-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 4px 29px;
+      padding: 11px 10px;
+      border: 1px solid rgba(241, 250, 238, 0.13);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.045);
+    }
+
+    .workspace-avatar {
+      display: grid;
+      flex: 0 0 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 9px;
+      color: var(--navy);
+      background: var(--seafoam);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .workspace-name {
+      overflow: hidden;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .workspace-type {
+      color: #b8c4d0;
+      font-size: 11px;
+    }
+
+    .nav-heading {
+      margin: 0 10px 9px;
+      color: #aab7c5;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+    }
+
+    .nav-list {
+      display: grid;
+      gap: 5px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .nav-button {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 8px;
+      color: #d5dfe8;
+      background: transparent;
+      text-align: left;
+      transition: background 150ms ease, color 150ms ease;
+    }
+
+    .nav-button:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.09);
+    }
+
+    .nav-button[aria-current="page"] {
+      color: #fff;
+      background: #2b777a;
+      box-shadow: inset 3px 0 0 var(--seafoam);
+    }
+
+    .nav-icon {
+      display: grid;
+      width: 20px;
+      height: 20px;
+      flex: 0 0 20px;
+      place-items: center;
+      color: currentColor;
+    }
+
+    .sidebar-footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: auto;
+      padding: 15px 8px 3px;
+      border-top: 1px solid rgba(241, 250, 238, 0.14);
+    }
+
+    .user-avatar {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      flex: 0 0 36px;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--navy);
+      background: #d8e9e4;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .user-name {
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .user-role {
+      color: #b8c4d0;
+      font-size: 11px;
+    }
+
+    .main-area {
+      width: calc(100% - 248px);
+      min-height: 100vh;
+      margin-left: 248px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 70px;
+      padding: 0 48px;
+      border-bottom: 1px solid #e5eae8;
+      background: rgba(255, 255, 255, 0.74);
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .breadcrumb strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .secure-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .secure-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #3a9d7b;
+      box-shadow: 0 0 0 3px #e2f2eb;
+    }
+
+    .content-wrap {
+      width: min(100%, 1010px);
+      margin: 0 auto;
+      padding: 44px 48px 64px;
+    }
+
+    .page-intro {
+      margin-bottom: 29px;
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--teal-dark);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.25px;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 7px;
+      color: var(--navy);
+      font-size: clamp(25px, 3vw, 31px);
+      font-weight: 700;
+      letter-spacing: -1.1px;
+      line-height: 1.2;
+    }
+
+    .page-description {
+      max-width: 640px;
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .settings-card {
+      overflow: hidden;
+      border: 1px solid #e0e7e5;
+      border-radius: 13px;
+      background: var(--surface);
+      box-shadow: 0 3px 13px rgba(26, 35, 50, 0.035);
+    }
+
+    .card-heading {
+      padding: 22px 25px 19px;
+      border-bottom: 1px solid #e9eeec;
+    }
+
+    .card-heading h2 {
+      margin-bottom: 4px;
+      color: var(--navy);
+      font-size: 16px;
+      letter-spacing: -0.2px;
+    }
+
+    .card-heading p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .card-body {
+      padding: 24px 25px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field label {
+      color: #263446;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .field input {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid #cbd6d8;
+      border-radius: 7px;
+      color: var(--ink);
+      background: #fff;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .field input::placeholder {
+      color: #718091;
+    }
+
+    .field input:hover {
+      border-color: #8ea4aa;
+    }
+
+    .field input:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px rgba(45, 139, 139, 0.15);
+      outline: none;
+    }
+
+    .field input[aria-invalid="true"] {
+      border-color: var(--danger);
+    }
+
+    .field-hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .card-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+      margin-top: 25px;
+      padding-top: 19px;
+      border-top: 1px solid #edf0ef;
+    }
+
+    .action-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .button {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 17px;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+    }
+
+    .button:active {
+      transform: translateY(1px);
+    }
+
+    .button-primary {
+      color: #fff;
+      background: var(--teal-dark);
+    }
+
+    .button-primary:hover {
+      background: #185f60;
+    }
+
+    .button-secondary {
+      border-color: #cbd7d7;
+      color: var(--navy);
+      background: #fff;
+    }
+
+    .button-secondary:hover {
+      border-color: #91aaaa;
+      background: #f7faf9;
+    }
+
+    .button-danger {
+      color: #fff;
+      background: #a83737;
+    }
+
+    .button-danger:hover {
+      background: #842b2b;
+    }
+
+    .button-danger-outline {
+      border-color: #d6a8a5;
+      color: #922f2c;
+      background: #fff;
+    }
+
+    .button-danger-outline:hover {
+      border-color: #b75b56;
+      background: #fff7f6;
+    }
+
+    .message {
+      margin: 0 0 18px;
+      padding: 11px 13px;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      font-size: 12px;
+    }
+
+    .message[hidden] {
+      display: none;
+    }
+
+    .message-error {
+      border-color: #e5b7b3;
+      color: #762623;
+      background: var(--danger-soft);
+    }
+
+    .message-success {
+      border-color: #b9d9c8;
+      color: #155c49;
+      background: var(--success-soft);
+    }
+
+    .switch-list {
+      display: grid;
+    }
+
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 72px;
+      border-bottom: 1px solid #edf0ef;
+    }
+
+    .switch-row:first-child { padding-top: 0; }
+    .switch-row:last-child { border-bottom: 0; }
+
+    .switch-title {
+      display: block;
+      margin-bottom: 3px;
+      color: #253448;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .switch-description {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .switch-control {
+      position: relative;
+      display: inline-flex;
+      width: 48px;
+      height: 28px;
+      flex: 0 0 48px;
+      align-items: center;
+      padding: 3px;
+      border: 2px solid #71808c;
+      border-radius: 20px;
+      background: #71808c;
+      transition: background 150ms ease, border-color 150ms ease;
+    }
+
+    .switch-control::after {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      content: "";
+      transition: transform 150ms ease;
+    }
+
+    .switch-control[aria-checked="true"] {
+      border-color: var(--teal-dark);
+      background: var(--teal-dark);
+    }
+
+    .switch-control[aria-checked="true"]::after {
+      transform: translateX(18px);
+    }
+
+    .switch-control:focus-visible {
+      outline: 3px solid #55b9b5;
+      outline-offset: 3px;
+    }
+
+    .member-list {
+      display: grid;
+    }
+
+    .member-row {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      min-height: 78px;
+      border-bottom: 1px solid #edf0ef;
+    }
+
+    .member-row:first-child { padding-top: 0; }
+    .member-row:last-child { border-bottom: 0; }
+
+    .member-avatar {
+      display: grid;
+      width: 40px;
+      height: 40px;
+      flex: 0 0 40px;
+      place-items: center;
+      border-radius: 50%;
+      color: #174f53;
+      background: #dceeed;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .member-info {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .member-name {
+      display: block;
+      overflow: hidden;
+      color: #243246;
+      font-size: 12px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .member-email {
+      display: block;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .member-role {
+      min-width: 80px;
+      padding: 4px 9px;
+      border-radius: 20px;
+      color: #35535a;
+      background: #edf4f2;
+      font-size: 10px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .remove-button {
+      display: inline-flex;
+      min-width: 44px;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 8px;
+      border: 0;
+      border-radius: 6px;
+      color: #8b3431;
+      background: transparent;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .remove-button:hover {
+      background: #fff0ef;
+    }
+
+    .subsection {
+      margin-top: 24px;
+      padding-top: 22px;
+      border-top: 1px solid #e9eeec;
+    }
+
+    .subsection h3 {
+      margin-bottom: 4px;
+      color: var(--navy);
+      font-size: 14px;
+    }
+
+    .subsection-description {
+      margin-bottom: 16px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .invite-form {
+      display: flex;
+      align-items: end;
+      gap: 11px;
+    }
+
+    .invite-form .field {
+      flex: 1;
+    }
+
+    .invite-form .button {
+      flex: 0 0 auto;
+    }
+
+    .empty-state {
+      display: grid;
+      min-height: 255px;
+      align-content: center;
+      justify-items: center;
+      padding: 35px 25px;
+      text-align: center;
+    }
+
+    .empty-illustration {
+      display: grid;
+      width: 62px;
+      height: 62px;
+      margin-bottom: 16px;
+      place-items: center;
+      border: 1px solid #d5e9e5;
+      border-radius: 18px;
+      color: var(--teal-dark);
+      background: #eef7f4;
+    }
+
+    .empty-state h2 {
+      margin-bottom: 7px;
+      color: var(--navy);
+      font-size: 17px;
+    }
+
+    .empty-state p {
+      max-width: 390px;
+      margin-bottom: 19px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .project-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .project-item {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      min-height: 70px;
+      padding: 12px 14px;
+      border: 1px solid #e3eae8;
+      border-radius: 9px;
+      background: #fff;
+    }
+
+    .project-symbol {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      flex: 0 0 38px;
+      place-items: center;
+      border-radius: 10px;
+      color: var(--teal-dark);
+      background: #eaf4f1;
+    }
+
+    .project-name {
+      color: var(--navy);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .project-meta {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .plan-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 20px;
+      padding: 17px 18px;
+      border: 1px solid #c9e0dd;
+      border-radius: 9px;
+      background: #eff7f4;
+    }
+
+    .plan-label {
+      margin-bottom: 4px;
+      color: var(--teal-dark);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .plan-name {
+      margin: 0;
+      color: var(--navy);
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .plan-description {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .plan-price {
+      color: var(--navy);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .plan-price strong {
+      font-size: 22px;
+      letter-spacing: -0.7px;
+    }
+
+    .card-number-field {
+      margin-bottom: 18px;
+    }
+
+    .billing-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .payment-lock {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .danger-card {
+      overflow: hidden;
+      border: 1px solid #e3c4c1;
+      border-radius: 13px;
+      background: #fff;
+      box-shadow: 0 3px 13px rgba(26, 35, 50, 0.035);
+    }
+
+    .danger-heading {
+      padding: 21px 25px;
+      border-bottom: 1px solid #f0dedc;
+      background: #fff8f7;
+    }
+
+    .danger-heading h2 {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0;
+      color: #852e2b;
+      font-size: 15px;
+    }
+
+    .danger-body {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 22px;
+      padding: 24px 25px;
+    }
+
+    .danger-body h3 {
+      margin-bottom: 5px;
+      color: var(--navy);
+      font-size: 13px;
+    }
+
+    .danger-body p {
+      max-width: 480px;
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .panel {
+      display: block;
+    }
+
+    .panel[hidden] {
+      display: none;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(13, 23, 35, 0.58);
+    }
+
+    .modal-backdrop[hidden] {
+      display: none;
+    }
+
+    .dialog {
+      width: min(100%, 440px);
+      padding: 25px;
+      border: 1px solid #e1e8e6;
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 22px 70px rgba(10, 20, 30, 0.26);
+    }
+
+    .dialog-icon {
+      display: grid;
+      width: 43px;
+      height: 43px;
+      margin-bottom: 17px;
+      place-items: center;
+      border-radius: 12px;
+      color: #922f2c;
+      background: #fff0ef;
+    }
+
+    .dialog h2 {
+      margin-bottom: 7px;
+      color: var(--navy);
+      font-size: 18px;
+      letter-spacing: -0.3px;
+    }
+
+    .dialog p {
+      margin-bottom: 22px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .sr-only {
+      position: absolute;
+      overflow: hidden;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 900px) {
+      .sidebar {
+        width: 214px;
+        padding-right: 12px;
+        padding-left: 12px;
+      }
+
+      .main-area {
+        width: calc(100% - 214px);
+        margin-left: 214px;
+      }
+
+      .topbar {
+        padding-right: 30px;
+        padding-left: 30px;
+      }
+
+      .content-wrap {
+        padding: 35px 30px 50px;
+      }
+    }
+
+    @media (max-width: 650px) {
+      .app-shell {
+        display: block;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 0;
+        width: 100%;
+        height: auto;
+        padding: 10px 12px;
+      }
+
+      .brand {
+        margin: 0 2px 10px;
+        font-size: 17px;
+      }
+
+      .brand-mark {
+        width: 32px;
+        height: 32px;
+      }
+
+      .workspace-label,
+      .workspace-card,
+      .nav-heading,
+      .sidebar-footer {
+        display: none;
+      }
+
+      .nav-list {
+        display: flex;
+        gap: 5px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+      }
+
+      .nav-list li {
+        flex: 0 0 auto;
+      }
+
+      .nav-button {
+        min-height: 42px;
+        gap: 7px;
+        padding: 0 10px;
+        font-size: 11px;
+      }
+
+      .nav-button[aria-current="page"] {
+        box-shadow: inset 0 -3px 0 var(--seafoam);
+      }
+
+      .nav-icon {
+        width: 17px;
+        height: 17px;
+        flex-basis: 17px;
+      }
+
+      .main-area {
+        width: 100%;
+        margin: 0;
+      }
+
+      .topbar {
+        min-height: 51px;
+        padding: 0 18px;
+      }
+
+      .content-wrap {
+        padding: 29px 18px 42px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .form-grid, .billing-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .card-heading, .card-body {
+        padding-right: 18px;
+        padding-left: 18px;
+      }
+
+      .invite-form {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .member-role {
+        display: none;
+      }
+
+      .danger-body {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 20px 18px;
+      }
+
+      .danger-heading {
+        padding-right: 18px;
+        padding-left: 18px;
+      }
+
+      .topbar-right .secure-label {
+        display: none;
+      }
+
+      .card-actions {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .card-actions .button {
+        width: 100%;
+      }
+
+      .plan-card {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .dialog-actions {
+        flex-direction: column-reverse;
+      }
+
+      .dialog-actions .button {
+        width: 100%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Workspace navigation">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none">
+            <path d="M4 16.5c2.2 0 2.2-2 4.4-2s2.2 2 4.4 2 2.2-2 4.4-2 2.2 2 4.4 2M4 11.5c2.2 0 2.2-2 4.4-2s2.2 2 4.4 2 2.2-2 4.4-2 2.2 2 4.4 2M12 3v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M9 6h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </span>
+        Harbor
+      </div>
+
+      <p class="workspace-label">Workspace</p>
+      <div class="workspace-card" aria-label="Current workspace: Northwind">
+        <span class="workspace-avatar" aria-hidden="true">N</span>
+        <span>
+          <span class="workspace-name">Northwind</span><br>
+          <span class="workspace-type">Team workspace</span>
+        </span>
+      </div>
+
+      <p class="nav-heading">Settings</p>
+      <nav aria-label="Settings">
+        <ul class="nav-list">
+          <li><button class="nav-button" type="button" data-nav="profile" aria-current="page">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="19" height="19" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="1.7"/><path d="M5 20c.7-3.2 3.1-5 7-5s6.3 1.8 7 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>Profile
+          </button></li>
+          <li><button class="nav-button" type="button" data-nav="notifications">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Notifications
+          </button></li>
+          <li><button class="nav-button" type="button" data-nav="team">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="19" height="19" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 20c.4-3 2.3-4.5 5.5-4.5s5.1 1.5 5.5 4.5M16 5.5a3 3 0 0 1 0 5.8M17 15.8c2.1.4 3.3 1.8 3.5 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>Team
+          </button></li>
+          <li><button class="nav-button" type="button" data-nav="projects">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M3.5 7.5h7l2 2h8v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2h4l2 2" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M3.5 10h17" stroke="currentColor" stroke-width="1.7"/></svg></span>Projects
+          </button></li>
+          <li><button class="nav-button" type="button" data-nav="billing">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="19" height="19" fill="none"><rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M3 10h18M7 15h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>Billing
+          </button></li>
+          <li><button class="nav-button" type="button" data-nav="danger">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M12 3 21 19H3L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 9v4M12 16.5v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>Danger zone
+          </button></li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span class="user-avatar" aria-hidden="true">JD</span>
+        <span>
+          <span class="user-name">Jordan Davis</span><br>
+          <span class="user-role">Workspace owner</span>
+        </span>
+      </div>
+    </aside>
+
+    <main class="main-area" id="main-content">
+      <header class="topbar">
+        <div class="breadcrumb" aria-label="Breadcrumb">
+          <span>Northwind</span>
+          <span aria-hidden="true">/</span>
+          <strong>Settings</strong>
+        </div>
+        <div class="topbar-right">
+          <span class="secure-label"><span class="secure-dot" aria-hidden="true"></span>All changes are private to your workspace</span>
+        </div>
+      </header>
+
+      <div class="content-wrap">
+        <section class="panel" id="profile" data-panel="profile" aria-labelledby="page-title-profile">
+          <div class="page-intro">
+            <p class="eyebrow">Your account</p>
+            <h1 id="page-title-profile">Profile</h1>
+            <p class="page-description">Manage the personal details your teammates see in Harbor.</p>
+          </div>
+          <div class="settings-card">
+            <div class="card-heading">
+              <h2>Personal information</h2>
+              <p>Keep your name and email up to date.</p>
+            </div>
+            <div class="card-body">
+              <p class="message message-error" data-error role="alert" hidden></p>
+              <p class="message message-success" role="status" hidden></p>
+              <form id="profile-form" novalidate>
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="profile-name">Full name</label>
+                    <input id="profile-name" name="name" type="text" autocomplete="name" value="Jordan Davis" data-field="name" aria-describedby="profile-name-hint">
+                    <p class="field-hint" id="profile-name-hint">This is how your name appears to the team.</p>
+                  </div>
+                  <div class="field">
+                    <label for="profile-email">Email address</label>
+                    <input id="profile-email" name="email" type="email" autocomplete="email" value="jordan.davis@northwind.com" data-field="email">
+                  </div>
+                </div>
+                <div class="card-actions">
+                  <p class="action-note">Your profile is visible to members of Northwind.</p>
+                  <button class="button button-primary" type="submit" data-action="save-profile">
+                    <svg aria-hidden="true" viewBox="0 0 20 20" width="15" height="15" fill="none"><path d="M4 3h10l3 3v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.5"/><path d="M6 3v5h8V3M6 17v-6h8v6" stroke="currentColor" stroke-width="1.5"/></svg>
+                    Save changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="notifications" data-panel="notifications" aria-labelledby="page-title-notifications" hidden>
+          <div class="page-intro">
+            <p class="eyebrow">Stay in the loop</p>
+            <h1 id="page-title-notifications">Notifications</h1>
+            <p class="page-description">Choose which updates you’d like to receive from Harbor.</p>
+          </div>
+          <div class="settings-card">
+            <div class="card-heading">
+              <h2>Email preferences</h2>
+              <p>Changes take effect after you save your preferences.</p>
+            </div>
+            <div class="card-body">
+              <p class="message message-success" role="status" hidden></p>
+              <form id="notifications-form">
+                <div class="switch-list">
+                  <div class="switch-row">
+                    <div><span class="switch-title">Product updates</span><span class="switch-description">New features, improvements, and release notes.</span></div>
+                    <button class="switch-control" type="button" role="switch" aria-checked="true" aria-label="Product updates" data-switch="product-updates"></button>
+                  </div>
+                  <div class="switch-row">
+                    <div><span class="switch-title">Comments</span><span class="switch-description">When someone comments on work you follow.</span></div>
+                    <button class="switch-control" type="button" role="switch" aria-checked="true" aria-label="Comments" data-switch="comments"></button>
+                  </div>
+                  <div class="switch-row">
+                    <div><span class="switch-title">Mentions</span><span class="switch-description">When a teammate mentions you in a conversation.</span></div>
+                    <button class="switch-control" type="button" role="switch" aria-checked="true" aria-label="Mentions" data-switch="mentions"></button>
+                  </div>
+                  <div class="switch-row">
+                    <div><span class="switch-title">Weekly digest</span><span class="switch-description">A short summary of your workspace activity each week.</span></div>
+                    <button class="switch-control" type="button" role="switch" aria-checked="false" aria-label="Weekly digest" data-switch="weekly-digest"></button>
+                  </div>
+                </div>
+                <div class="card-actions">
+                  <p class="action-note">You can change these preferences at any time.</p>
+                  <button class="button button-primary" type="submit" data-action="save-notifications">Save preferences</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="team" data-panel="team" aria-labelledby="page-title-team" hidden>
+          <div class="page-intro">
+            <p class="eyebrow">Work better together</p>
+            <h1 id="page-title-team">Team</h1>
+            <p class="page-description">Manage who has access to the Northwind workspace.</p>
+          </div>
+          <div class="settings-card">
+            <div class="card-heading">
+              <h2>Workspace members <span id="member-count" class="sr-only">3 members</span></h2>
+              <p>People who can access your team’s work.</p>
+            </div>
+            <div class="card-body">
+              <p class="message message-error" data-error role="alert" hidden></p>
+              <p class="message message-success" role="status" hidden></p>
+              <div class="member-list" id="member-list" aria-label="Workspace members">
+                <div class="member-row" data-member="m1">
+                  <span class="member-avatar" aria-hidden="true">JD</span>
+                  <span class="member-info"><span class="member-name">Jordan Davis</span><span class="member-email">jordan.davis@northwind.com</span></span>
+                  <span class="member-role">Owner</span>
+                  <button class="remove-button" type="button" data-action="remove-member" aria-label="Remove Jordan Davis">Remove</button>
+                </div>
+                <div class="member-row" data-member="m2">
+                  <span class="member-avatar" aria-hidden="true">AC</span>
+                  <span class="member-info"><span class="member-name">Alex Chen</span><span class="member-email">alex.chen@northwind.com</span></span>
+                  <span class="member-role">Admin</span>
+                  <button class="remove-button" type="button" data-action="remove-member" aria-label="Remove Alex Chen">Remove</button>
+                </div>
+                <div class="member-row" data-member="m3">
+                  <span class="member-avatar" aria-hidden="true">MP</span>
+                  <span class="member-info"><span class="member-name">Morgan Patel</span><span class="member-email">morgan.patel@northwind.com</span></span>
+                  <span class="member-role">Member</span>
+                  <button class="remove-button" type="button" data-action="remove-member" aria-label="Remove Morgan Patel">Remove</button>
+                </div>
+              </div>
+
+              <div class="subsection">
+                <h3>Invite a teammate</h3>
+                <p class="subsection-description">They’ll receive an email invitation to join Northwind.</p>
+                <form id="invite-form" class="invite-form" novalidate>
+                  <div class="field">
+                    <label for="invite-email">Email address</label>
+                    <input id="invite-email" name="invite-email" data-field="invite-email" type="email" autocomplete="email" placeholder="teammate@company.com" aria-describedby="invite-error">
+                  </div>
+                  <button class="button button-primary" type="submit" data-action="invite">
+                    <svg aria-hidden="true" viewBox="0 0 20 20" width="15" height="15" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    Send invite
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="projects" data-panel="projects" aria-labelledby="page-title-projects" hidden>
+          <div class="page-intro">
+            <p class="eyebrow">Make good things happen</p>
+            <h1 id="page-title-projects">Projects</h1>
+            <p class="page-description">A shared place for your team to plan and make progress.</p>
+          </div>
+          <div class="settings-card">
+            <div class="card-heading">
+              <h2>Your projects</h2>
+              <p>Projects created in the Northwind workspace.</p>
+            </div>
+            <div class="card-body">
+              <p class="message message-success" role="status" hidden></p>
+              <div id="project-empty" class="empty-state" data-empty>
+                <span class="empty-illustration" aria-hidden="true">
+                  <svg viewBox="0 0 28 28" width="30" height="30" fill="none"><path d="M5 8.5h7l2 2h9v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-12a2 2 0 0 1 2-2h4l2 2" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 13v5M11.5 15.5h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                </span>
+                <h2>No projects yet</h2>
+                <p>Create your first project to give your team a shared place to get started.</p>
+                <button class="button button-primary" type="button" data-action="create-project">Create a project</button>
+              </div>
+              <div id="project-list" class="project-list" aria-label="Projects" hidden></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="billing" data-panel="billing" aria-labelledby="page-title-billing" hidden>
+          <div class="page-intro">
+            <p class="eyebrow">Plan and payment</p>
+            <h1 id="page-title-billing">Billing</h1>
+            <p class="page-description">Review your current plan and update your payment details.</p>
+          </div>
+          <div class="settings-card">
+            <div class="card-heading">
+              <h2>Plan and payment method</h2>
+              <p>Your subscription and payment details for Northwind.</p>
+            </div>
+            <div class="card-body">
+              <div class="plan-card">
+                <div>
+                  <p class="plan-label">Current plan</p>
+                  <p class="plan-name">Harbor Team</p>
+                  <p class="plan-description">Everything your team needs to work together.</p>
+                </div>
+                <div class="plan-price"><strong>$24</strong> / month</div>
+              </div>
+              <p class="message message-error" data-error role="alert" hidden></p>
+              <p class="message message-success" role="status" hidden></p>
+              <form id="billing-form" novalidate>
+                <div class="field card-number-field">
+                  <label for="card-number">Card number</label>
+                  <input id="card-number" name="card-number" data-field="card-number" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="1234 5678 9012 3456" aria-describedby="card-number-hint">
+                  <p id="card-number-hint" class="field-hint">Enter the 16 digits on your card.</p>
+                </div>
+                <div class="billing-grid">
+                  <div class="field">
+                    <label for="card-expiry">Expiry date</label>
+                    <input id="card-expiry" name="card-expiry" data-field="card-expiry" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM / YY">
+                  </div>
+                  <div class="field">
+                    <label for="card-cvc">Security code</label>
+                    <input id="card-cvc" name="card-cvc" data-field="card-cvc" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="CVC">
+                  </div>
+                </div>
+                <div class="card-actions">
+                  <span class="payment-lock">
+                    <svg aria-hidden="true" viewBox="0 0 20 20" width="14" height="14" fill="none"><rect x="4" y="8" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 8V6a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    Your payment details are securely handled.
+                  </span>
+                  <button class="button button-primary" type="submit" data-action="pay">Update payment method</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="danger" data-panel="danger" aria-labelledby="page-title-danger" hidden>
+          <div class="page-intro">
+            <p class="eyebrow">Workspace settings</p>
+            <h1 id="page-title-danger">Danger zone</h1>
+            <p class="page-description">Actions here can permanently affect your workspace and its data.</p>
+          </div>
+          <div class="danger-card">
+            <div class="danger-heading">
+              <h2>
+                <svg aria-hidden="true" viewBox="0 0 20 20" width="17" height="17" fill="none"><path d="M10 2.5 18 17H2l8-14.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 7v4M10 13.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                Irreversible actions
+              </h2>
+            </div>
+            <div class="danger-body">
+              <div>
+                <h3>Delete this workspace</h3>
+                <p>Deleting Northwind permanently removes its members, projects, and workspace data. This action can’t be undone.</p>
+              </div>
+              <button class="button button-danger-outline" type="button" data-action="delete-workspace">Delete workspace</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="confirm-modal" hidden>
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby="dialog-description" tabindex="-1">
+      <span class="dialog-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none"><path d="M12 3 21 19H3L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 9v4M12 16.5v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </span>
+      <h2 id="dialog-title">Confirm action</h2>
+      <p id="dialog-description"></p>
+      <div class="dialog-actions">
+        <button class="button button-secondary" type="button" id="dialog-cancel">Keep workspace</button>
+        <button class="button button-danger" type="button" id="dialog-confirm">Confirm</button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const navButtons = Array.from(document.querySelectorAll("[data-nav]"));
+      const panels = Array.from(document.querySelectorAll("[data-panel]"));
+      const modal = document.getElementById("confirm-modal");
+      const dialog = modal.querySelector('[role="dialog"]');
+      const dialogTitle = document.getElementById("dialog-title");
+      const dialogDescription = document.getElementById("dialog-description");
+      const dialogCancel = document.getElementById("dialog-cancel");
+      const dialogConfirm = document.getElementById("dialog-confirm");
+      let previousFocus = null;
+      let pendingAction = null;
+      let projectCount = 0;
+      let memberCount = 3;
+
+      function clearPanelMessages(panel) {
+        if (!panel) return;
+        panel.querySelectorAll("[data-error], [role='status']").forEach((message) => {
+          message.textContent = "";
+          message.hidden = true;
+        });
+        panel.querySelectorAll("input[aria-invalid='true']").forEach((input) => {
+          input.removeAttribute("aria-invalid");
+        });
+      }
+
+      function showMessage(element, text) {
+        if (!element) return;
+        element.textContent = text;
+        element.hidden = false;
+      }
+
+      function setPanel(panelName) {
+        panels.forEach((panel) => {
+          const selected = panel.dataset.panel === panelName;
+          panel.hidden = !selected;
+        });
+
+        navButtons.forEach((button) => {
+          if (button.dataset.nav === panelName) {
+            button.setAttribute("aria-current", "page");
+          } else {
+            button.removeAttribute("aria-current");
+          }
+        });
+
+        const current = panels.find((panel) => panel.dataset.panel === panelName);
+        if (current) {
+          const heading = current.querySelector("h1");
+          if (heading) heading.focus({ preventScroll: true });
+        }
+      }
+
+      navButtons.forEach((button) => {
+        button.addEventListener("click", () => setPanel(button.dataset.nav));
+      });
+
+      document.querySelectorAll("[data-switch]").forEach((switchButton) => {
+        switchButton.addEventListener("click", () => {
+          switchButton.setAttribute(
+            "aria-checked",
+            switchButton.getAttribute("aria-checked") === "true" ? "false" : "true"
+          );
+          const status = document.querySelector("#notifications [role='status']");
+          status.hidden = true;
+          status.textContent = "";
+        });
+      });
+
+      document.getElementById("profile-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const panel = document.getElementById("profile");
+        clearPanelMessages(panel);
+        const nameInput = panel.querySelector('[data-field="name"]');
+        const error = panel.querySelector("[data-error]");
+        const status = panel.querySelector("[role='status']");
+
+        if (!nameInput.value.trim()) {
+          nameInput.setAttribute("aria-invalid", "true");
+          showMessage(error, "Enter your name to save your profile.");
+          nameInput.focus();
+          return;
+        }
+
+        const firstName = nameInput.value.trim().split(/\s+/)[0];
+        const avatar = document.querySelector(".user-avatar");
+        avatar.textContent = nameInput.value.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
+        document.querySelector(".user-name").textContent = nameInput.value.trim();
+        showMessage(status, `Your profile has been updated, ${firstName}.`);
+      });
+
+      document.getElementById("notifications-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const status = document.querySelector("#notifications [role='status']");
+        status.textContent = "";
+        status.hidden = true;
+        showMessage(status, "Your notification preferences have been saved.");
+      });
+
+      function initialsFromEmail(email) {
+        const name = email.split("@")[0].replace(/[._-]+/g, " ").trim();
+        return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "T";
+      }
+
+      function displayNameFromEmail(email) {
+        const name = email.split("@")[0].replace(/[._-]+/g, " ").trim();
+        return name.split(/\s+/).filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ") || email;
+      }
+
+      function updateMemberCount() {
+        const countLabel = document.getElementById("member-count");
+        countLabel.textContent = `${memberCount} ${memberCount === 1 ? "member" : "members"}`;
+      }
+
+      document.getElementById("invite-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const panel = document.getElementById("team");
+        const error = panel.querySelector("[data-error]");
+        const status = panel.querySelector("[role='status']");
+        const input = panel.querySelector('[data-field="invite-email"]');
+        clearPanelMessages(panel);
+        const email = input.value.trim();
+        const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+        if (!validEmail) {
+          input.setAttribute("aria-invalid", "true");
+          showMessage(error, "Enter a valid email address, such as teammate@company.com.");
+          input.focus();
+          return;
+        }
+
+        const existing = Array.from(document.querySelectorAll("#member-list .member-email"))
+          .some((node) => node.textContent.toLowerCase() === email.toLowerCase());
+
+        if (existing) {
+          input.setAttribute("aria-invalid", "true");
+          showMessage(error, "This person is already part of the Northwind workspace.");
+          input.focus();
+          return;
+        }
+
+        const row = document.createElement("div");
+        row.className = "member-row";
+        row.dataset.member = `m${Date.now()}`;
+        const avatar = document.createElement("span");
+        avatar.className = "member-avatar";
+        avatar.setAttribute("aria-hidden", "true");
+        avatar.textContent = initialsFromEmail(email);
+
+        const info = document.createElement("span");
+        info.className = "member-info";
+        const name = document.createElement("span");
+        name.className = "member-name";
+        name.textContent = displayNameFromEmail(email);
+        const emailLabel = document.createElement("span");
+        emailLabel.className = "member-email";
+        emailLabel.textContent = email;
+        info.append(name, emailLabel);
+
+        const role = document.createElement("span");
+        role.className = "member-role";
+        role.textContent = "Member";
+
+        const removeButton = document.createElement("button");
+        removeButton.className = "remove-button";
+        removeButton.type = "button";
+        removeButton.dataset.action = "remove-member";
+        removeButton.setAttribute("aria-label", `Remove ${displayNameFromEmail(email)}`);
+        removeButton.textContent = "Remove";
+
+        row.append(avatar, info, role, removeButton);
+        document.getElementById("member-list").appendChild(row);
+        memberCount += 1;
+        updateMemberCount();
+        input.value = "";
+        showMessage(status, `An invitation was sent to ${email}.`);
+      });
+
+      function openDialog({ title, description, confirmText, cancelText, onConfirm }) {
+        previousFocus = document.activeElement;
+        pendingAction = onConfirm;
+        dialogTitle.textContent = title;
+        dialogDescription.textContent = description;
+        dialogConfirm.textContent = confirmText;
+        dialogCancel.textContent = cancelText;
+        modal.hidden = false;
+        dialogConfirm.focus();
+      }
+
+      function closeDialog() {
+        modal.hidden = true;
+        pendingAction = null;
+        if (previousFocus && typeof previousFocus.focus === "function") {
+          previousFocus.focus();
+        }
+      }
+
+      dialogCancel.addEventListener("click", closeDialog);
+      dialogConfirm.addEventListener("click", () => {
+        const action = pendingAction;
+        if (typeof action === "function") action();
+        closeDialog();
+      });
+
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) closeDialog();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (modal.hidden) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeDialog();
+          return;
+        }
+
+        if (event.key === "Tab") {
+          const focusable = Array.from(dialog.querySelectorAll("button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex='-1'])"))
+            .filter((element) => element.offsetParent !== null);
+          if (!focusable.length) {
+            event.preventDefault();
+            dialog.focus();
+            return;
+          }
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        const removeButton = event.target.closest('[data-action="remove-member"]');
+        if (removeButton) {
+          const row = removeButton.closest("[data-member]");
+          const memberName = row.querySelector(".member-name").textContent;
+          openDialog({
+            title: `Remove ${memberName}?`,
+            description: `${memberName} will lose access to the Northwind workspace. You can invite them again later.`,
+            confirmText: "Remove member",
+            cancelText: "Keep member",
+            onConfirm: () => {
+              const teamPanel = document.getElementById("team");
+              row.remove();
+              memberCount = Math.max(0, memberCount - 1);
+              updateMemberCount();
+              showMessage(teamPanel.querySelector("[role='status']"), `${memberName} was removed from the workspace.`);
+            }
+          });
+        }
+      });
+
+      document.querySelector('[data-action="create-project"]').addEventListener("click", () => {
+        const panel = document.getElementById("projects");
+        const empty = document.getElementById("project-empty");
+        const list = document.getElementById("project-list");
+        const status = panel.querySelector("[role='status']");
+        projectCount += 1;
+        const projectName = `Northwind project ${projectCount}`;
+
+        const item = document.createElement("div");
+        item.className = "project-item";
+        item.dataset.project = `p${projectCount}`;
+        const symbol = document.createElement("span");
+        symbol.className = "project-symbol";
+        symbol.setAttribute("aria-hidden", "true");
+        symbol.innerHTML = '<svg viewBox="0 0 20 20" width="19" height="19" fill="none"><path d="M3 5.5h5l1.5 1.7H17v7.3a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5v-9Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 11h6M10 8v6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+        const info = document.createElement("span");
+        const name = document.createElement("span");
+        name.className = "project-name";
+        name.textContent = projectName;
+        const meta = document.createElement("span");
+        meta.className = "project-meta";
+        meta.textContent = "Created just now";
+        info.append(name, document.createElement("br"), meta);
+        item.append(symbol, info);
+        list.appendChild(item);
+        empty.hidden = true;
+        list.hidden = false;
+        showMessage(status, `${projectName} is ready for your team.`);
+      });
+
+      document.getElementById("billing-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const panel = document.getElementById("billing");
+        clearPanelMessages(panel);
+        const error = panel.querySelector("[data-error]");
+        const status = panel.querySelector("[role='status']");
+        const numberInput = panel.querySelector('[data-field="card-number"]');
+        const expiryInput = panel.querySelector('[data-field="card-expiry"]');
+        const cvcInput = panel.querySelector('[data-field="card-cvc"]');
+        const digits = numberInput.value.replace(/\D/g, "");
+        const expiry = expiryInput.value.trim();
+        const cvc = cvcInput.value.replace(/\D/g, "");
+
+        if (digits.length !== 16) {
+          numberInput.setAttribute("aria-invalid", "true");
+          showMessage(error, "Enter a valid 16-digit card number.");
+          numberInput.focus();
+          return;
+        }
+
+        if (!/^(0[1-9]|1[0-2])\s*\/\s*\d{2,4}$/.test(expiry)) {
+          expiryInput.setAttribute("aria-invalid", "true");
+          showMessage(error, "Enter a valid expiry date in MM / YY format.");
+          expiryInput.focus();
+          return;
+        }
+
+        if (cvc.length < 3 || cvc.length > 4) {
+          cvcInput.setAttribute("aria-invalid", "true");
+          showMessage(error, "Enter the 3- or 4-digit security code on your card.");
+          cvcInput.focus();
+          return;
+        }
+
+        if (digits === "4000000000000002") {
+          showMessage(error, "Payment declined. Your bank declined this card. Try a different card or contact your bank.");
+          numberInput.setAttribute("aria-invalid", "true");
+          numberInput.focus();
+          return;
+        }
+
+        showMessage(status, "Payment method updated. Your Harbor Team plan is ready to go.");
+      });
+
+      document.querySelector('[data-action="delete-workspace"]').addEventListener("click", (event) => {
+        openDialog({
+          title: "Delete the Northwind workspace?",
+          description: "This permanently deletes Northwind, including its members, projects, and workspace data. This action can’t be undone.",
+          confirmText: "Delete workspace",
+          cancelText: "Keep workspace",
+          onConfirm: () => {
+            const dangerPanel = document.getElementById("danger");
+            let status = dangerPanel.querySelector("[role='status']");
+            if (!status) {
+              status = document.createElement("p");
+              status.className = "message message-success";
+              status.setAttribute("role", "status");
+              dangerPanel.appendChild(status);
+            }
+            showMessage(status, "The workspace deletion request has been submitted.");
+          }
+        });
+      });
+
+      document.querySelectorAll("input").forEach((input) => {
+        input.addEventListener("input", () => {
+          if (input.hasAttribute("aria-invalid")) {
+            input.removeAttribute("aria-invalid");
+          }
+          const panel = input.closest("[data-panel]");
+          if (panel) {
+            const error = panel.querySelector("[data-error]");
+            if (error && !error.hidden) {
+              error.textContent = "";
+              error.hidden = true;
+            }
+          }
+        });
+      });
+
+      updateMemberCount();
+    })();
+  </script>
+</body>
+</html>
+```

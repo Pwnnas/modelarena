@@ -1,0 +1,25 @@
+{
+  "source": "arena run",
+  "endpoint": "192.168.1.121:8080",
+  "apiModel": "Qwen3.8",
+  "servedModel": "Qwen3.8",
+  "params": {
+    "thinking": "low"
+  },
+  "startedAt": "2026-11-01T23:29:01.343Z",
+  "wallMs": 300695,
+  "ttftMs": 1244,
+  "thinkingMs": 203197,
+  "promptTokens": 3835,
+  "completionTokens": 35752,
+  "reasoningTokens": 24481,
+  "tokensEstimated": false,
+  "genTokensPerSec": 119.4,
+  "promptTokensPerSec": null,
+  "finishReason": "stop",
+  "replyChars": 31752,
+  "reasoningChars": 65246,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 31761
+}

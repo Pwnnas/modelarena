@@ -1,0 +1,2169 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Commander</title>
+<style>
+  :root {
+    --accent: #5b5bd6;
+    --palette-list-max: 320px;
+  }
+
+  html[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface-2: #eef0f4;
+    --sidebar: #fbfcfd;
+    --text: #111827;
+    --muted: #6b7280;
+    --border: #e2e5ea;
+    --shadow: 0 18px 55px rgba(15, 23, 42, 0.16);
+  }
+
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #080b10;
+    --surface: #11151c;
+    --surface-2: #1a2029;
+    --sidebar: #0b0e13;
+    --text: #e5e7eb;
+    --muted: #8994a3;
+    --border: #232a36;
+    --shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  button {
+    font: inherit;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  #app {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  #app.sidebar-collapsed,
+  #app.focus-mode {
+    grid-template-columns: 0 minmax(0, 1fr);
+  }
+
+  #app.sidebar-collapsed .sidebar,
+  #app.focus-mode .sidebar {
+    display: none;
+  }
+
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    padding: 14px 12px 12px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px 14px;
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 750;
+    font-size: 17px;
+    letter-spacing: -0.02em;
+  }
+
+  .brand-mark {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+
+  .brand-mark svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .sidebar-section-label {
+    margin: 8px 10px 2px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  .nav-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .nav-item:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+
+  .nav-item.active {
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
+  .nav-item svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .notes-list {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 2px;
+  }
+
+  .note-item {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 9px 10px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .note-item:hover {
+    background: var(--surface-2);
+  }
+
+  .note-item[aria-current="true"] {
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
+  .note-title {
+    display: block;
+    font-size: 13.5px;
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .note-snippet {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .main {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-width: 0;
+    background: var(--bg);
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .view-title {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #open-palette {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    width: min(320px, 42vw);
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  #open-palette:hover,
+  #open-palette:focus-visible {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+    color: var(--text);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  .open-icon {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .open-label {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .open-keys {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .keycap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    padding: 3px 5px;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .editor-shell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--bg);
+  }
+
+  .editor-title {
+    padding: 20px 42px 10px;
+    font-size: 24px;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #editor {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    resize: none;
+    border: 0;
+    outline: 0;
+    padding: 8px 42px 48px;
+    background: transparent;
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13.5px;
+    line-height: 1.8;
+    caret-color: var(--accent);
+  }
+
+  #editor.nowrap {
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  #editor:focus-visible {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+
+  #palette {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: min(14vh, 128px);
+  }
+
+  #palette.open,
+  #palette.closing {
+    display: flex;
+  }
+
+  #palette[hidden] {
+    display: none !important;
+  }
+
+  #palette-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(9, 12, 18, 0.38);
+    opacity: 0;
+  }
+
+  html[data-theme="dark"] #palette-overlay {
+    background: rgba(0, 0, 0, 0.62);
+  }
+
+  #palette.open #palette-overlay {
+    animation: overlayIn 170ms ease-out forwards;
+  }
+
+  #palette.closing #palette-overlay {
+    animation: overlayOut 150ms ease-in forwards;
+  }
+
+  #palette-panel {
+    position: relative;
+    width: min(680px, calc(100vw - 32px));
+    max-height: min(620px, calc(100vh - 140px));
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    opacity: 1;
+  }
+
+  #palette.open #palette-panel {
+    animation: panelIn 190ms cubic-bezier(.16, 1, .3, 1);
+  }
+
+  #palette.closing #palette-panel {
+    animation: panelOut 170ms cubic-bezier(.4, 0, .2, 1) forwards;
+  }
+
+  .palette-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .palette-search-icon {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+    stroke: var(--muted);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  #palette-input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  #palette-input::placeholder {
+    color: var(--muted);
+  }
+
+  #palette-breadcrumb {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 55%;
+    padding: 5px 9px;
+    border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 650;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #palette-breadcrumb button {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .palette-close {
+    border: 0;
+    padding: 5px 7px;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 750;
+    cursor: pointer;
+  }
+
+  .palette-close:hover,
+  .palette-close:focus-visible {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .palette-list-wrap {
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #palette-list {
+    position: relative;
+    min-height: 0;
+    padding: 8px;
+    overflow: auto;
+    max-height: var(--palette-list-max, 320px);
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--muted) 35%, transparent) transparent;
+  }
+
+  #palette-list.empty {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  #palette-highlight {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    top: 0;
+    height: 0;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .group-heading {
+    position: relative;
+    z-index: 1;
+    padding: 12px 12px 5px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .option {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 40px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    cursor: default;
+    color: var(--text);
+  }
+
+  .option:hover {
+    background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+  }
+
+  .option[aria-selected="true"] .option-title {
+    color: var(--accent);
+  }
+
+  .option-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 550;
+  }
+
+  .option-title mark {
+    padding: 0 2px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--accent) 24%, transparent);
+    color: inherit;
+  }
+
+  .option-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+  }
+
+  .accent-swatch {
+    width: 14px;
+    height: 14px;
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 4%, transparent);
+  }
+
+  #palette-empty {
+    padding: 28px 18px;
+    color: var(--muted);
+    text-align: center;
+    font-size: 14px;
+  }
+
+  .palette-footer {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .palette-footer kbd {
+    display: inline-block;
+    padding: 2px 5px;
+    margin-right: 4px;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10.5px;
+    line-height: 1.2;
+    color: var(--muted);
+  }
+
+  #toasts {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 1100;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 9px;
+    max-width: min(360px, calc(100vw - 28px));
+    pointer-events: none;
+  }
+
+  .toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: max-content;
+    max-width: 340px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    color: var(--text);
+    animation: toastIn 220ms cubic-bezier(.16, 1, .3, 1);
+  }
+
+  .toast.hide {
+    animation: toastOut 230ms ease-in forwards;
+  }
+
+  .toast-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
+    flex: 0 0 auto;
+  }
+
+  .toast-text {
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  @keyframes overlayIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes overlayOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  @keyframes panelIn {
+    from {
+      opacity: 0;
+      transform: scale(.965) translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes panelOut {
+    from {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: scale(.975) translateY(4px);
+    }
+  }
+
+  @keyframes toastIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes toastOut {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(8px) scale(.98);
+    }
+  }
+
+  @keyframes reducedFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes reducedFadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition: none !important;
+    }
+
+    html,
+    body,
+    #app,
+    .sidebar,
+    .topbar,
+    #palette-panel,
+    #palette-input,
+    #editor {
+      transition: none !important;
+    }
+
+    #palette.open #palette-panel {
+      animation: reducedFadeIn 110ms ease-out !important;
+      transform: none !important;
+    }
+
+    #palette.closing #palette-panel {
+      animation: reducedFadeOut 110ms ease-in forwards !important;
+      transform: none !important;
+    }
+
+    #palette.open #palette-overlay {
+      animation: reducedFadeIn 110ms ease-out !important;
+    }
+
+    #palette.closing #palette-overlay {
+      animation: reducedFadeOut 110ms ease-in forwards !important;
+    }
+
+    .toast {
+      animation: reducedFadeIn 110ms ease-out !important;
+      transform: none !important;
+    }
+
+    .toast.hide {
+      animation: reducedFadeOut 110ms ease-in forwards !important;
+      transform: none !important;
+    }
+
+    #palette-highlight {
+      display: none !important;
+    }
+
+    .option[aria-selected="true"] {
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+  }
+
+  @media (max-width: 980px) {
+    #app {
+      grid-template-columns: 220px minmax(0, 1fr);
+    }
+
+    #editor {
+      padding-left: 24px;
+      padding-right: 24px;
+    }
+
+    .editor-title {
+      padding-left: 24px;
+      padding-right: 24px;
+    }
+  }
+
+  @media (max-width: 720px) {
+    #app {
+      grid-template-columns: 0 minmax(0, 1fr);
+    }
+
+    .sidebar {
+      display: none;
+    }
+  }
+</style>
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar" aria-label="Sidebar">
+      <a class="brand" href="#" aria-label="Commander home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M7 7h10M7 12h10M7 17h6" />
+          </svg>
+        </span>
+        Commander
+      </a>
+
+      <div class="sidebar-section-label">Views</div>
+      <nav id="nav-sections" class="nav-sections" aria-label="Views">
+        <button type="button" class="nav-item active" data-view="Inbox">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4 4-4M3 7h10l8 6v4H3z"/></svg>
+          Inbox
+        </button>
+        <button type="button" class="nav-item" data-view="Today">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8"/></svg>
+          Today
+        </button>
+        <button type="button" class="nav-item" data-view="Archive">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v4H4zM4 11h16v8H4zM10 15h4"/></svg>
+          Archive
+        </button>
+        <button type="button" class="nav-item" data-view="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-14 0 7 7 0 0 0 14 0z"/></svg>
+          Settings
+        </button>
+      </nav>
+
+      <div class="sidebar-section-label">Notes</div>
+      <div id="notes-list" class="notes-list" aria-label="Notes"></div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="topbar-left">
+          <div id="view-title" class="view-title" aria-live="polite">Inbox</div>
+        </div>
+        <button id="open-palette" type="button" aria-label="Open command palette">
+          <svg class="open-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10 17a7 7 0 1 1 0-14 7 7 0 0 1 0 14zm7-7l4 4" />
+          </svg>
+          <span class="open-label">Search commands</span>
+          <span class="open-keys" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <section class="editor-shell">
+        <div id="editor-title" class="editor-title">No note selected</div>
+        <textarea id="editor" aria-label="Note body" spellcheck="false"></textarea>
+      </section>
+    </main>
+  </div>
+
+  <div id="palette" role="dialog" aria-modal="true" aria-labelledby="palette-title" hidden>
+    <div id="palette-overlay" aria-hidden="true"></div>
+
+    <div id="palette-panel">
+      <h1 id="palette-title" class="visually-hidden">Command palette</h1>
+
+      <div class="palette-search">
+        <svg class="palette-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M10 17a7 7 0 1 1 0-14 7 7 0 0 1 0 14zm7-7l4 4" />
+        </svg>
+
+        <div id="palette-breadcrumb" hidden>
+          <button type="button" aria-label="Return to command list">
+            <span class="breadcrumb-text"></span>
+          </button>
+        </div>
+
+        <input
+          id="palette-input"
+          type="text"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="false"
+          aria-controls="palette-list"
+          aria-label="Search commands"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Search commands…"
+        />
+
+        <button id="palette-close" type="button" class="palette-close" aria-label="Close command palette">Esc</button>
+      </div>
+
+      <div class="palette-list-wrap">
+        <div id="palette-list" role="listbox" aria-label="Command results">
+          <div id="palette-highlight" aria-hidden="true"></div>
+        </div>
+        <div id="palette-empty" hidden>No matching commands</div>
+      </div>
+
+      <div class="palette-footer" aria-hidden="true">
+        <span><kbd>↑</kbd><kbd>↓</kbd>Navigate</span>
+        <span><kbd>↵</kbd>Run</span>
+        <span><kbd>esc</kbd>Close</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  const COMMANDS = [
+    { id: "go-inbox",          title: "Go to Inbox",             group: "Navigation", keywords: ["home"] },
+    { id: "go-today",          title: "Go to Today",             group: "Navigation" },
+    { id: "go-archive",        title: "Go to Archive",           group: "Navigation" },
+    { id: "go-settings",       title: "Go to Settings",          group: "Navigation", keywords: ["preferences", "options"], shortcut: "Mod+," },
+    { id: "go-line",           title: "Go to Line…",             group: "Navigation", keywords: ["jump"], shortcut: "Mod+G" },
+    { id: "go-symbol",         title: "Go to Symbol…",           group: "Navigation", shortcut: "Mod+Shift+O" },
+    { id: "search-notes",      title: "Search Notes…",           group: "Navigation", keywords: ["find"], shortcut: "Mod+Shift+F" },
+    { id: "new-note",          title: "New Note",                group: "Notes", keywords: ["create", "add"], shortcut: "Mod+N" },
+    { id: "new-note-template", title: "New Note from Template…", group: "Notes" },
+    { id: "duplicate-note",    title: "Duplicate Note",          group: "Notes", keywords: ["copy", "clone"] },
+    { id: "rename-note",       title: "Rename Note…",            group: "Notes", shortcut: "F2" },
+    { id: "delete-note",       title: "Delete Note",             group: "Notes", keywords: ["remove", "trash"] },
+    { id: "pin-note",          title: "Pin Note",                group: "Notes", keywords: ["favorite", "star"] },
+    { id: "move-note",         title: "Move Note to Folder…",    group: "Notes" },
+    { id: "export-pdf",        title: "Export Note as PDF",      group: "Notes" },
+    { id: "export-md",         title: "Export Note as Markdown", group: "Notes" },
+    { id: "share-note",        title: "Share Note Link",         group: "Notes", keywords: ["copy", "url"] },
+    { id: "bold",              title: "Bold",                    group: "Editor", shortcut: "Mod+B" },
+    { id: "italic",            title: "Italic",                  group: "Editor", shortcut: "Mod+I" },
+    { id: "insert-link",       title: "Insert Link…",            group: "Editor", keywords: ["url"] },
+    { id: "insert-table",      title: "Insert Table",            group: "Editor" },
+    { id: "insert-code",       title: "Insert Code Block",       group: "Editor", keywords: ["snippet"] },
+    { id: "insert-checklist",  title: "Insert Checklist",        group: "Editor", keywords: ["todo", "task"] },
+    { id: "word-wrap",         title: "Toggle Word Wrap",        group: "Editor", shortcut: "Alt+Z" },
+    { id: "format-doc",        title: "Format Document",         group: "Editor", keywords: ["prettify", "beautify"], shortcut: "Shift+Alt+F" },
+    { id: "sort-asc",          title: "Sort Lines Ascending",    group: "Editor" },
+    { id: "sort-desc",         title: "Sort Lines Descending",   group: "Editor" },
+    { id: "toggle-dark-mode",  title: "Toggle Dark Mode",        group: "View", keywords: ["theme", "night", "appearance"], shortcut: "Mod+Shift+L" },
+    { id: "change-accent",     title: "Change Accent Color…",    group: "View", keywords: ["theme", "color"], page: "accent" },
+    { id: "toggle-sidebar",    title: "Toggle Sidebar",          group: "View", shortcut: "Mod+\\" },
+    { id: "toggle-focus-mode", title: "Toggle Focus Mode",       group: "View", keywords: ["zen", "distraction free"] },
+    { id: "zoom-in",           title: "Zoom In",                 group: "View", shortcut: "Mod+=" },
+    { id: "zoom-out",          title: "Zoom Out",                group: "View", shortcut: "Mod+-" },
+    { id: "zoom-reset",        title: "Reset Zoom",              group: "View", shortcut: "Mod+0" },
+    { id: "shortcuts",         title: "Keyboard Shortcuts",      group: "Help", keywords: ["keys", "hotkeys"], shortcut: "Mod+/" },
+    { id: "release-notes",     title: "Release Notes",           group: "Help", keywords: ["changelog", "what's new"] },
+    { id: "feedback",          title: "Send Feedback",           group: "Help" },
+    { id: "about",             title: "About Commander",         group: "Help" },
+  ];
+
+  const ACCENTS = [
+    { id: "accent-indigo",  title: "Indigo",  value: "#5b5bd6" },
+    { id: "accent-emerald", title: "Emerald", value: "#10b981" },
+    { id: "accent-rose",    title: "Rose",    value: "#e11d48" },
+    { id: "accent-amber",   title: "Amber",   value: "#f59e0b" },
+    { id: "accent-sky",     title: "Sky",     value: "#0ea5e9" },
+  ];
+
+  const GROUP_ORDER = ["Navigation", "Notes", "Editor", "View", "Help"];
+  const RECENTS_KEY = "commander.recents";
+  const TITLE_BASE = 1_000_000;
+  const KEYWORD_BASE = 200_000;
+  const EXACT_BONUS = 120_000;
+  const PREFIX_BONUS = 60_000;
+
+  const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
+  const MOD_LABEL = isMac ? "⌘" : "Ctrl";
+
+  const app = document.getElementById("app");
+  const openPaletteButton = document.getElementById("open-palette");
+  const openKeys = document.querySelector("#open-palette .open-keys");
+  const palette = document.getElementById("palette");
+  const palettePanel = document.getElementById("palette-panel");
+  const paletteOverlay = document.getElementById("palette-overlay");
+  const paletteInput = document.getElementById("palette-input");
+  const paletteList = document.getElementById("palette-list");
+  const paletteEmpty = document.getElementById("palette-empty");
+  const paletteHighlight = document.getElementById("palette-highlight");
+  const paletteBreadcrumb = document.getElementById("palette-breadcrumb");
+  const breadcrumbText = paletteBreadcrumb.querySelector(".breadcrumb-text");
+  const paletteCloseButton = document.getElementById("palette-close");
+  const editor = document.getElementById("editor");
+  const editorTitle = document.getElementById("editor-title");
+  const notesList = document.getElementById("notes-list");
+  const navSections = document.getElementById("nav-sections");
+  const viewTitle = document.getElementById("view-title");
+  const toasts = document.getElementById("toasts");
+
+  let paletteOpen = false;
+  let closeTimer = null;
+  let currentPage = null;
+  let lastFocused = null;
+  let currentOptions = [];
+  let activeIndex = -1;
+  let activeEl = null;
+  let recents = loadRecents();
+  let appZoom = 1;
+  let currentView = "Inbox";
+
+  const notes = [
+    {
+      id: "welcome",
+      title: "Welcome to Commander",
+      body: `Welcome to Commander\n\nUse ${isMac ? "⌘K" : "Ctrl K"} or the search button to open the command palette.\n\nThe palette ranks commands as you type: exact prefixes first, then word-start and contiguous matches.\n\nTry:\n- Toggle Dark Mode\n- Change Accent Color\n- New Note`
+    },
+    {
+      id: "roadmap",
+      title: "Q3 planning",
+      body: `## Q3 planning\n\n- Improve command ranking\n- Add richer motion polish\n- Test focus restoration\n- Ship keyboard navigation refinements\n`
+    },
+    {
+      id: "meeting-notes",
+      title: "Design review notes",
+      body: `## Design review\n\nPalette should feel calm and keyboard-first.\nMotion is feedback, not decoration.\n\nOpen the palette with ${isMac ? "⌘K" : "Ctrl K"}.`
+    }
+  ];
+
+  let currentNoteId = notes[0].id;
+  let currentNote = notes[0];
+
+  document.documentElement.dataset.theme = "light";
+  document.documentElement.style.setProperty("--accent", "#5b5bd6");
+  updatePaletteSize();
+
+  appendKeycaps(openKeys, "Mod+K");
+  renderNotes();
+  selectNote(currentNote.id);
+
+  openPaletteButton.addEventListener("click", function () {
+    if (!paletteOpen) openPalette();
+  });
+
+  paletteOverlay.addEventListener("pointerdown", function (event) {
+    if (!paletteOpen) return;
+    if (event.target === paletteOverlay) closePalette();
+  });
+
+  paletteCloseButton.addEventListener("click", function () {
+    closePalette();
+  });
+
+  paletteBreadcrumb.addEventListener("click", function () {
+    if (currentPage) goRoot();
+  });
+
+  paletteInput.addEventListener("input", function () {
+    renderResults({ animateHeight: true });
+  });
+
+  notesList.addEventListener("click", function (event) {
+    const item = event.target.closest("[data-note]");
+    if (!item) return;
+    selectNote(item.dataset.note);
+  });
+
+  navSections.addEventListener("click", function (event) {
+    const item = event.target.closest("[data-view]");
+    if (!item) return;
+    setView(item.dataset.view);
+  });
+
+  editor.addEventListener("input", function () {
+    if (currentNote) currentNote.body = editor.value;
+  });
+
+  document.addEventListener("keydown", onKeyDown);
+  window.addEventListener("resize", updatePaletteSize);
+
+  paletteList.addEventListener("mouseover", function (event) {
+    if (!paletteOpen) return;
+    const option = event.target.closest(".option");
+    if (!option) return;
+    const entry = findOptionEntryByElement(option);
+    if (entry) setActiveIndex(entry.index, true);
+  });
+
+  paletteList.addEventListener("click", function (event) {
+    if (!paletteOpen) return;
+    const option = event.target.closest(".option");
+    if (!option) return;
+    const entry = findOptionEntryByElement(option);
+    if (entry) executeItem(entry.item);
+  });
+
+  function updatePaletteSize() {
+    const max = Math.max(160, Math.min(320, Math.floor(window.innerHeight - 260)));
+    document.documentElement.style.setProperty("--palette-list-max", max + "px");
+  }
+
+  function loadRecents() {
+    try {
+      const raw = localStorage.getItem(RECENTS_KEY);
+      if (!raw) return [];
+      const ids = JSON.parse(raw);
+      if (!Array.isArray(ids)) return [];
+      return ids.filter(function (id) {
+        return COMMANDS.some(function (cmd) { return cmd.id === id; });
+      }).slice(0, 5);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveRecents() {
+    try {
+      localStorage.setItem(RECENTS_KEY, JSON.stringify(recents.slice(0, 5)));
+    } catch (e) {}
+  }
+
+  function recordRecent(id) {
+    if (!COMMANDS.some(function (cmd) { return cmd.id === id; })) return;
+    recents = [id].concat(recents.filter(function (existing) { return existing !== id; })).slice(0, 5);
+    saveRecents();
+  }
+
+  function renderNotes() {
+    notesList.textContent = "";
+    notes.forEach(function (note) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "note-item";
+      button.setAttribute("data-note", note.id);
+      if (note.id === currentNoteId) button.setAttribute("aria-current", "true");
+
+      const title = document.createElement("span");
+      title.className = "note-title";
+      title.textContent = note.title;
+
+      const snippet = document.createElement("span");
+      snippet.className = "note-snippet";
+      const firstLine = String(note.body || "").split(/\r?\n/).find(function (line) { return line.trim().length > 0; }) || "Empty note";
+      snippet.textContent = firstLine.replace(/^#+\s*/, "");
+
+      button.append(title, snippet);
+      notesList.append(button);
+    });
+  }
+
+  function selectNote(id) {
+    currentNote = notes.find(function (n) { return n.id === id; }) || null;
+    currentNoteId = currentNote ? currentNote.id : null;
+    if (currentNote) {
+      editorTitle.textContent = currentNote.title;
+      editor.value = currentNote.body;
+    } else {
+      editorTitle.textContent = "No note selected";
+      editor.value = "";
+    }
+    renderNotes();
+  }
+
+  function setView(name) {
+    currentView = name;
+    viewTitle.textContent = name;
+    navSections.querySelectorAll("[data-view]").forEach(function (item) {
+      item.classList.toggle("active", item.dataset.view === name);
+    });
+  }
+
+  function createNote() {
+    const id = "note-" + Date.now().toString(36);
+    const note = {
+      id: id,
+      title: "Untitled note",
+      body: "Untitled note\n\n"
+    };
+    notes.unshift(note);
+    selectNote(note.id);
+  }
+
+  function deleteNote() {
+    if (!currentNote) return;
+    const idx = notes.findIndex(function (n) { return n.id === currentNote.id; });
+    if (idx < 0) return;
+    notes.splice(idx, 1);
+    selectNote(notes.length ? notes[Math.max(0, Math.min(idx, notes.length - 1))].id : null);
+  }
+
+  function duplicateNote() {
+    if (!currentNote) return;
+    const id = "note-" + Date.now().toString(36);
+    const copy = {
+      id: id,
+      title: currentNote.title + " (copy)",
+      body: currentNote.body
+    };
+    notes.unshift(copy);
+    selectNote(copy.id);
+  }
+
+  function insertText(text) {
+    if (!currentNote) return;
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    editor.setRangeText(text, start, end, "end");
+    currentNote.body = editor.value;
+    editor.focus();
+  }
+
+  function wrapSelection(marker) {
+    if (!currentNote) return;
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const selected = editor.value.slice(start, end) || "text";
+    const replacement = marker + selected + marker;
+    editor.setRangeText(replacement, start, end, "end");
+    currentNote.body = editor.value;
+    editor.focus();
+  }
+
+  function sortLines(descending) {
+    if (!currentNote) return;
+    const lines = String(editor.value).split(/\r?\n/);
+    lines.sort(function (a, b) {
+      const cmp = a.toLowerCase().localeCompare(b.toLowerCase());
+      return descending ? -cmp : cmp;
+    });
+    const next = lines.join("\n");
+    editor.value = next;
+    currentNote.body = next;
+  }
+
+  function formatDocument() {
+    if (!currentNote) return;
+    const next = String(editor.value)
+      .split(/\r?\n/)
+      .map(function (line) { return line.replace(/[ \t]+$/g, ""); })
+      .join("\n");
+    editor.value = next;
+    currentNote.body = next;
+  }
+
+  function toggleWordWrap() {
+    editor.classList.toggle("nowrap");
+  }
+
+  function toggleSidebar() {
+    app.classList.toggle("sidebar-collapsed");
+  }
+
+  function toggleFocusMode() {
+    app.classList.toggle("focus-mode");
+  }
+
+  function toggleDarkMode() {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+  }
+
+  function applyZoom(next) {
+    appZoom = Math.max(0.75, Math.min(1.25, next));
+    app.style.zoom = String(appZoom);
+  }
+
+  function zoomIn() {
+    applyZoom(appZoom * 1.08);
+  }
+
+  function zoomOut() {
+    applyZoom(appZoom / 1.08);
+  }
+
+  function zoomReset() {
+    appZoom = 1;
+    app.style.zoom = "";
+  }
+
+  function applyCommand(cmd) {
+    switch (cmd.id) {
+      case "go-inbox":
+        setView("Inbox");
+        break;
+      case "go-today":
+        setView("Today");
+        break;
+      case "go-archive":
+        setView("Archive");
+        break;
+      case "go-settings":
+        setView("Settings");
+        break;
+      case "new-note":
+      case "new-note-template":
+        createNote();
+        break;
+      case "duplicate-note":
+        duplicateNote();
+        break;
+      case "delete-note":
+        deleteNote();
+        break;
+      case "bold":
+        wrapSelection("**");
+        break;
+      case "italic":
+        wrapSelection("*");
+        break;
+      case "insert-link":
+        insertText("[text](https://example.com)");
+        break;
+      case "insert-table":
+        insertText("\n| Column | Column |\n|---|---|\n| Value | Value |\n");
+        break;
+      case "insert-code":
+        insertText("\n```\ncode here\n```\n");
+        break;
+      case "insert-checklist":
+        insertText("\n- [ ] Task\n- [ ] Task\n");
+        break;
+      case "word-wrap":
+        toggleWordWrap();
+        break;
+      case "format-doc":
+        formatDocument();
+        break;
+      case "sort-asc":
+        sortLines(false);
+        break;
+      case "sort-desc":
+        sortLines(true);
+        break;
+      case "toggle-dark-mode":
+        toggleDarkMode();
+        break;
+      case "toggle-sidebar":
+        toggleSidebar();
+        break;
+      case "toggle-focus-mode":
+        toggleFocusMode();
+        break;
+      case "zoom-in":
+        zoomIn();
+        break;
+      case "zoom-out":
+        zoomOut();
+        break;
+      case "zoom-reset":
+        zoomReset();
+        break;
+      default:
+        break;
+    }
+  }
+
+  function openPalette() {
+    if (paletteOpen) return;
+
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+
+    lastFocused = document.activeElement || openPaletteButton;
+
+    palette.removeAttribute("hidden");
+    palette.classList.remove("closing");
+    palette.classList.add("open");
+
+    cancelElementAnimations(paletteList);
+    cancelElementAnimations(paletteHighlight);
+    paletteList.style.height = "";
+    paletteList.style.overflow = "";
+    paletteList.style.maxHeight = "";
+    paletteList.classList.remove("empty");
+
+    currentPage = null;
+    paletteBreadcrumb.hidden = true;
+    breadcrumbText.textContent = "";
+    paletteInput.value = "";
+    paletteInput.placeholder = "Search commands…";
+    paletteInput.setAttribute("aria-label", "Search commands");
+    paletteInput.setAttribute("aria-expanded", "true");
+
+    paletteOpen = true;
+    paletteInput.focus();
+    renderResults({ animateHeight: false });
+  }
+
+  function closePalette() {
+    if (!paletteOpen) return;
+
+    paletteOpen = false;
+    palette.classList.remove("open");
+    palette.classList.add("closing");
+    paletteInput.setAttribute("aria-expanded", "false");
+    setActiveNone();
+
+    if (closeTimer) clearTimeout(closeTimer);
+    closeTimer = setTimeout(function () {
+      palette.classList.remove("closing");
+      palette.setAttribute("hidden", "");
+      paletteList.style.height = "";
+      paletteList.style.overflow = "";
+      paletteList.style.maxHeight = "";
+      closeTimer = null;
+      restoreFocus();
+    }, 230);
+  }
+
+  function restoreFocus() {
+    try {
+      if (lastFocused && lastFocused.isConnected && typeof lastFocused.focus === "function") {
+        lastFocused.focus();
+      } else {
+        openPaletteButton.focus();
+      }
+    } catch (e) {
+      openPaletteButton.focus();
+    }
+  }
+
+  function openSubPage(page) {
+    currentPage = page;
+    paletteBreadcrumb.hidden = false;
+    breadcrumbText.textContent = page === "accent" ? "Change Accent Color…" : "Sub-page";
+    paletteInput.value = "";
+    paletteInput.placeholder = page === "accent" ? "Search accent colors…" : "Search…";
+    paletteInput.setAttribute("aria-label", page === "accent" ? "Search accent colors" : "Search sub-page");
+    paletteInput.focus();
+    renderResults({ animateHeight: true });
+  }
+
+  function goRoot() {
+    if (!currentPage) return;
+    currentPage = null;
+    paletteBreadcrumb.hidden = true;
+    breadcrumbText.textContent = "";
+    paletteInput.value = "";
+    paletteInput.placeholder = "Search commands…";
+    paletteInput.setAttribute("aria-label", "Search commands");
+    paletteInput.focus();
+    renderResults({ animateHeight: true });
+  }
+
+  function normalizeQuery(query) {
+    return String(query || "").trim().toLowerCase().replace(/\s+/g, "");
+  }
+
+  function isWordChar(ch) {
+    const lower = String(ch).toLowerCase();
+    return (lower >= "a" && lower <= "z") || (lower >= "0" && lower <= "9");
+  }
+
+  function matchScore(queryNorm, targetRaw) {
+    const q = Array.from(queryNorm);
+    const t = Array.from(String(targetRaw).toLowerCase());
+    const targetCompact = String(targetRaw).toLowerCase().replace(/\s+/g, "");
+    const m = q.length;
+    const n = t.length;
+
+    if (!m || !targetCompact.length) return null;
+    if (targetCompact.length < m || n < m) return null;
+
+    const scores = new Float64Array(m * n).fill(-Infinity);
+    const parents = new Int32Array(m * n).fill(-1);
+
+    function charScore(j, contiguous) {
+      let s = 8;
+      if (isWordChar(t[j]) && (j === 0 || !isWordChar(t[j - 1]))) s += 24;
+      if (contiguous) s += 18;
+      return s;
+    }
+
+    for (let j = 0; j < n; j++) {
+      if (q[0] === t[j]) {
+        scores[j] = charScore(j, false);
+      }
+    }
+
+    for (let i = 1; i < m; i++) {
+      const prevOffset = (i - 1) * n;
+      const curOffset = i * n;
+      let bestPrevVal = -Infinity;
+      let bestPrevIdx = -1;
+
+      for (let j = 0; j < n; j++) {
+        if (q[i] === t[j]) {
+          let bestVal = -Infinity;
+          let bestIdx = -1;
+
+          if (bestPrevVal > -Infinity) {
+            const candidate = bestPrevVal + charScore(j, false);
+            if (candidate > bestVal) {
+              bestVal = candidate;
+              bestIdx = bestPrevIdx;
+            }
+          }
+
+          if (j > 0) {
+            const contiguousScore = scores[prevOffset + j - 1];
+            if (contiguousScore > -Infinity) {
+              const candidate = contiguousScore + charScore(j, true);
+              if (candidate > bestVal) {
+                bestVal = candidate;
+                bestIdx = j - 1;
+              }
+            }
+          }
+
+          if (bestVal > -Infinity) {
+            scores[curOffset + j] = bestVal;
+            parents[curOffset + j] = bestIdx;
+          }
+        }
+
+        const prevAtJ = scores[prevOffset + j];
+        if (prevAtJ > bestPrevVal) {
+          bestPrevVal = prevAtJ;
+          bestPrevIdx = j;
+        }
+      }
+    }
+
+    const finalOffset = (m - 1) * n;
+    let bestScore = -Infinity;
+    let bestEnd = -1;
+    for (let j = 0; j < n; j++) {
+      const score = scores[finalOffset + j];
+      if (score > bestScore) {
+        bestScore = score;
+        bestEnd = j;
+      }
+    }
+
+    if (bestEnd < 0 || bestScore === -Infinity) return null;
+
+    const indices = [];
+    let j = bestEnd;
+    for (let i = m - 1; i >= 0; i--) {
+      indices.push(j);
+      const parent = parents[i * n + j];
+      if (i > 0 && parent < 0) return null;
+      j = parent;
+    }
+    indices.reverse();
+
+    let score = bestScore;
+    if (queryNorm === targetCompact) score += EXACT_BONUS;
+    else if (targetCompact.startsWith(queryNorm)) score += PREFIX_BONUS;
+
+    return { score: score, indices: indices };
+  }
+
+  function scoreCommand(cmd, query) {
+    const titleMatch = matchScore(query, cmd.title);
+    if (titleMatch) {
+      return {
+        score: titleMatch.score + TITLE_BASE - cmd.title.length * 0.2,
+        indices: titleMatch.indices
+      };
+    }
+
+    let bestKeyword = null;
+    const keywords = cmd.keywords || [];
+    for (let i = 0; i < keywords.length; i++) {
+      const match = matchScore(query, keywords[i]);
+      if (match && (!bestKeyword || match.score > bestKeyword.score)) {
+        bestKeyword = match;
+      }
+    }
+
+    if (bestKeyword) {
+      return {
+        score: bestKeyword.score + KEYWORD_BASE - cmd.title.length * 0.2,
+        indices: null
+      };
+    }
+
+    return null;
+  }
+
+  function searchCommands(query) {
+    const q = normalizeQuery(query);
+    if (!q) return [];
+
+    const results = [];
+    COMMANDS.forEach(function (cmd, order) {
+      const scored = scoreCommand(cmd, q);
+      if (!scored) return;
+      results.push({
+        command: cmd,
+        title: cmd.title,
+        dataCommand: cmd.id,
+        shortcut: cmd.shortcut,
+        indices: scored.indices,
+        score: scored.score,
+        order: order
+      });
+    });
+
+    results.sort(function (a, b) {
+      return (b.score - a.score) || (a.order - b.order);
+    });
+
+    return results.slice(0, 50);
+  }
+
+  function searchAccents(query) {
+    const q = normalizeQuery(query);
+    const items = [];
+
+    ACCENTS.forEach(function (accent, order) {
+      if (!q) {
+        items.push({
+          accent: accent,
+          title: accent.title,
+          dataCommand: accent.id,
+          swatch: accent.value,
+          score: 0,
+          order: order
+        });
+        return;
+      }
+
+      const match = matchScore(q, accent.title);
+      if (!match) return;
+      items.push({
+        accent: accent,
+        title: accent.title,
+        dataCommand: accent.id,
+        swatch: accent.value,
+        score: match.score,
+        order: order
+      });
+    });
+
+    if (q) {
+      items.sort(function (a, b) {
+        return (b.score - a.score) || (a.order - b.order);
+      });
+    }
+
+    return items.slice(0, 50);
+  }
+
+  function buildItemsForRender(query) {
+    const items = [];
+
+    if (currentPage === "accent") {
+      const matches = searchAccents(query);
+      matches.forEach(function (item) {
+        items.push({
+          kind: "option",
+          item: item
+        });
+      });
+      return items;
+    }
+
+    const normalized = normalizeQuery(query);
+    if (normalized) {
+      const matches = searchCommands(query);
+      matches.forEach(function (item) {
+        items.push({
+          kind: "option",
+          item: item
+        });
+      });
+      return items;
+    }
+
+    if (recents.length) {
+      items.push({ kind: "heading", text: "Recent" });
+      recents.slice(0, 5).forEach(function (id) {
+        const cmd = COMMANDS.find(function (c) { return c.id === id; });
+        if (!cmd) return;
+        items.push({
+          kind: "option",
+          item: {
+            command: cmd,
+            title: cmd.title,
+            dataCommand: cmd.id,
+            shortcut: cmd.shortcut,
+            indices: null
+          }
+        });
+      });
+    }
+
+    GROUP_ORDER.forEach(function (group) {
+      items.push({ kind: "heading", text: group });
+      COMMANDS.filter(function (cmd) { return cmd.group === group; }).forEach(function (cmd) {
+        items.push({
+          kind: "option",
+          item: {
+            command: cmd,
+            title: cmd.title,
+            dataCommand: cmd.id,
+            shortcut: cmd.shortcut,
+            indices: null
+          }
+        });
+      });
+    });
+
+    return items;
+  }
+
+  function clearOptionChildren() {
+    paletteList.querySelectorAll(".option, .group-heading").forEach(function (el) {
+      el.remove();
+    });
+  }
+
+  function sanitizeOptionId(id, index) {
+    return "option-" + index + "-" + String(id).replace(/[^A-Za-z0-9_-]/g, "-");
+  }
+
+  function createOptionElement(item, id) {
+    const option = document.createElement("div");
+    option.className = "option";
+    option.id = id;
+    option.setAttribute("role", "option");
+    option.setAttribute("data-command", item.dataCommand);
+    option.setAttribute("aria-selected", "false");
+
+    const title = document.createElement("div");
+    title.className = "option-title";
+    if (item.indices && item.indices.length) {
+      buildHighlightedText(title, item.title, item.indices);
+    } else {
+      title.textContent = item.title;
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "option-meta";
+
+    if (item.accent && item.swatch) {
+      const swatch = document.createElement("span");
+      swatch.className = "accent-swatch";
+      swatch.style.background = item.swatch;
+      meta.append(swatch);
+    }
+
+    if (item.shortcut) {
+      appendKeycaps(meta, item.shortcut);
+    }
+
+    option.append(title, meta);
+    return option;
+  }
+
+  function buildHighlightedText(container, text, indices) {
+    const set = new Set(indices);
+    let i = 0;
+    while (i < text.length) {
+      if (set.has(i)) {
+        const start = i;
+        while (i < text.length && set.has(i)) i++;
+        const mark = document.createElement("mark");
+        mark.textContent = text.slice(start, i);
+        container.append(mark);
+      } else {
+        const start = i;
+        while (i < text.length && !set.has(i)) i++;
+        container.append(document.createTextNode(text.slice(start, i)));
+      }
+    }
+  }
+
+  function appendKeycaps(container, shortcut) {
+    if (!container || !shortcut) return;
+    shortcut.split("+").forEach(function (part) {
+      let label = part;
+      if (part === "Mod") label = MOD_LABEL;
+      else if (part === "Shift") label = "⇧";
+      else if (part === "Alt") label = isMac ? "⌥" : "Alt";
+
+      const span = document.createElement("span");
+      span.className = "keycap";
+      span.textContent = label;
+      container.append(span);
+    });
+  }
+
+  function renderResults(options) {
+    const animateHeight = options && options.animateHeight === true;
+    cancelElementAnimations(paletteList);
+    cancelElementAnimations(paletteHighlight);
+
+    const oldHeight = paletteList.offsetHeight;
+    const animateThis = animateHeight && !prefersReducedMotion() && oldHeight > 0;
+
+    if (oldHeight <= 0) {
+      paletteList.style.height = "";
+      paletteList.style.overflow = "";
+      paletteList.style.maxHeight = "";
+      paletteList.classList.remove("empty");
+    }
+
+    if (animateThis) {
+      paletteList.style.overflow = "hidden";
+      paletteList.style.height = oldHeight + "px";
+      paletteList.style.maxHeight = "none";
+    } else {
+      paletteList.style.height = "";
+      paletteList.style.overflow = "";
+      paletteList.style.maxHeight = "";
+      paletteList.classList.remove("empty");
+    }
+
+    clearOptionChildren();
+    currentOptions = [];
+    activeIndex = -1;
+    activeEl = null;
+
+    const query = paletteInput.value;
+    const items = buildItemsForRender(query);
+    let optionCount = 0;
+
+    items.forEach(function (entry) {
+      if (entry.kind === "heading") {
+        const heading = document.createElement("div");
+        heading.className = "group-heading";
+        heading.setAttribute("role", "presentation");
+        heading.textContent = entry.text;
+        paletteList.append(heading);
+      } else {
+        const id = sanitizeOptionId(entry.item.dataCommand, optionCount);
+        const option = createOptionElement(entry.item, id);
+        paletteList.append(option);
+        currentOptions.push({
+          item: entry.item,
+          el: option,
+          index: optionCount
+        });
+        optionCount++;
+      }
+    });
+
+    if (currentOptions.length) {
+      paletteEmpty.hidden = true;
+      setActiveIndex(0, false);
+    } else {
+      paletteEmpty.hidden = false;
+      paletteEmpty.textContent = currentPage === "accent" ? "No matching colors" : "No matching commands";
+      setActiveNone();
+    }
+
+    if (animateThis) {
+      const natural = measureNaturalListHeight();
+      const target = Math.max(0, Math.min(natural, getMaxListHeight()));
+      const anim = paletteList.animate(
+        [
+          { height: oldHeight + "px" },
+          { height: target + "px" }
+        ],
+        {
+          duration: 190,
+          easing: "cubic-bezier(.2, 0, .1, 1)"
+        }
+      );
+      anim.onfinish = function () {
+        if (currentOptions.length) {
+          paletteList.style.height = "";
+          paletteList.style.overflow = "";
+          paletteList.style.maxHeight = "";
+          if (activeEl) {
+            try { activeEl.scrollIntoView({ block: "nearest" }); } catch (e) {}
+          }
+        } else {
+          paletteList.classList.add("empty");
+          paletteList.style.height = "0px";
+          paletteList.style.overflow = "hidden";
+          paletteList.style.maxHeight = "none";
+        }
+      };
+    } else {
+      if (!currentOptions.length) {
+        paletteList.classList.add("empty");
+        paletteList.style.height = "0px";
+        paletteList.style.overflow = "hidden";
+        paletteList.style.maxHeight = "none";
+      } else {
+        paletteList.style.height = "";
+        paletteList.style.overflow = "";
+      }
+    }
+  }
+
+  function measureNaturalListHeight() {
+    let bottom = 0;
+    paletteList.querySelectorAll(".option, .group-heading").forEach(function (el) {
+      bottom = Math.max(bottom, el.offsetTop + el.offsetHeight);
+    });
+    const cs = getComputedStyle(paletteList);
+    const padBottom = parseFloat(cs.paddingBottom) || 0;
+    return bottom + padBottom;
+  }
+
+  function getMaxListHeight() {
+    return Math.max(160, Math.min(320, Math.floor(window.innerHeight - 260)));
+  }
+
+  function setActiveIndex(index, animate) {
+    if (index < 0 || index >= currentOptions.length) {
+      setActiveNone();
+      return;
+    }
+
+    const previousIndex = activeIndex;
+    const previousEl = activeEl;
+    if (previousIndex === index) return;
+
+    if (previousEl) previousEl.setAttribute("aria-selected", "false");
+
+    activeIndex = index;
+    activeEl = currentOptions[index].el;
+    activeEl.setAttribute("aria-selected", "true");
+    paletteInput.setAttribute("aria-activedescendant", activeEl.id);
+
+    if (animate && !prefersReducedMotion() && previousEl) {
+      moveHighlight(previousEl, activeEl);
+    } else {
+      setHighlight(activeEl);
+    }
+
+    try {
+      activeEl.scrollIntoView({ block: "nearest" });
+    } catch (e) {}
+  }
+
+  function setActiveNone() {
+    if (activeEl) activeEl.setAttribute("aria-selected", "false");
+    activeIndex = -1;
+    activeEl = null;
+    paletteInput.removeAttribute("aria-activedescendant");
+    hideHighlight();
+  }
+
+  function setHighlight(el) {
+    if (!el || prefersReducedMotion()) return;
+    cancelElementAnimations(paletteHighlight);
+    paletteHighlight.style.opacity = "1";
+    paletteHighlight.style.top = el.offsetTop + "px";
+    paletteHighlight.style.height = el.offsetHeight + "px";
+  }
+
+  function moveHighlight(oldEl, newEl) {
+    if (!oldEl || !newEl || prefersReducedMotion()) return;
+
+    const oldTop = oldEl.offsetTop;
+    const oldHeight = oldEl.offsetHeight;
+    const newTop = newEl.offsetTop;
+    const newHeight = newEl.offsetHeight;
+
+    if (!Number.isFinite(oldTop) || !Number.isFinite(oldHeight) || !Number.isFinite(newTop) || !Number.isFinite(newHeight)) {
+      setHighlight(newEl);
+      return;
+    }
+
+    cancelElementAnimations(paletteHighlight);
+    paletteHighlight.style.opacity = "1";
+
+    const anim = paletteHighlight.animate(
+      [
+        { top: oldTop + "px", height: oldHeight + "px" },
+        { top: newTop + "px", height: newHeight + "px" }
+      ],
+      {
+        duration: 130,
+        easing: "cubic-bezier(.2, 0, .1, 1)"
+      }
+    );
+
+    anim.onfinish = function () {
+      paletteHighlight.style.top = newTop + "px";
+      paletteHighlight.style.height = newHeight + "px";
+    };
+  }
+
+  function hideHighlight() {
+    cancelElementAnimations(paletteHighlight);
+    paletteHighlight.style.opacity = "0";
+    paletteHighlight.style.height = "0";
+    paletteHighlight.style.top = "0";
+  }
+
+  function findOptionEntryByElement(el) {
+    return currentOptions.find(function (entry) { return entry.el === el; }) || null;
+  }
+
+  function navigateActive(delta) {
+    if (!currentOptions.length) return;
+    let next = activeIndex;
+    if (next < 0) next = 0;
+    else next = (next + delta + currentOptions.length) % currentOptions.length;
+    setActiveIndex(next, true);
+  }
+
+  function executeActive() {
+    if (activeIndex < 0 || !currentOptions[activeIndex]) return;
+    executeItem(currentOptions[activeIndex].item);
+  }
+
+  function executeItem(item) {
+    if (!item) return;
+
+    if (item.accent) {
+      selectAccent(item.accent);
+      return;
+    }
+
+    const cmd = item.command;
+    if (!cmd) return;
+
+    if (cmd.id === "change-accent" || cmd.page === "accent") {
+      openSubPage("accent");
+      return;
+    }
+
+    applyCommand(cmd);
+    recordRecent(cmd.id);
+    closePalette();
+    showToast(cmd.title);
+  }
+
+  function selectAccent(accent) {
+    document.documentElement.style.setProperty("--accent", accent.value);
+    recordRecent("change-accent");
+    closePalette();
+    showToast("Change Accent Color…");
+  }
+
+  function onKeyDown(event) {
+    const modifierPressed = isMac ? event.metaKey : event.ctrlKey;
+
+    if (modifierPressed && (event.key === "k" || event.key === "K")) {
+      event.preventDefault();
+      if (paletteOpen) closePalette();
+      else openPalette();
+      return;
+    }
+
+    if (!paletteOpen) return;
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      if (currentPage) goRoot();
+      else closePalette();
+      return;
+    }
+
+    if (currentPage === "accent" && event.key === "Backspace" && paletteInput.value === "") {
+      event.preventDefault();
+      goRoot();
+      return;
+    }
+
+    if (event.key === "Tab") {
+      event.preventDefault();
+      const focusables = [paletteInput, paletteCloseButton];
+      const index = focusables.indexOf(document.activeElement);
+      if (index === -1) {
+        paletteInput.focus();
+        return;
+      }
+      const direction = event.shiftKey ? -1 : 1;
+      const next = (index + direction + focusables.length) % focusables.length;
+      focusables[next].focus();
+      return;
+    }
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (document.activeElement !== paletteInput) paletteInput.focus();
+      navigateActive(event.key === "ArrowDown" ? 1 : -1);
+      return;
+    }
+
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      if (!currentOptions.length) return;
+      setActiveIndex(event.key === "Home" ? 0 : currentOptions.length - 1, true);
+      return;
+    }
+
+    if (event.key === "Enter") {
+      if (document.activeElement === paletteInput) {
+        event.preventDefault();
+        executeActive();
+      }
+    }
+  }
+
+  function showToast(title) {
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.setAttribute("data-toast", title);
+
+    const dot = document.createElement("span");
+    dot.className = "toast-dot";
+    dot.setAttribute("aria-hidden", "true");
+
+    const text = document.createElement("span");
+    text.className = "toast-text";
+    text.textContent = title;
+
+    toast.append(dot, text);
+    toasts.append(toast);
+
+    setTimeout(function () {
+      toast.classList.add("hide");
+    }, 3000);
+
+    setTimeout(function () {
+      if (toast.parentNode) toast.remove();
+    }, 3260);
+  }
+
+  function cancelElementAnimations(element) {
+    if (!element || typeof element.getAnimations !== "function") return;
+    element.getAnimations().forEach(function (animation) {
+      animation.cancel();
+    });
+  }
+
+  function prefersReducedMotion() {
+    try {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch (e) {
+      return false;
+    }
+  }
+})();
+</script>
+</body>
+</html>

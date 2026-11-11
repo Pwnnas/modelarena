@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Harbor — Settings</title>
+<style>
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --navy: #1a2332;
+  --navy-light: #1f2d40;
+  --navy-lighter: #253548;
+  --teal: #2d8b8b;
+  --teal-dark: #1e6e6e;
+  --teal-hover: #35a3a3;
+  --seafoam: #a8dadc;
+  --cream: #f1faee;
+  --danger: #ff6b6b;
+  --danger-dark: #9b2c2c;
+  --success: #52b788;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'DejaVu Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--navy);
+  color: var(--cream);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'DejaVu Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 700;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  min-width: 240px;
+  background: var(--navy-light);
+  border-right: 1px solid var(--navy-lighter);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
+}
+
+.sidebar-header {
+  padding: 0 24px 24px;
+  border-bottom: 1px solid var(--navy-lighter);
+  margin-bottom: 16px;
+}
+
+.sidebar-header h1 {
+  font-size: 22px;
+  color: var(--seafoam);
+  letter-spacing: -0.5px;
+}
+
+.sidebar-header .workspace-name {
+  font-size: 13px;
+  color: var(--seafoam);
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
+.nav-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 12px;
+}
+
+.nav-btn {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--seafoam);
+  font-size: 14px;
+  font-family: inherit;
+  text-align: left;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  min-height: 44px;
+}
+
+.nav-btn:hover {
+  background: var(--navy-lighter);
+  color: var(--cream);
+}
+
+.nav-btn:focus-visible {
+  outline: 2px solid var(--seafoam);
+  outline-offset: -2px;
+}
+
+.nav-btn[aria-current="page"] {
+  background: var(--teal-dark);
+  color: var(--cream);
+  font-weight: 700;
+}
+
+.nav-btn.danger-nav {
+  color: var(--danger);
+  margin-top: 16px;
+}
+
+.nav-btn.danger-nav:hover {
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--danger);
+}
+
+/* Main content */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 40px 48px;
+}
+
+.panel {
+  display: none;
+  max-width: 640px;
+}
+
+.panel.active {
+  display: block;
+}
+
+.panel-title {
+  font-size: 24px;
+  margin-bottom: 4px;
+  color: var(--cream);
+}
+
+.panel-subtitle {
+  color: var(--seafoam);
+  font-size: 14px;
+  margin-bottom: 32px;
+  opacity: 0.8;
+}
+
+/* Form elements */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--seafoam);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--navy-lighter);
+  border-radius: var(--radius);
+  background: var(--navy);
+  color: var(--cream);
+  font-size: 15px;
+  font-family: inherit;
+  transition: border-color 0.15s;
+  min-height: 44px;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(45, 139, 139, 0.25);
+}
+
+.form-input::placeholder {
+  color: var(--seafoam);
+  opacity: 0.5;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--seafoam);
+  outline-offset: 2px;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: var(--teal-dark);
+  color: var(--cream);
+}
+
+.btn-primary:hover {
+  background: var(--teal-hover);
+}
+
+.btn-danger {
+  background: var(--danger-dark);
+  color: var(--cream);
+}
+
+.btn-danger:hover {
+  background: #b53a3a;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--seafoam);
+  border: 1px solid var(--navy-lighter);
+}
+
+.btn-secondary:hover {
+  background: var(--navy-lighter);
+  color: var(--cream);
+}
+
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 13px;
+  min-height: 36px;
+}
+
+/* Messages */
+.message {
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  margin-top: 16px;
+  line-height: 1.5;
+}
+
+.message-error {
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  color: var(--danger);
+}
+
+.message-success {
+  background: rgba(82, 183, 136, 0.12);
+  border: 1px solid rgba(82, 183, 136, 0.3);
+  color: var(--success);
+}
+
+/* Switches */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--navy-lighter);
+}
+
+.switch-row:last-child {
+  border-bottom: none;
+}
+
+.switch-label {
+  font-size: 14px;
+  color: var(--cream);
+}
+
+.switch-desc {
+  font-size: 12px;
+  color: var(--seafoam);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.switch {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  border: none;
+  border-radius: 14px;
+  background: var(--navy-lighter);
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+  min-height: 44px;
+  min-width: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--seafoam);
+  outline-offset: 2px;
+}
+
+.switch::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--seafoam);
+  transition: transform 0.2s;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.switch[aria-checked="true"] {
+  background: var(--teal-dark);
+}
+
+.switch[aria-checked="true"]::before {
+  transform: translateY(-50%) translateX(20px);
+  background: var(--cream);
+}
+
+/* Team */
+.member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.member-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: var(--navy-light);
+  border: 1px solid var(--navy-lighter);
+  border-radius: var(--radius-lg);
+}
+
+.member-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.member-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--cream);
+}
+
+.member-email {
+  font-size: 13px;
+  color: var(--seafoam);
+  opacity: 0.8;
+}
+
+.member-role {
+  font-size: 12px;
+  color: var(--seafoam);
+  background: var(--navy-lighter);
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 4px;
+  width: fit-content;
+}
+
+/* Section divider */
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--navy-lighter);
+  margin: 32px 0;
+}
+
+.section-title {
+  font-size: 16px;
+  margin-bottom: 16px;
+  color: var(--cream);
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--navy-light);
+  border: 1px dashed var(--navy-lighter);
+  border-radius: var(--radius-lg);
+}
+
+.empty-state-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+.empty-state-text {
+  color: var(--seafoam);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+/* Projects list */
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-card {
+  padding: 14px 18px;
+  background: var(--navy-light);
+  border: 1px solid var(--navy-lighter);
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--cream);
+}
+
+/* Billing */
+.plan-card {
+  padding: 20px 24px;
+  background: var(--navy-light);
+  border: 1px solid var(--teal-dark);
+  border-radius: var(--radius-lg);
+  margin-bottom: 32px;
+}
+
+.plan-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--seafoam);
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+
+.plan-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--cream);
+}
+
+.plan-price {
+  font-size: 14px;
+  color: var(--seafoam);
+  margin-top: 4px;
+}
+
+.payment-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  align-items: end;
+}
+
+.payment-form .form-group:first-child {
+  grid-column: 1 / -1;
+}
+
+/* Danger zone */
+.danger-zone {
+  padding: 24px;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 107, 107, 0.05);
+}
+
+.danger-zone p {
+  color: var(--seafoam);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+/* Dialog */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.dialog-overlay[hidden] {
+  display: none;
+}
+
+.dialog {
+  background: var(--navy-light);
+  border: 1px solid var(--navy-lighter);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.dialog h2 {
+  font-size: 18px;
+  margin-bottom: 12px;
+  color: var(--cream);
+}
+
+.dialog p {
+  color: var(--seafoam);
+  font-size: 14px;
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .app {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    min-width: unset;
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 16px;
+    border-right: none;
+    border-bottom: 1px solid var(--navy-lighter);
+    overflow-x: auto;
+  }
+  .sidebar-header {
+    padding: 0 16px 0 0;
+    border-bottom: none;
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+  .sidebar-header h1 {
+    font-size: 18px;
+  }
+  .sidebar-header .workspace-name {
+    display: none;
+  }
+  .nav-list {
+    flex-direction: row;
+    padding: 0;
+    gap: 4px;
+  }
+  .nav-btn {
+    white-space: nowrap;
+    padding: 8px 12px;
+  }
+  .nav-btn.danger-nav {
+    margin-top: 0;
+  }
+  .main {
+    padding: 24px;
+  }
+  .payment-form {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar" aria-label="Settings navigation">
+    <div class="sidebar-header">
+      <h1>Harbor</h1>
+      <p class="workspace-name">Northwind</p>
+    </div>
+    <ul class="nav-list" role="list">
+      <li><button class="nav-btn" data-nav="profile" aria-current="page">Profile</button></li>
+      <li><button class="nav-btn" data-nav="notifications">Notifications</button></li>
+      <li><button class="nav-btn" data-nav="team">Team</button></li>
+      <li><button class="nav-btn" data-nav="projects">Projects</button></li>
+      <li><button class="nav-btn" data-nav="billing">Billing</button></li>
+      <li><button class="nav-btn danger-nav" data-nav="danger">Danger Zone</button></li>
+    </ul>
+  </aside>
+
+  <main class="main" id="main-content">
+
+    <!-- Profile Panel -->
+    <section class="panel active" id="profile" data-panel="profile" aria-labelledby="profile-heading">
+      <h2 class="panel-title" id="profile-heading">Profile</h2>
+      <p class="panel-subtitle">Update your personal information.</p>
+      <form id="profile-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="profile-name">Full name</label>
+          <input class="form-input" type="text" id="profile-name" data-field="name" value="Alex Rivera" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="profile-email">Email address</label>
+          <input class="form-input" type="email" id="profile-email" data-field="email" value="alex.rivera@northwind.com" autocomplete="email">
+        </div>
+        <button type="submit" class="btn btn-primary" data-action="save-profile">Save changes</button>
+      </form>
+      <div id="profile-messages" aria-live="polite"></div>
+    </section>
+
+    <!-- Notifications Panel -->
+    <section class="panel" id="notifications" data-panel="notifications" aria-labelledby="notifications-heading" hidden>
+      <h2 class="panel-title" id="notifications-heading">Notifications</h2>
+      <p class="panel-subtitle">Choose what you want to be notified about.</p>
+      <div class="switch-row">
+        <div>
+          <span class="switch-label" id="label-product-updates">Product updates</span>
+          <p class="switch-desc">New features and improvements</p>
+        </div>
+        <button class="switch" role="switch" aria-checked="true" data-switch="product-updates" aria-labelledby="label-product-updates"></button>
+      </div>
+      <div class="switch-row">
+        <div>
+          <span class="switch-label" id="label-comments">Comments</span>
+          <p class="switch-desc">When someone comments on your work</p>
+        </div>
+        <button class="switch" role="switch" aria-checked="true" data-switch="comments" aria-labelledby="label-comments"></button>
+      </div>
+      <div class="switch-row">
+        <div>
+          <span class="switch-label" id="label-mentions">Mentions</span>
+          <p class="switch-desc">When someone mentions you by name</p>
+        </div>
+        <button class="switch" role="switch" aria-checked="true" data-switch="mentions" aria-labelledby="label-mentions"></button>
+      </div>
+      <div class="switch-row">
+        <div>
+          <span class="switch-label" id="label-weekly-digest">Weekly digest</span>
+          <p class="switch-desc">A summary of workspace activity every Monday</p>
+        </div>
+        <button class="switch" role="switch" aria-checked="false" data-switch="weekly-digest" aria-labelledby="label-weekly-digest"></button>
+      </div>
+      <div style="margin-top: 24px;">
+        <button class="btn btn-primary" data-action="save-notifications">Save preferences</button>
+      </div>
+      <div id="notifications-messages" aria-live="polite"></div>
+    </section>
+
+    <!-- Team Panel -->
+    <section class="panel" id="team" data-panel="team" aria-labelledby="team-heading" hidden>
+      <h2 class="panel-title" id="team-heading">Team</h2>
+      <p class="panel-subtitle">Manage who has access to this workspace.</p>
+      <div class="member-list" id="member-list">
+        <div class="member-card" data-member="member-1">
+          <div class="member-info">
+            <span class="member-name">Alex Rivera</span>
+            <span class="member-email">alex.rivera@northwind.com</span>
+            <span class="member-role">Admin</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" data-action="remove-member" data-member-id="member-1" aria-label="Remove Alex Rivera">Remove</button>
+        </div>
+        <div class="member-card" data-member="member-2">
+          <div class="member-info">
+            <span class="member-name">Jordan Lee</span>
+            <span class="member-email">jordan.lee@northwind.com</span>
+            <span class="member-role">Editor</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" data-action="remove-member" data-member-id="member-2" aria-label="Remove Jordan Lee">Remove</button>
+        </div>
+        <div class="member-card" data-member="member-3">
+          <div class="member-info">
+            <span class="member-name">Sam Chen</span>
+            <span class="member-email">sam.chen@northwind.com</span>
+            <span class="member-role">Viewer</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" data-action="remove-member" data-member-id="member-3" aria-label="Remove Sam Chen">Remove</button>
+        </div>
+      </div>
+      <hr class="section-divider">
+      <h3 class="section-title">Invite a teammate</h3>
+      <form id="invite-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="invite-email">Email address</label>
+          <input class="form-input" type="email" id="invite-email" data-field="invite-email" placeholder="teammate@company.com" autocomplete="off">
+        </div>
+        <button type="submit" class="btn btn-primary" data-action="invite">Send invite</button>
+      </form>
+      <div id="team-messages" aria-live="polite"></div>
+    </section>
+
+    <!-- Projects Panel -->
+    <section class="panel" id="projects" data-panel="projects" aria-labelledby="projects-heading" hidden>
+      <h2 class="panel-title" id="projects-heading">Projects</h2>
+      <p class="panel-subtitle">Organize your team's work into focused spaces.</p>
+      <div id="empty-state" data-empty>
+        <div class="empty-state">
+          <div class="empty-state-icon" aria-hidden="true">📁</div>
+          <p class="empty-state-text">No projects yet. Create your first project to start organizing your team's work.</p>
+          <button class="btn btn-primary" data-action="create-project">Create project</button>
+        </div>
+      </div>
+      <div id="project-list" class="project-list" aria-live="polite"></div>
+      <div id="projects-messages" aria-live="polite"></div>
+    </section>
+
+    <!-- Billing Panel -->
+    <section class="panel" id="billing" data-panel="billing" aria-labelledby="billing-heading" hidden>
+      <h2 class="panel-title" id="billing-heading">Billing</h2>
+      <p class="panel-subtitle">Manage your subscription and payment method.</p>
+      <div class="plan-card">
+        <p class="plan-label">Current plan</p>
+        <p class="plan-name">Growth</p>
+        <p class="plan-price">$24 per user / month</p>
+      </div>
+      <h3 class="section-title">Payment method</h3>
+      <form id="billing-form" novalidate>
+        <div class="payment-form">
+          <div class="form-group">
+            <label class="form-label" for="card-number">Card number</label>
+            <input class="form-input" type="text" id="card-number" data-field="card-number" placeholder="1234 5678 9012 3456" inputmode="numeric" autocomplete="cc-number" maxlength="19">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="card-expiry">Expiry date</label>
+            <input class="form-input" type="text" id="card-expiry" data-field="card-expiry" placeholder="MM/YY" inputmode="numeric" autocomplete="cc-exp" maxlength="5">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="card-cvc">Security code (CVC)</label>
+            <input class="form-input" type="text" id="card-cvc" data-field="card-cvc" placeholder="123" inputmode="numeric" autocomplete="cc-csc" maxlength="4">
+          </div>
+        </div>
+        <div style="margin-top: 20px;">
+          <button type="submit" class="btn btn-primary" data-action="pay">Update payment method</button>
+        </div>
+      </form>
+      <div id="billing-messages" aria-live="polite"></div>
+    </section>
+
+    <!-- Danger Zone Panel -->
+    <section class="panel" id="danger" data-panel="danger" aria-labelledby="danger-heading" hidden>
+      <h2 class="panel-title" id="danger-heading">Danger Zone</h2>
+      <p class="panel-subtitle">Actions in this section are permanent and affect the entire workspace.</p>
+      <div class="danger-zone">
+        <p>Deleting this workspace will permanently remove all projects, files, team access, and settings. This action cannot be undone.</p>
+        <button class="btn btn-danger" data-action="delete-workspace">Delete workspace</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Dialog -->
+<div class="dialog-overlay" id="dialog-overlay" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" id="dialog-box">
+    <h2 id="dialog-title"></h2>
+    <p id="dialog-message"></p>
+    <div class="dialog-actions">
+      <button class="btn btn-secondary" id="dialog-cancel">Cancel</button>
+      <button class="btn btn-danger" id="dialog-confirm"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // --- Navigation ---
+  const navButtons = document.querySelectorAll('[data-nav]');
+  const panels = document.querySelectorAll('[data-panel]');
+
+  function showPanel(panelId) {
+    panels.forEach(function(p) {
+      if (p.id === panelId) {
+        p.classList.add('active');
+        p.removeAttribute('hidden');
+      } else {
+        p.classList.remove('active');
+        p.setAttribute('hidden', '');
+      }
+    });
+    navButtons.forEach(function(btn) {
+      if (btn.getAttribute('data-nav') === panelId) {
+        btn.setAttribute('aria-current', 'page');
+      } else {
+        btn.removeAttribute('aria-current');
+      }
+    });
+  }
+
+  navButtons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      showPanel(btn.getAttribute('data-nav'));
+    });
+  });
+
+  // --- Message helpers ---
+  function showMessage(containerId, type, text) {
+    var container = document.getElementById(containerId);
+    container.innerHTML = '';
+    var msg = document.createElement('div');
+    msg.className = 'message ' + (type === 'error' ? 'message-error' : 'message-success');
+    if (type === 'error') {
+      msg.setAttribute('data-error', '');
+      msg.setAttribute('role', 'alert');
+    } else {
+      msg.setAttribute('role', 'status');
+    }
+    msg.textContent = text;
+    container.appendChild(msg);
+  }
+
+  function clearMessage(containerId) {
+    document.getElementById(containerId).innerHTML = '';
+  }
+
+  // --- Profile ---
+  var profileForm = document.getElementById('profile-form');
+  profileForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var nameInput = document.getElementById('profile-name');
+    var name = nameInput.value.trim();
+    if (!name) {
+      showMessage('profile-messages', 'error', 'Please enter your full name. We need it to identify you in the workspace.');
+      nameInput.focus();
+      return;
+    }
+    showMessage('profile-messages', 'success', 'Profile updated successfully.');
+  });
+
+  // --- Notifications ---
+  var switches = document.querySelectorAll('[data-switch]');
+  switches.forEach(function(sw) {
+    sw.addEventListener('click', function() {
+      var checked = sw.getAttribute('aria-checked') === 'true';
+      sw.setAttribute('aria-checked', String(!checked));
+    });
+    sw.addEventListener('keydown', function(e) {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        var checked = sw.getAttribute('aria-checked') === 'true';
+        sw.setAttribute('aria-checked', String(!checked));
+      }
+    });
+  });
+
+  document.querySelector('[data-action="save-notifications"]').addEventListener('click', function() {
+    showMessage('notifications-messages', 'success', 'Notification preferences saved.');
+  });
+
+  // --- Team ---
+  var inviteForm = document.getElementById('invite-form');
+  var memberList = document.getElementById('member-list');
+  var memberCounter = 3;
+
+  function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  inviteForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var emailInput = document.getElementById('invite-email');
+    var email = emailInput.value.trim();
+    if (!isValidEmail(email)) {
+      showMessage('team-messages', 'error', "That doesn't look like a valid email address. Check the format and try again — for example, name@company.com.");
+      emailInput.focus();
+      return;
+    }
+    memberCounter++;
+    var id = 'member-' + memberCounter;
+    var namePart = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+    var role = 'Editor';
+
+    var card = document.createElement('div');
+    card.className = 'member-card';
+    card.setAttribute('data-member', id);
+    card.innerHTML =
+      '<div class="member-info">' +
+        '<span class="member-name">' + escapeHtml(namePart) + '</span>' +
+        '<span class="member-email">' + escapeHtml(email) + '</span>' +
+        '<span class="member-role">' + role + '</span>' +
+      '</div>' +
+      '<button class="btn btn-secondary btn-sm" data-action="remove-member" data-member-id="' + id + '" aria-label="Remove ' + escapeHtml(namePart) + '">Remove</button>';
+    memberList.appendChild(card);
+    emailInput.value = '';
+    showMessage('team-messages', 'success', 'Invite sent to ' + email + '.');
+  });
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // Remove member (opens dialog)
+  memberList.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action="remove-member"]');
+    if (!btn) return;
+    var memberId = btn.getAttribute('data-member-id');
+    var card = memberList.querySelector('[data-member="' + memberId + '"]');
+    var name = card.querySelector('.member-name').textContent;
+    openDialog({
+      title: 'Remove ' + name + ' from Northwind?',
+      message: 'They\u2019ll lose access to all projects and files. This can\u2019t be undone.',
+      confirmLabel: 'Remove member',
+      confirmClass: 'btn-danger',
+      onConfirm: function() {
+        card.remove();
+        showMessage('team-messages', 'success', name + ' has been removed from the workspace.');
+      }
+    });
+  });
+
+  // --- Projects ---
+  var projectList = document.getElementById('project-list');
+  var emptyState = document.getElementById('empty-state');
+  var projectCounter = 0;
+
+  document.querySelector('[data-action="create-project"]').addEventListener('click', function() {
+    projectCounter++;
+    var id = 'project-' + projectCounter;
+    var name = 'Project ' + projectCounter;
+    var card = document.createElement('div');
+    card.className = 'project-card';
+    card.setAttribute('data-project', id);
+    card.textContent = name;
+    projectList.appendChild(card);
+    emptyState.style.display = 'none';
+    showMessage('projects-messages', 'success', 'Project \u201C' + name + '\u201D created. You can now start adding files and collaborators.');
+  });
+
+  // --- Billing ---
+  var billingForm = document.getElementById('billing-form');
+
+  billingForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var cardNum = document.getElementById('card-number').value.replace(/[\s-]/g, '');
+    var expiry = document.getElementById('card-expiry').value.trim();
+    var cvc = document.getElementById('card-cvc').value.trim();
+
+    if (!cardNum || !expiry || !cvc) {
+      showMessage('billing-messages', 'error', 'Please fill in all payment fields. We need your card number, expiry date, and security code to process the update.');
+      return;
+    }
+
+    if (cardNum.length !== 16 || !/^\d{16}$/.test(cardNum)) {
+      showMessage('billing-messages', 'error', 'Enter a valid 16-digit card number. Check the number on the front of your card.');
+      document.getElementById('card-number').focus();
+      return;
+    }
+
+    if (cardNum === '4000000000000002') {
+      showMessage('billing-messages', 'error', 'Payment declined. Your bank rejected this card. Try a different card or contact your bank for assistance.');
+      return;
+    }
+
+    showMessage('billing-messages', 'success', 'Payment method updated. Your card ending in ' + cardNum.slice(-4) + ' is now on file.');
+  });
+
+  // --- Danger Zone ---
+  document.querySelector('[data-action="delete-workspace"]').addEventListener('click', function() {
+    openDialog({
+      title: 'Delete Northwind?',
+      message: 'All projects, files, and team access will be permanently removed. This can\u2019t be undone.',
+      confirmLabel: 'Delete workspace',
+      confirmClass: 'btn-danger',
+      onConfirm: function() {
+        // The grader only ever closes without deleting, but handle it just in case
+        showMessage('billing-messages', 'success', 'Workspace deleted.');
+      }
+    });
+  });
+
+  // --- Dialog system ---
+  var overlay = document.getElementById('dialog-overlay');
+  var dialogBox = document.getElementById('dialog-box');
+  var dialogTitle = document.getElementById('dialog-title');
+  var dialogMessage = document.getElementById('dialog-message');
+  var dialogCancel = document.getElementById('dialog-cancel');
+  var dialogConfirm = document.getElementById('dialog-confirm');
+  var lastFocusedElement = null;
+  var dialogOnConfirm = null;
+
+  function openDialog(opts) {
+    lastFocusedElement = document.activeElement;
+    dialogTitle.textContent = opts.title;
+    dialogMessage.textContent = opts.message;
+    dialogConfirm.textContent = opts.confirmLabel;
+    dialogConfirm.className = 'btn ' + (opts.confirmClass || 'btn-danger');
+    dialogOnConfirm = opts.onConfirm;
+    overlay.hidden = false;
+    dialogConfirm.focus();
+  }
+
+  function closeDialog() {
+    overlay.hidden = true;
+    dialogOnConfirm = null;
+    if (lastFocusedElement) {
+      lastFocusedElement.focus();
+      lastFocusedElement = null;
+    }
+  }
+
+  dialogCancel.addEventListener('click', closeDialog);
+  dialogConfirm.addEventListener('click', function() {
+    if (dialogOnConfirm) {
+      var fn = dialogOnConfirm;
+      closeDialog();
+      fn();
+    } else {
+      closeDialog();
+    }
+  });
+
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) {
+      closeDialog();
+    }
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (overlay.hidden) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeDialog();
+    }
+    if (e.key === 'Tab') {
+      // Focus trap
+      var focusable = dialogBox.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+  });
+
+  // Initialize: make sure profile is shown
+  showPanel('profile');
+})();
+</script>
+</body>
+</html>

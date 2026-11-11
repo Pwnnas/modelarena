@@ -4,7 +4,7 @@ import zlib from 'node:zlib';
 export const meta = {
   title: 'Relay',
   subtitle: 'Binary protocol decoder + capture explorer',
-  order: 8,
+  order: 9,
   suite: 'v2',
   skills: ['tool use: multi-step decoding', 'binary protocols', 'varint/zigzag/CRC', 'data visualization'],
   summary:

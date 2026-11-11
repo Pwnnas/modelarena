@@ -1,0 +1,26 @@
+{
+  "source": "arena run",
+  "endpoint": "openrouter.ai",
+  "apiModel": "anthropic/claude-haiku-5.5",
+  "servedModel": "anthropic/claude-haiku-5.5",
+  "provider": "Claude Platform on AWS",
+  "params": {
+    "thinking": "medium"
+  },
+  "startedAt": "2026-10-29T23:35:53.288Z",
+  "wallMs": 212332,
+  "ttftMs": 1990,
+  "thinkingMs": 181066,
+  "promptTokens": 1614,
+  "completionTokens": 49350,
+  "reasoningTokens": 38363,
+  "tokensEstimated": false,
+  "genTokensPerSec": 234.6,
+  "promptTokensPerSec": null,
+  "finishReason": "stop",
+  "replyChars": 20812,
+  "reasoningChars": 27656,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 20808
+}

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Horizon</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#000}
+canvas{display:block;width:100vw;height:100vh}
+#ui{position:absolute;top:10px;left:10px;color:#fff;font-family:system-ui,sans-serif;background:rgba(0,0,0,.4);padding:10px 12px;border-radius:8px;backdrop-filter:blur(4px)}
+#ui label{display:block;margin:6px 0 2px}
+#ui input{width:180px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+<div>Autopilot: <b id="auto">ON</b> (F)</div>
+<label>Time <input id="time" type="range" min="0" max="24" step="0.01" value="12"></label>
+<label>Seed <input id="seed" type="number" value="1"></label>
+<div>FPS <span id="fps">0</span></div>
+</div>
+<script>
+(() => {
+const canvas=document.getElementById('c');
+const gl=canvas.getContext('webgl')||canvas.getContext('webgl2');
+if(!gl){alert('WebGL not supported');return;}
+function resize(){const dpr=Math.min(window.devicePixelRatio||1,2);const w=Math.floor(innerWidth*dpr);const h=Math.floor(innerHeight*dpr);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);} }window.addEventListener('resize',resize);resize();
+const timeSlider=document.getElementById('time');
+const seedInput=document.getElementById('seed');
+const autoIndicator=document.getElementById('auto');
+const fpsSpan=document.getElementById('fps');
+let seed=parseInt(seedInput.value)||1;
+let timeHours=12;
+let frozen=false;
+let autopilot=true;
+const camera={x:0,y:60,z:0,yaw:0,pitch:0};
+const keys={};
+window.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyF'){autopilot=!autopilot;autoIndicator.textContent=autopilot?'ON':'OFF';}});
+window.addEventListener('keyup',e=>{keys[e.code]=false;});
+let dragging=false,lastX=0,lastY=0;
+canvas.addEventListener('mousedown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;});
+window.addEventListener('mouseup',()=>dragging=false);
+window.addEventListener('mousemove',e=>{if(!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;camera.yaw+=dx*0.003;camera.pitch+=dy*0.003;camera.pitch=Math.max(-1.2,Math.min(1.2,camera.pitch));});
+timeSlider.addEventListener('input',e=>{timeHours=parseFloat(e.target.value);});
+seedInput.addEventListener('change',e=>{seed=parseInt(e.target.value)||1;initNoise(seed);clearChunks();});
+function mat4Identity(){return new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);}
+function mat4Multiply(a,b){const o=new Float32Array(16);for(let i=0;i<4;i++)for(let j=0;j<4;j++){o[i*4+j]=a[i*4+0]*b[0*4+j]+a[i*4+1]*b[1*4+j]+a[i*4+2]*b[2*4+j]+a[i*4+3]*b[3*4+j];}return o;}
+function mat4Perspective(fov,aspect,near,far){const f=1/Math.tan(fov/2);const nf=1/(near-far);const o=new Float32Array(16);o[0]=f/aspect;o[5]=f;o[10]=(far+near)*nf;o[11]=-1;o[14]=2*far*near*nf;return o;}
+function mat4LookAt(eye,center,up){const fx=center[0]-eye[0],fy=center[1]-eye[1],fz=center[2]-eye[2];let fl=Math.hypot(fx,fy,fz);const f=[fx/fl,fy/fl,fz/fl];let sx=fy*up[2]-fz*up[1],sy=fz*up[0]-fx*up[2],sz=fx*up[1]-fy*up[0];let sl=Math.hypot(sx,sy,sz);sx/=sl;sy/=sl;sz/=sl;let ux=sy*fz-sz*fy,uy=sz*fx-sx*fz,uz=sx*fy-sy*fx;const o=new Float32Array(16);o[0]=sx;o[1]=ux;o[2]=-f[0];o[4]=sy;o[5]=uy;o[6]=-f[1];o[8]=sz;o[9]=uz;o[10]=-f[2];o[12]=-(sx*eye[0]+sy*eye[1]+sz*eye[2]);o[13]=-(ux*eye[0]+uy*eye[1]+uz*eye[2]);o[14]= f[0]*eye[0]+f[1]*eye[1]+f[2]*eye[2];o[15]=1;return o;}
+let perm=null;
+function createPermutation(s){const p=new Uint8Array(256);for(let i=0;i<256;i++)p[i]=i;let seed=s>>>0;function rand(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}for(let i=255;i>0;i--){const j=Math.floor(rand()*(i+1));const t=p[i];p[i]=p[j];p[j]=t;}const permArr=new Uint8Array(512);for(let i=0;i<512;i++)permArr[i]=p[i&255];return permArr;}
+function initNoise(s){perm=createPermutation(s);}
+function fade(t){return t*t*t*(t*(t*6-15)+10);}
+function lerp(a,b,t){return a+t*(b-a);}
+function grad(h,x,y){const hh=h&7;const u=hh<4?x:y;const v=hh<4?y:x;return (hh&1?-u:u)+(hh&2?-v:v);}
+function noise2d(x,y){const X=Math.floor(x)&255,Y=Math.floor(y)&255;x-=Math.floor(x);y-=Math.floor(y);const u=fade(x),v=fade(y);const A=perm[X]+Y;const AA=perm[A],AB=perm[A+1];const B=perm[X+1]+Y;const BA=perm[B],BB=perm[B+1];const g00=grad(perm[AA],x,y);const g10=grad(perm[BA],x-1,y);const g01=grad(perm[AB],x,y-1);const g11=grad(perm[BB],x-1,y-1);return lerp(lerp(g00,g10,u),lerp(g01,g11,u),v);}
+function fBm(x,z,oct=6){let amp=1,freq=0.8,sum=0,max=0;for(let i=0;i<oct;i++){sum+=noise2d(x*freq,z*freq)*amp;max+=amp;amp*=0.5;freq*=2;}return sum/max;}
+function getHeight(x,z){const n=fBm(x*0.0006,z*0.0006);return n*240+80;}
+initNoise(seed);
+function compileShader(src,type){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(s));return s;}
+function createProgram(vs,fs){const p=gl.createProgram();gl.attachShader(p,vs);gl.attachShader(p,fs);gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))console.error(gl.getProgramInfoLog(p));return p;}
+const terrainVS=`attribute vec3 aPosition;attribute vec3 aNormal;uniform mat4 uMVP;uniform mat4 uMV;varying vec3 vWorldPos;varying vec3 vNormal;varying vec3 vViewPos;void main(){vWorldPos=aPosition;vNormal=aNormal;vec4 mv=uMV*vec4(aPosition,1.0);vViewPos=mv.xyz;gl_Position=uMVP*vec4(aPosition,1.0);}`;
+const terrainFS=`precision mediump float;varying vec3 vWorldPos;varying vec3 vNormal;varying vec3 vViewPos;uniform vec3 uSunDir;uniform vec3 uSunColor;uniform vec3 uAmbient;uniform vec3 uFogColor;uniform float uFogDensity;void main(){vec3 N=normalize(vNormal);vec3 L=normalize(uSunDir);float diff=max(dot(N,L),0.0);vec3 base;float h=vWorldPos.y;if(h<0.0){base=vec3(0.05,0.07,0.12);}else if(h<5.0){base=vec3(0.76,0.70,0.50);}else if(h<80.0){base=vec3(0.35,0.55,0.25);}else if(h<200.0){base=vec3(0.55,0.45,0.35);}else{base=vec3(0.9,0.9,0.95);}float slope=1.0-abs(dot(N,vec3(0,1,0)));if(slope>0.3)base=mix(base,vec3(0.4,0.35,0.3),0.6);vec3 col=base*(uAmbient+uSunColor*diff);float dist=length(vViewPos);float fog=exp(-dist*uFogDensity);col=mix(uFogColor,col,fog);gl_FragColor=vec4(col,1.0);}`;
+const skyVS=`attribute vec2 aPos;varying vec2 vUV;void main(){vUV=aPos*0.5+0.5;gl_Position=vec4(aPos,0.0,1.0);}`;
+const skyFS=`precision mediump float;varying vec2 vUV;uniform vec3 uZenith;uniform vec3 uHorizon;uniform vec2 uSunScreen;uniform float uSunRadius;void main(){float t=1.0-vUV.y;vec3 col=mix(uHorizon,uZenith,pow(t,0.5));float d=distance(vUV,uSunScreen);float glow=exp(-d*d*200.0);col+=glow*vec3(1.0,0.9,0.6);gl_FragColor=vec4(col,1.0);}`;
+const waterVS=`attribute vec3 aPosition;uniform mat4 uMVP;uniform float uTime;varying vec3 vPos;void main(){vec3 p=aPosition;float w=sin(p.x*0.01+uTime)*0.5+cos(p.z*0.012+uTime*1.3)*0.5;p.y+=w*0.3;vPos=p;gl_Position=uMVP*vec4(p,1.0);}`;
+const waterFS=`precision mediump float;varying vec3 vPos;uniform vec3 uSunColor;uniform vec3 uSkyColor;void main(){vec3 col=mix(vec3(0.0,0.25,0.45),uSkyColor,0.4);gl_FragColor=vec4(col,0.85);}`;
+const terrainProg=createProgram(compileShader(terrainVS,gl.VERTEX_SHADER),compileShader(terrainFS,gl.FRAGMENT_SHADER));
+const skyProg=createProgram(compileShader(skyVS,gl.VERTEX_SHADER),compileShader(skyFS,gl.FRAGMENT_SHADER));
+const waterProg=createProgram(compileShader(waterVS,gl.VERTEX_SHADER),compileShader(waterFS,gl.FRAGMENT_SHADER));
+const terrainLoc={pos:gl.getAttribLocation(terrainProg,'aPosition'),norm:gl.getAttribLocation(terrainProg,'aNormal')};
+const skyLoc={pos:gl.getAttribLocation(skyProg,'aPos')};
+const waterLoc={pos:gl.getAttribLocation(waterProg,'aPosition')};
+const skyVbo=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,skyVbo);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+const WATER_SIZE=16384,WATER_STEP=128,WATER_RES=WATER_SIZE/WATER_STEP;
+let waterVbo=null,waterIbo=null;
+function buildWater(){const verts=[];const idx=[];for(let i=0;i<=WATER_RES;i++)for(let j=0;j<=WATER_RES;j++){const x=(i-WATER_RES/2)*WATER_STEP;const z=(j-WATER_RES/2)*WATER_STEP;verts.push(x,0,z);}for(let i=0;i<WATER_RES;i++)for(let j=0;j<WATER_RES;j++){const a=i*(WATER_RES+1)+j;const b=a+WATER_RES+1;idx.push(a,b,a+1);idx.push(b,b+1,a+1);}waterVbo=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,waterVbo);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STATIC_DRAW);waterIbo=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,waterIbo);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(idx),gl.STATIC_DRAW);}
+buildWater();
+const CHUNK_SIZE=256,CHUNK_RES=32,CHUNK_STEP=CHUNK_SIZE/CHUNK_RES;
+const chunks=new Map();let totalTriangles=0;
+function chunkKey(cx,cz){return cx+','+cz;}
+function clearChunks(){for(const k of chunks.keys()){const c=chunks.get(k);gl.deleteBuffer(c.vbo);gl.deleteBuffer(c.nbo);gl.deleteBuffer(c.ibo);}chunks.clear();}
+function createChunk(cx,cz){const verts=[],norms=[],idx=[];for(let i=0;i<=CHUNK_RES;i++)for(let j=0;j<=CHUNK_RES;j++){const wx=cx*CHUNK_SIZE+i*CHUNK_STEP;const wz=cz*CHUNK_SIZE+j*CHUNK_STEP;const h=getHeight(wx,wz);verts.push(wx,h,wz);}for(let i=0;i<=CHUNK_RES;i++)for(let j=0;j<=CHUNK_RES;j++){const wx=cx*CHUNK_SIZE+i*CHUNK_STEP;const wz=cz*CHUNK_SIZE+j*CHUNK_STEP;const hx1=getHeight(wx+CHUNK_STEP,wz);const hx0=getHeight(wx-CHUNK_STEP,wz);const hz1=getHeight(wx,wz+CHUNK_STEP);const hz0=getHeight(wx,wz-CHUNK_STEP);const dx=(hx1-hx0)/(2*CHUNK_STEP);const dz=(hz1-hz0)/(2*CHUNK_STEP);let nx=-dx,ny=1.0,nz=-dz;const len=Math.hypot(nx,ny,nz);nx/=len;ny/=len;nz/=len;norms.push(nx,ny,nz);}for(let i=0;i<CHUNK_RES;i++)for(let j=0;j<CHUNK_RES;j++){const a=i*(CHUNK_RES+1)+j;const b=a+CHUNK_RES+1;idx.push(a,b,a+1);idx.push(b,b+1,a+1);}const vbo=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vbo);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STATIC_DRAW);const nbo=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,nbo);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(norms),gl.STATIC_DRAW);const ibo=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ibo);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(idx),gl.STATIC_DRAW);return {vbo,nbo,ibo,idxCount:idx.length};}
+function updateChunks(){const cx=Math.floor(camera.x/CHUNK_SIZE);const cz=Math.floor(camera.z/CHUNK_SIZE);const radius=5;const needed=new Set();for(let dx=-radius;dx<=radius;dx++)for(let dz=-radius;dz<=radius;dz++)if(dx*dx+dz*dz<=radius*radius)needed.add(chunkKey(cx+dx,cz+dz));for(const k of Array.from(chunks.keys()))if(!needed.has(k)){const c=chunks.get(k);gl.deleteBuffer(c.vbo);gl.deleteBuffer(c.nbo);gl.deleteBuffer(c.ibo);chunks.delete(k);}for(const k of needed)if(!chunks.has(k)){const [cxk,czk]=k.split(',').map(Number);chunks.set(k,createChunk(cxk,czk));}}
+function computeSun(t){const ang=t/24*2*Math.PI;const elevation=Math.sin(ang-Math.PI/2);const azimuth=ang;const horiz=Math.sqrt(Math.max(0,1-elevation*elevation));return {dir:[horiz*Math.cos(azimuth),elevation,horiz*Math.sin(azimuth)],elevation};}
+function forwardVec(){const cp=Math.cos(camera.pitch);return [Math.sin(camera.yaw)*cp,Math.sin(camera.pitch),-Math.cos(camera.yaw)*cp];}
+function rightVec(){const f=forwardVec();const rx=f[1]*0- f[2]*1;const ry=f[2]*0- f[0]*0;const rz=f[0]*1- f[1]*0;return [1,0,0];}
+let lastTime=performance.now();let fpsTimer=0,frames=0;
+function loop(now){const dt=Math.min(0.05,(now-lastTime)/1000);lastTime=now;frames++;fpsTimer+=dt;if(fpsTimer>=0.5){fpsSpan.textContent=Math.round(frames/fpsTimer);frames=0;fpsTimer=0;}
+if(!frozen){if(timeHours>=24)timeHours-=24;timeHours+=dt*0.2;if(timeHours>=24)timeHours-=24;timeSlider.value=timeHours;}
+if(autopilot && !frozen){const f=forwardVec();const s=25*dt;camera.x+=f[0]*s;camera.z+=f[2]*s;camera.pitch=Math.max(-0.2,camera.pitch);}else if(!autopilot){const s=30*dt;const f=forwardVec();const cp=Math.cos(camera.pitch);const right=[Math.sin(camera.yaw+Math.PI/2)*cp,0,-Math.cos(camera.yaw+Math.PI/2)*cp];if(keys['KeyW']){camera.x+=f[0]*s;camera.z+=f[2]*s;}if(keys['KeyS']){camera.x-=f[0]*s;camera.z-=f[2]*s;}if(keys['KeyA']){camera.x-=right[0]*s;camera.z-=right[2]*s;}if(keys['KeyD']){camera.x+=right[0]*s;camera.z+=right[2]*s;}if(keys['ShiftLeft']||keys['ShiftRight'])camera.y-=s*0.5;if(keys['Space'])camera.y+=s*0.5;if(keys['KeyQ'])camera.y-=s*0.5;if(keys['KeyE'])camera.y+=s*0.5;}
+const h=getHeight(camera.x,camera.z);const minY=Math.max(h+2,5);if(camera.y<minY)camera.y=minY;
+updateChunks();
+const aspect=canvas.width/canvas.height;const proj=mat4Perspective(0.8,aspect,0.1,5000);const eye=[camera.x,camera.y,camera.z];const fwd=forwardVec();const center=[eye[0]+fwd[0],eye[1]+fwd[1],eye[2]+fwd[2]];const view=mat4LookAt(eye,center,[0,1,0]);const mvp=mat4Multiply(proj,view);
+const sun=computeSun(timeHours);const sunDir=sun.dir;const elev=sun.elevation;const sunIntensity=Math.max(0,elev);const sunColor=[1,0.95,0.85];const ambient=elev>0?[0.05,0.05,0.07]:[0.02,0.02,0.05];
+const dayZenith=[0.5,0.7,1.0],dayHorizon=[0.8,0.85,1.0],nightZenith=[0.02,0.02,0.08],nightHorizon=[0.05,0.05,0.15];
+const mixF=Math.max(0,Math.min(1,(elev+1)/2));const zenith=[dayZenith[0]*mixF+nightZenith[0]*(1-mixF),dayZenith[1]*mixF+nightZenith[1]*(1-mixF),dayZenith[2]*mixF+nightZenith[2]*(1-mixF)];const horizon=[dayHorizon[0]*mixF+nightHorizon[0]*(1-mixF),dayHorizon[1]*mixF+nightHorizon[1]*(1-mixF),dayHorizon[2]*mixF+nightHorizon[2]*(1-mixF)];
+gl.clearColor(zenith[0],zenith[1],zenith[2],1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);
+gl.disable(gl.DEPTH_TEST);gl.useProgram(skyProg);gl.bindBuffer(gl.ARRAY_BUFFER,skyVbo);gl.enableVertexAttribArray(skyLoc.pos);gl.vertexAttribPointer(skyLoc.pos,2,gl.FLOAT,false,0,0);gl.uniform3fv(gl.getUniformLocation(skyProg,'uZenith'),zenith);gl.uniform3fv(gl.getUniformLocation(skyProg,'uHorizon'),horizon);gl.uniform2f(gl.getUniformLocation(skyProg,'uSunScreen'),0.5+sunDir[0]*0.3,0.5+sunDir[1]*0.4);gl.uniform1f(gl.getUniformLocation(skyProg,'uSunRadius'),0.05);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);gl.enable(gl.DEPTH_TEST);
+gl.useProgram(waterProg);gl.bindBuffer(gl.ARRAY_BUFFER,waterVbo);gl.enableVertexAttribArray(waterLoc.pos);gl.vertexAttribPointer(waterLoc.pos,3,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,waterIbo);const waterMVP=mat4Multiply(proj,view);gl.uniformMatrix4fv(gl.getUniformLocation(waterProg,'uMVP'),false,waterMVP);gl.uniform1f(gl.getUniformLocation(waterProg,'uTime'),frozen?0:performance.now()*0.001);gl.uniform3fv(gl.getUniformLocation(waterProg,'uSunColor'),sunColor);gl.uniform3fv(gl.getUniformLocation(waterProg,'uSkyColor'),zenith);gl.drawElements(gl.TRIANGLES,WATER_RES*WATER_RES*6,gl.UNSIGNED_SHORT,0);
+gl.useProgram(terrainProg);gl.uniformMatrix4fv(gl.getUniformLocation(terrainProg,'uMVP'),false,mvp);gl.uniformMatrix4fv(gl.getUniformLocation(terrainProg,'uMV'),false,view);gl.uniform3fv(gl.getUniformLocation(terrainProg,'uSunDir'),sunDir);gl.uniform3fv(gl.getUniformLocation(terrainProg,'uSunColor'),[sunColor[0]*sunIntensity,sunColor[1]*sunIntensity,sunColor[2]*sunIntensity]);gl.uniform3fv(gl.getUniformLocation(terrainProg,'uAmbient'),ambient);gl.uniform3fv(gl.getUniformLocation(terrainProg,'uFogColor'),zenith);gl.uniform1f(gl.getUniformLocation(terrainProg,'uFogDensity'),mixF>0.1?0.00015:0.00005);
+totalTriangles=0;for(const c of chunks.values()){gl.bindBuffer(gl.ARRAY_BUFFER,c.vbo);gl.enableVertexAttribArray(terrainLoc.pos);gl.vertexAttribPointer(terrainLoc.pos,3,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ARRAY_BUFFER,c.nbo);gl.enableVertexAttribArray(terrainLoc.norm);gl.vertexAttribPointer(terrainLoc.norm,3,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,c.ibo);gl.drawElements(gl.TRIANGLES,c.idxCount,gl.UNSIGNED_SHORT,0);totalTriangles+=c.idxCount/3;}
+requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+window.__arena={freeze(on){frozen=!!on;},setSeed(n){seed=parseInt(n);if(isNaN(seed))return;seedInput.value=seed;initNoise(seed);clearChunks();},setTime(h){timeHours=parseFloat(h);timeSlider.value=timeHours;},setCamera(o){if(o.x!==undefined)camera.x=o.x;if(o.z!==undefined)camera.z=o.z;if(o.yaw!==undefined)camera.yaw=o.yaw;if(o.pitch!==undefined)camera.pitch=Math.max(-1.2,Math.min(1.2,o.pitch));if(o.y!==undefined){const hh=getHeight(camera.x,camera.z);const minY=Math.max(hh+2,5);camera.y=Math.max(o.y,minY);} },getCamera(){return{x:camera.x,y:camera.y,z:camera.z,yaw:camera.yaw,pitch:camera.pitch};},terrainHeight(x,z){return getHeight(x,z);},stats(){return{chunks:chunks.size,triangles:totalTriangles};}};
+})();
+</script>
+</body>
+</html>

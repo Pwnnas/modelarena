@@ -1,0 +1,890 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Gridcalc</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 13px; background: #fff; color: #1a1a1a; }
+
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+#toolbar { display: flex; align-items: center; padding: 4px 8px; border-bottom: 1px solid #d0d0d0; background: #f8f9fa; gap: 6px; flex-shrink: 0; }
+#cell-address { font-weight: 600; font-size: 12px; color: #555; min-width: 48px; text-align: center; background: #fff; border: 1px solid #ccc; border-radius: 3px; padding: 4px 6px; }
+#formula-bar { flex: 1; border: 1px solid #ccc; border-radius: 3px; padding: 5px 8px; font-family: "SF Mono", "Consolas", "Monaco", monospace; font-size: 13px; outline: none; background: #fff; }
+#formula-bar:focus { border-color: #4a90d9; box-shadow: 0 0 0 2px rgba(74,144,217,0.15); }
+#formula-bar.editing { background: #fffdf0; }
+
+#grid-container { flex: 1; overflow: auto; position: relative; }
+
+table#grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+
+table#grid th, table#grid td { height: 24px; min-height: 24px; max-height: 24px; border-right: 1px solid #e0e0e0; border-bottom: 1px solid #e0e0e0; padding: 0 6px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; user-select: none; position: relative; }
+
+table#grid td { background: #fff; color: #1a1a1a; }
+table#grid td.num { text-align: right; font-family: "SF Mono", "Consolas", monospace; }
+table#grid td.txt { text-align: left; }
+
+table#grid thead th { position: sticky; top: 0; z-index: 2; background: #f0f0f0; color: #444; font-weight: 600; text-align: center; min-width: 72px; width: 72px; font-size: 11px; border-bottom: 2px solid #ccc; }
+table#grid thead th.corner { position: sticky; top: 0; left: 0; z-index: 3; width: 40px; min-width: 40px; }
+table#grid tbody th { position: sticky; left: 0; z-index: 1; background: #f0f0f0; color: #444; font-weight: 600; text-align: center; width: 40px; min-width: 40px; font-size: 11px; }
+
+table#grid thead th.active { background: #d4e6f9; color: #1a5276; }
+table#grid tbody th.active { background: #d4e6f9; color: #1a5276; }
+
+table#grid td.selected { background: #d4e6f9 !important; outline: 2px solid #4a90d9; outline-offset: -2px; z-index: 1; }
+table#grid td.editing-cell { outline: 2px solid #2196F3; outline-offset: -2px; background: #e3f2fd !important; }
+
+table#grid td.error-cell { background: #fef0f0 !important; color: #c0392b; font-weight: 600; }
+
+table#grid td.ref-highlight { box-shadow: inset 0 0 0 2px rgba(255, 107, 53, 0.7); background: rgba(255, 107, 53, 0.06) !important; }
+
+#status-bar { height: 24px; display: flex; align-items: center; padding: 0 12px; border-top: 1px solid #d0d0d0; background: #f8f9fa; font-size: 11px; color: #666; gap: 16px; flex-shrink: 0; }
+#status-bar span.label { font-weight: 600; color: #444; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <span id="cell-address">A1</span>
+    <input id="formula-bar" type="text" spellcheck="false" autocomplete="off">
+  </div>
+  <div id="grid-container"></div>
+  <div id="status-bar">
+    <span><span class="label">SUM:</span> <span id="status-sum"></span></span>
+    <span><span class="label">AVG:</span> <span id="status-avg"></span></span>
+    <span><span class="label">COUNT:</span> <span id="status-count"></span></span>
+  </div>
+</div>
+<script>
+(function() {
+"use strict";
+
+const COLS = 26, ROWS = 100;
+const KNOWN_FUNCTIONS = ['SUM','AVERAGE','MIN','MAX','COUNT','IF','ABS','ROUND'];
+
+let cellData = {};
+let computedValues = {};
+let parsedASTs = {};
+let selectedCell = 'A1';
+let isEditing = false;
+let editingOldContent = '';
+let clipboard = null;
+
+const colNames = [];
+for (let i = 0; i < 26; i++) colNames.push(String.fromCharCode(65 + i));
+
+function colIdx(name) { return name.charCodeAt(0) - 65; }
+function colName(idx) { return colNames[idx]; }
+function cellAddress(c, r) { return colName(c) + (r + 1); }
+function parseAddr(addr) {
+  const m = addr.match(/^([A-Z])(\d+)$/);
+  if (!m) return null;
+  return { col: colIdx(m[1]), row: parseInt(m[2]) - 1 };
+}
+function isValidCol(c) { return c >= 0 && c < COLS; }
+function isValidRow(r) { return r >= 0 && r < ROWS; }
+function isValidCell(c, r) { return isValidCol(c) && isValidRow(r); }
+
+// === FORMULA ENGINE ===
+
+function tokenize(input) {
+  const tokens = [];
+  let i = 0;
+  while (i < input.length) {
+    if (/\s/.test(input[i])) { i++; continue; }
+    if (/[0-9]/.test(input[i]) || (input[i] === '.' && i + 1 < input.length && /[0-9]/.test(input[i+1]))) {
+      let start = i;
+      while (i < input.length && /[0-9]/.test(input[i])) i++;
+      if (i < input.length && input[i] === '.') { i++; while (i < input.length && /[0-9]/.test(input[i])) i++; }
+      if (i < input.length && (input[i] === 'e' || input[i] === 'E')) {
+        let save = i; i++;
+        if (i < input.length && (input[i] === '+' || input[i] === '-')) i++;
+        if (i < input.length && /[0-9]/.test(input[i])) { while (i < input.length && /[0-9]/.test(input[i])) i++; }
+        else i = save;
+      }
+      const val = Number(input.slice(start, i));
+      if (isNaN(val)) return null;
+      tokens.push({ type: 'NUMBER', value: val, pos: start });
+      continue;
+    }
+    if (input[i] === '"') {
+      i++;
+      let str = '';
+      while (i < input.length && input[i] !== '"') str += input[i++];
+      if (i >= input.length) return null;
+      i++;
+      tokens.push({ type: 'STRING', value: str });
+      continue;
+    }
+    if (/[A-Za-z$]/.test(input[i])) {
+      let start = i;
+      while (i < input.length && /[A-Za-z0-9$]/.test(input[i])) i++;
+      tokens.push({ type: 'IDENT', value: input.slice(start, i), pos: start });
+      continue;
+    }
+    if (input[i] === '<') {
+      if (i+1 < input.length && input[i+1] === '>') { tokens.push({type:'OP',value:'<>'}); i+=2; continue; }
+      if (i+1 < input.length && input[i+1] === '=') { tokens.push({type:'OP',value:'<='}); i+=2; continue; }
+      tokens.push({type:'OP',value:'<'}); i++; continue;
+    }
+    if (input[i] === '>') {
+      if (i+1 < input.length && input[i+1] === '=') { tokens.push({type:'OP',value:'>='}); i+=2; continue; }
+      tokens.push({type:'OP',value:'>'}); i++; continue;
+    }
+    const c = input[i];
+    if ('+-*/&()='.includes(c)) { tokens.push({type: c==='('?'LPAREN':c===')'?'RPAREN':'OP', value:c}); i++; continue; }
+    if (c === ',') { tokens.push({type:'COMMA'}); i++; continue; }
+    if (c === ':') { tokens.push({type:'COLON'}); i++; continue; }
+    return null;
+  }
+  return tokens;
+}
+
+function parseFormula(expr) {
+  const tokens = tokenize(expr);
+  if (tokens === null) return null;
+  let pos = 0;
+  function peek() { return pos < tokens.length ? tokens[pos] : null; }
+  function advance() { return tokens[pos++]; }
+  function expectToken(type) { if (!peek() || peek().type !== type) throw new Error('parse'); return advance(); }
+
+  function parseExpr() { return parseComparison(); }
+  function parseComparison() {
+    let left = parseConcat();
+    while (peek() && peek().type === 'OP' && ['=','<>','<','>','<=','>='].includes(peek().value)) {
+      const op = advance().value;
+      left = { type:'binop', op, left, right: parseConcat() };
+    }
+    return left;
+  }
+  function parseConcat() {
+    let left = parseAddSub();
+    while (peek() && peek().type === 'OP' && peek().value === '&') {
+      advance();
+      left = { type:'binop', op:'&', left, right: parseAddSub() };
+    }
+    return left;
+  }
+  function parseAddSub() {
+    let left = parseMulDiv();
+    while (peek() && peek().type === 'OP' && (peek().value === '+' || peek().value === '-')) {
+      const op = advance().value;
+      left = { type:'binop', op, left, right: parseMulDiv() };
+    }
+    return left;
+  }
+  function parseMulDiv() {
+    let left = parseUnary();
+    while (peek() && peek().type === 'OP' && (peek().value === '*' || peek().value === '/')) {
+      const op = advance().value;
+      left = { type:'binop', op, left, right: parseUnary() };
+    }
+    return left;
+  }
+  function parseUnary() {
+    if (peek() && peek().type === 'OP' && (peek().value === '-' || peek().value === '+')) {
+      const op = advance().value;
+      const operand = parseUnary();
+      if (op === '+') return operand;
+      return { type:'unop', op:'-', operand };
+    }
+    return parsePower();
+  }
+  function parsePower() {
+    let base = parseAtom();
+    if (peek() && peek().type === 'OP' && peek().value === '^') {
+      advance();
+      return { type:'binop', op:'^', left:base, right:parseUnary() };
+    }
+    return base;
+  }
+  function parseAtom() {
+    const t = peek();
+    if (!t) throw new Error('parse');
+    if (t.type === 'NUMBER') { advance(); return { type:'number', value:t.value }; }
+    if (t.type === 'STRING') { advance(); return { type:'string', value:t.value }; }
+    if (t.type === 'LPAREN') { advance(); const e = parseExpr(); expectToken('RPAREN'); return e; }
+    if (t.type === 'IDENT') {
+      advance();
+      const upper = t.value.toUpperCase();
+      if (peek() && peek().type === 'LPAREN') {
+        if (!KNOWN_FUNCTIONS.includes(upper)) throw new Error('unknown func');
+        advance();
+        const args = parseFuncArgs();
+        expectToken('RPAREN');
+        return { type:'func', name:upper, args };
+      }
+      return parseRefOrRange(t.value);
+    }
+    throw new Error('parse');
+  }
+  function parseRefOrRange(ident) {
+    const ref = parseCellRefBase(ident);
+    if (peek() && peek().type === 'COLON') {
+      advance();
+      const t2 = peek();
+      if (!t2 || t2.type !== 'IDENT') throw new Error('bad range');
+      advance();
+      return { type:'range', start:ref, end:parseCellRefBase(t2.value) };
+    }
+    return ref;
+  }
+  function parseCellRefBase(ident) {
+    const m = ident.match(/^(\$?)([A-Za-z])(\$?)(\d+)$/);
+    if (!m) throw new Error('bad ref');
+    return { type:'cellref', col: colIdx(m[2].toUpperCase()), row: parseInt(m[4]) - 1, absCol: m[1]==='$', absRow: m[3]==='$' };
+  }
+  function parseFuncArgs() {
+    const args = [];
+    if (peek() && peek().type === 'RPAREN') return args;
+    args.push(parseExpr());
+    while (peek() && peek().type === 'COMMA') { advance(); args.push(parseExpr()); }
+    return args;
+  }
+
+  try {
+    const ast = parseExpr();
+    if (pos < tokens.length) return null;
+    return ast;
+  } catch(e) { return null; }
+}
+
+// Collect cell references from AST
+function collectRefs(ast, refs) {
+  if (!ast) return;
+  if (ast.type === 'cellref') { refs.add(cellAddress(ast.col, ast.row)); }
+  else if (ast.type === 'range') {
+    for (let c = Math.min(ast.start.col, ast.end.col); c <= Math.max(ast.start.col, ast.end.col); c++)
+      for (let r = Math.min(ast.start.row, ast.end.row); r <= Math.max(ast.start.row, ast.end.row); r++)
+        if (isValidCell(c,r)) refs.add(cellAddress(c,r));
+  }
+  else if (ast.type === 'binop') { collectRefs(ast.left, refs); collectRefs(ast.right, refs); }
+  else if (ast.type === 'unop') { collectRefs(ast.operand, refs); }
+  else if (ast.type === 'func') { ast.args.forEach(a => collectRefs(a, refs)); }
+}
+
+// Evaluation helpers
+const ERR = { error: true };
+function makeErr(code) { return { error: true, code }; }
+function isErr(v) { return v && typeof v === 'object' && v.error; }
+
+function getCellValue(addr) {
+  const p = parseAddr(addr);
+  if (!p || !isValidCell(p.col, p.row)) return makeErr('#REF!');
+  return computedValues[addr] ?? null;
+}
+
+function evalExpr(ast) {
+  if (!ast) return makeErr('#ERROR!');
+  switch (ast.type) {
+    case 'number': return ast.value;
+    case 'string': return ast.value;
+    case 'cellref': {
+      if (!isValidCell(ast.col, ast.row)) return makeErr('#REF!');
+      const v = getCellValue(cellAddress(ast.col, ast.row));
+      return v === null ? 0 : v;
+    }
+    case 'range': return { type:'range_value', start:ast.start, end:ast.end };
+    case 'func': return evalFunc(ast);
+    case 'binop': return evalBinop(ast);
+    case 'unop': return evalUnary(ast);
+    default: return makeErr('#ERROR!');
+  }
+}
+
+function evalFunc(ast) {
+  const name = ast.name;
+  if (name === 'IF') {
+    if (ast.args.length < 3) return makeErr('#ERROR!');
+    const cond = evalExpr(ast.args[0]);
+    if (isErr(cond)) return cond;
+    if (truthy(cond)) return evalExpr(ast.args[1]);
+    return evalExpr(ast.args[2]);
+  }
+  if (name === 'ABS') {
+    if (ast.args.length !== 1) return makeErr('#ERROR!');
+    const v = evalExpr(ast.args[0]);
+    if (isErr(v)) return v;
+    if (typeof v !== 'number') return makeErr('#VALUE!');
+    return Math.abs(v);
+  }
+  if (name === 'ROUND') {
+    if (ast.args.length !== 2) return makeErr('#ERROR!');
+    const v = evalExpr(ast.args[0]);
+    if (isErr(v)) return v;
+    if (typeof v !== 'number') return makeErr('#VALUE!');
+    const d = evalExpr(ast.args[1]);
+    if (isErr(d)) return d;
+    if (typeof d !== 'number') return makeErr('#VALUE!');
+    const mult = Math.pow(10, Math.round(d));
+    return Math.round(v * mult) / mult;
+  }
+  // Collection functions
+  const values = [];
+  for (const arg of ast.args) {
+    const v = evalExpr(arg);
+    if (isErr(v)) return v;
+    collectFlat(v, values);
+  }
+  if (name === 'COUNT') return values.filter(x => typeof x === 'number').length;
+  const nums = values.filter(x => typeof x === 'number');
+  if (name === 'SUM') return nums.reduce((a,b)=>a+b, 0);
+  if (name === 'MIN') return nums.length ? Math.min(...nums) : 0;
+  if (name === 'MAX') return nums.length ? Math.max(...nums) : 0;
+  if (name === 'AVERAGE') { if (!nums.length) return makeErr('#DIV/0!'); return nums.reduce((a,b)=>a+b,0)/nums.length; }
+  return makeErr('#ERROR!');
+}
+
+function collectFlat(v, out) {
+  if (v && v.type === 'range_value') {
+    const start = v.start, end = v.end;
+    for (let c = Math.min(start.col, end.col); c <= Math.max(start.col, end.col); c++)
+      for (let r = Math.min(start.row, end.row); r <= Math.max(start.row, end.row); r++) {
+        if (isValidCell(c, r)) { const val = getCellValue(cellAddress(c,r)); if (val !== null) out.push(val); }
+      }
+  } else { out.push(v); }
+}
+
+function evalBinop(ast) {
+  const left = evalExpr(ast.left);
+  if (isErr(left)) return left;
+  const right = evalExpr(ast.right);
+  if (isErr(right)) return right;
+  const op = ast.op;
+  if (op === '&') return displayVal(left) + displayVal(right);
+  if (['=','<>','<','>','<=','>='].includes(op)) return compareVals(left, right, op);
+  // Arithmetic
+  const l = coerceNum(left), r = coerceNum(right);
+  if (l === null) return makeErr('#VALUE!');
+  if (r === null) return makeErr('#VALUE!');
+  if (op === '+') return l + r;
+  if (op === '-') return l - r;
+  if (op === '*') return l * r;
+  if (op === '/') { if (r === 0) return makeErr('#DIV/0!'); return l / r; }
+  if (op === '^') { if (l === 0 && r < 0) return makeErr('#DIV/0!'); return Math.pow(l, r); }
+  return makeErr('#ERROR!');
+}
+
+function evalUnary(ast) {
+  const v = evalExpr(ast.operand);
+  if (isErr(v)) return v;
+  if (typeof v !== 'number') return makeErr('#VALUE!');
+  return -v;
+}
+
+function coerceNum(v) {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  if (typeof v === 'string') { const n = Number(v); return isNaN(n) ? null : n; }
+  if (v === null) return 0;
+  if (v && v.type === 'range_value') return null;
+  return null;
+}
+
+function truthy(v) { if (typeof v === 'boolean') return v; if (typeof v === 'number') return v !== 0; if (typeof v === 'string') return v !== ''; return false; }
+
+function compareVals(l, r, op) {
+  let result;
+  if (typeof l === 'number' && typeof r === 'number') result = compareNum(l, r, op);
+  else if (typeof l === 'boolean' && typeof r === 'boolean') result = compareNum(l?1:0, r?1:0, op);
+  else if (typeof l === 'number' && typeof r === 'boolean') result = compareNum(l, r?1:0, op);
+  else if (typeof l === 'boolean' && typeof r === 'number') result = compareNum(l?1:0, r, op);
+  else result = compareStr(displayVal(l), displayVal(r), op);
+  return result;
+}
+function compareNum(a, b, op) {
+  if (op==='=') return a===b; if (op==='<>') return a!==b;
+  if (op==='<') return a<b; if (op==='>') return a>b;
+  if (op==='<=') return a<=b; if (op==='>=') return a>=b;
+}
+function compareStr(a, b, op) {
+  if (op==='=') return a===b; if (op==='<>') return a!==b;
+  if (op==='<') return a<b; if (op==='>') return a>b;
+  if (op==='<=') return a<=b; if (op==='>=') return a>=b;
+}
+
+// === DISPLAY ===
+function formatNumber(n) {
+  if (Object.is(n, -0)) n = 0;
+  if (!Number.isFinite(n)) return String(n);
+  if (n === 0) return '0';
+  let s = n.toPrecision(10);
+  if (s.includes('e') || s.includes('E')) {
+    let m = s.match(/^(-?)(\d*\.?\d+)[eE]([+-]?\d+)$/);
+    if (m) { s = Number(s).toString(); }
+  }
+  if (s.includes('.')) { s = s.replace(/0+$/, ''); if (s.endsWith('.')) s = s.slice(0,-1); }
+  return s;
+}
+
+function displayVal(v) {
+  if (v === null || v === undefined) return '';
+  if (isErr(v)) return v.code;
+  if (typeof v === 'number') return formatNumber(v);
+  if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+  if (typeof v === 'string') return v;
+  return '';
+}
+
+// === GRID ===
+function buildGrid() {
+  const container = document.getElementById('grid-container');
+  const table = document.createElement('table');
+  table.id = 'grid';
+  const thead = document.createElement('thead');
+  const hrow = document.createElement('tr');
+  const corner = document.createElement('th');
+  corner.className = 'corner';
+  corner.textContent = '';
+  hrow.appendChild(corner);
+  for (let c = 0; c < COLS; c++) { const th = document.createElement('th'); th.textContent = colNames[c]; th.setAttribute('data-col', c); hrow.appendChild(th); }
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  for (let r = 0; r < ROWS; r++) {
+    const tr = document.createElement('tr');
+    const rh = document.createElement('th');
+    rh.textContent = String(r + 1);
+    rh.setAttribute('data-row', r);
+    tr.appendChild(rh);
+    for (let c = 0; c < COLS; c++) {
+      const td = document.createElement('td');
+      td.setAttribute('data-cell', cellAddress(c, r));
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  container.appendChild(table);
+}
+
+function getCellEl(addr) { return document.querySelector(`[data-cell="${addr}"]`); }
+
+function updateCellDisplay(addr) {
+  const el = getCellEl(addr);
+  if (!el) return;
+  const val = computedValues[addr];
+  el.textContent = displayVal(val);
+  el.classList.toggle('num', typeof val === 'number');
+  el.classList.toggle('txt', typeof val === 'string' || val === null || val === undefined);
+  if (isErr(val)) { el.classList.add('error-cell'); el.title = val.code; } else { el.classList.remove('error-cell'); el.removeAttribute('title'); }
+}
+
+function updateAllDisplays() {
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      updateCellDisplay(cellAddress(c, r));
+}
+
+// === SELECTION ===
+function selectCell(addr) {
+  if (selectedCell) {
+    const prev = getCellEl(selectedCell);
+    if (prev) { prev.classList.remove('selected'); prev.removeAttribute('aria-selected'); }
+    const p = parseAddr(selectedCell);
+    if (p) {
+      const rh = document.querySelector(`[data-row="${p.row}"]`);
+      const ch = document.querySelector(`[data-col="${p.col}"]`);
+      if (rh) rh.classList.remove('active');
+      if (ch) ch.classList.remove('active');
+    }
+  }
+  selectedCell = addr;
+  const el = getCellEl(addr);
+  if (el) { el.classList.add('selected'); el.setAttribute('aria-selected', 'true'); }
+  const p = parseAddr(addr);
+  if (p) {
+    const rh = document.querySelector(`[data-row="${p.row}"]`);
+    const ch = document.querySelector(`[data-col="${p.col}"]`);
+    if (rh) rh.classList.add('active');
+    if (ch) ch.classList.add('active');
+  }
+  if (el) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  updateFormulaBarDisplay();
+  updateStatusBar();
+}
+
+function updateFormulaBarDisplay() {
+  const fb = document.getElementById('formula-bar');
+  const addrEl = document.getElementById('cell-address');
+  addrEl.textContent = selectedCell;
+  if (!isEditing) { fb.value = cellData[selectedCell] || ''; }
+}
+
+function updateStatusBar() {
+  const val = computedValues[selectedCell];
+  const sumEl = document.getElementById('status-sum');
+  const avgEl = document.getElementById('status-avg');
+  const countEl = document.getElementById('status-count');
+  if (typeof val === 'number') { sumEl.textContent = formatNumber(val); avgEl.textContent = formatNumber(val); countEl.textContent = '1'; }
+  else if (isErr(val)) { sumEl.textContent = ''; avgEl.textContent = ''; countEl.textContent = ''; }
+  else { sumEl.textContent = '0'; avgEl.textContent = ''; countEl.textContent = '0'; }
+}
+
+// === EDITING ===
+function startEditing(content) {
+  isEditing = true;
+  editingOldContent = content;
+  const fb = document.getElementById('formula-bar');
+  fb.value = content;
+  fb.classList.add('editing');
+  const el = getCellEl(selectedCell);
+  if (el) el.classList.add('editing-cell');
+  fb.focus();
+  fb.setSelectionRange(fb.value.length, fb.value.length);
+  updateRefHighlight();
+}
+
+function commitEdit() {
+  const fb = document.getElementById('formula-bar');
+  const newContent = fb.value;
+  const addr = selectedCell;
+  setCellContent(addr, newContent);
+  isEditing = false;
+  fb.classList.remove('editing');
+  const el = getCellEl(addr);
+  if (el) el.classList.remove('editing-cell');
+  clearRefHighlight();
+  recalculate();
+  updateAllDisplays();
+  updateFormulaBarDisplay();
+}
+
+function cancelEdit() {
+  isEditing = false;
+  const fb = document.getElementById('formula-bar');
+  fb.classList.remove('editing');
+  const el = getCellEl(selectedCell);
+  if (el) el.classList.remove('editing-cell');
+  clearRefHighlight();
+  updateFormulaBarDisplay();
+}
+
+function setCellContent(addr, content) {
+  if (content === '' || content === undefined) { cellData[addr] = undefined; delete cellData[addr]; }
+  else { cellData[addr] = content; }
+  const raw = cellData[addr];
+  if (raw && raw.startsWith('=')) {
+    parsedASTs[addr] = parseFormula(raw.slice(1));
+  } else {
+    delete parsedASTs[addr];
+    if (raw !== undefined) {
+      const num = tryParseNumber(raw);
+      if (num !== null) computedValues[addr] = num;
+      else computedValues[addr] = raw;
+    } else { delete computedValues[addr]; }
+  }
+}
+
+function tryParseNumber(s) {
+  if (!s) return null;
+  const m = s.match(/^-?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i);
+  if (m) { const n = Number(s); return isNaN(n) ? null : n; }
+  return null;
+}
+
+// === FORMULA REFERENCE HIGHLIGHTING ===
+function updateRefHighlight() {
+  clearRefHighlight();
+  const fb = document.getElementById('formula-bar');
+  const val = fb.value;
+  if (!val.startsWith('=')) return;
+  const refs = new Set();
+  const regex = /\$?([A-Z])\$?(\d+)/g;
+  let m;
+  while ((m = regex.exec(val)) !== null) {
+    const c = colIdx(m[1]), r = parseInt(m[2]) - 1;
+    if (isValidCell(c, r)) refs.add(cellAddress(c, r));
+  }
+  for (const ref of refs) {
+    const el = getCellEl(ref);
+    if (el && ref !== selectedCell) el.classList.add('ref-highlight');
+  }
+}
+
+function clearRefHighlight() {
+  document.querySelectorAll('.ref-highlight').forEach(el => el.classList.remove('ref-highlight'));
+}
+
+// === RECALCULATION ===
+function recalculate() {
+  // Build dependency graph
+  const deps = {}; // addr -> set of addr it depends on
+  const reverseDeps = {}; // addr -> set of addr that depend on it
+  const formulaCells = [];
+
+  for (const addr of Object.keys(parsedASTs)) {
+    if (!parsedASTs[addr]) { computedValues[addr] = makeErr('#ERROR!'); continue; }
+    const refs = new Set();
+    collectRefs(parsedASTs[addr], refs);
+    // Also check for out-of-bounds refs
+    let hasRefError = false;
+    const ast = parsedASTs[addr];
+    if (checkAstBounds(ast)) hasRefError = true;
+    deps[addr] = refs;
+    formulaCells.push(addr);
+    for (const r of refs) {
+      if (!reverseDeps[r]) reverseDeps[r] = new Set();
+      reverseDeps[r].add(addr);
+    }
+  }
+
+  // Find cycles using DFS coloring
+  const WHITE = 0, GRAY = 1, BLACK = 2;
+  const color = {};
+  const inCycle = new Set();
+  const cycleMembers = new Set();
+
+  function dfs(node, stack) {
+    color[node] = GRAY;
+    stack.push(node);
+    if (deps[node]) {
+      for (const dep of deps[node]) {
+        if (!formulaCells.includes(dep) && !(dep in cellData)) continue;
+        if (color[dep] === GRAY) {
+          // Found a cycle - mark all nodes from dep to node in stack
+          const idx = stack.indexOf(dep);
+          for (let i = idx; i < stack.length; i++) cycleMembers.add(stack[i]);
+        } else if (!color[dep] || color[dep] === WHITE) {
+          dfs(dep, stack);
+        }
+      }
+    }
+    stack.pop();
+    color[node] = BLACK;
+  }
+
+  for (const addr of formulaCells) { if (!color[addr]) dfs(addr, []); }
+
+  // Any cell depending on a cycle member is also affected
+  // BFS from cycle members through reverse deps
+  const affectedByCycle = new Set(cycleMembers);
+  const queue = [...cycleMembers];
+  while (queue.length) {
+    const node = queue.shift();
+    if (reverseDeps[node]) {
+      for (const dependent of reverseDeps[node]) {
+        if (!affectedByCycle.has(dependent)) { affectedByCycle.add(dependent); queue.push(dependent); }
+      }
+    }
+  }
+
+  // Topological sort of non-cycle formula cells
+  const topoOrder = [];
+  const visited = new Set();
+  function topo(node) {
+    if (visited.has(node)) return;
+    visited.add(node);
+    if (deps[node]) { for (const dep of deps[node]) if (formulaCells.includes(dep) && !cycleMembers.has(dep)) topo(dep); }
+    topoOrder.push(node);
+  }
+  for (const addr of formulaCells) { if (!cycleMembers.has(addr)) topo(addr); }
+
+  // Evaluate
+  for (const addr of topoOrder) {
+    if (cycleMembers.has(addr)) { computedValues[addr] = makeErr('#CYCLE!'); continue; }
+    const ast = parsedASTs[addr];
+    if (!ast) { computedValues[addr] = makeErr('#ERROR!'); continue; }
+    const result = evalExpr(ast);
+    computedValues[addr] = result;
+  }
+  // Cycle cells and their dependents
+  for (const addr of affectedByCycle) {
+    if (cycleMembers.has(addr)) computedValues[addr] = makeErr('#CYCLE!');
+    else if (formulaCells.includes(addr)) {
+      // Check if this formula cell depends on a cycle - propagate error
+      const hasCycleDep = [...deps[addr]].some(d => affectedByCycle.has(d));
+      if (hasCycleDep) computedValues[addr] = makeErr('#CYCLE!');
+    }
+  }
+}
+
+function checkAstBounds(ast) {
+  if (!ast) return false;
+  if (ast.type === 'cellref') return !isValidCell(ast.col, ast.row);
+  if (ast.type === 'range') return !isValidCell(ast.start.col, ast.start.row) || !isValidCell(ast.end.col, ast.end.row);
+  if (ast.type === 'binop') return checkAstBounds(ast.left) || checkAstBounds(ast.right);
+  if (ast.type === 'unop') return checkAstBounds(ast.operand);
+  if (ast.type === 'func') return ast.args.some(a => checkAstBounds(a));
+  return false;
+}
+
+// === PERSISTENCE ===
+function saveState() { localStorage.setItem('gridcalc', JSON.stringify(cellData)); }
+function loadState() {
+  try {
+    const data = JSON.parse(localStorage.getItem('gridcalc'));
+    if (data) { for (const [addr, content] of Object.entries(data)) { if (content !== undefined && content !== null) cellData[addr] = content; } }
+  } catch(e) {}
+  for (const addr of Object.keys(cellData)) {
+    const raw = cellData[addr];
+    if (raw && raw.startsWith('=')) { parsedASTs[addr] = parseFormula(raw.slice(1)); }
+    else { const num = tryParseNumber(raw); if (num !== null) computedValues[addr] = num; else computedValues[addr] = raw; }
+  }
+  recalculate();
+}
+
+// === COPY/PASTE ===
+function copyCell() {
+  const raw = cellData[selectedCell] || '';
+  const p = parseAddr(selectedCell);
+  clipboard = { content: raw, col: p ? p.col : 0, row: p ? p.row : 0 };
+}
+
+function pasteCell() {
+  if (!clipboard || !clipboard.content) return;
+  let content = clipboard.content;
+  if (content.startsWith('=')) {
+    const target = parseAddr(selectedCell);
+    if (!target) return;
+    const colOff = target.col - clipboard.col;
+    const rowOff = target.row - clipboard.row;
+    content = shiftFormula(content, colOff, rowOff);
+  }
+  setCellContent(selectedCell, content);
+  recalculate();
+  updateAllDisplays();
+  updateFormulaBarDisplay();
+}
+
+function shiftFormula(raw, colOff, rowOff) {
+  const expr = raw.slice(1);
+  const tokens = tokenize(expr);
+  if (!tokens) return raw;
+  // Find cell ref positions and shift them
+  const replacements = [];
+  for (const t of tokens) {
+    if (t.type === 'IDENT' && t.pos !== undefined) {
+      const m = t.value.match(/^(\$?)([A-Za-z])(\$?)(\d+)$/);
+      if (m) {
+        let col = colIdx(m[2].toUpperCase());
+        let row = parseInt(m[4]) - 1;
+        const absCol = m[1] === '$';
+        const absRow = m[3] === '$';
+        if (!absCol) col += colOff;
+        if (!absRow) row += rowOff;
+        const newRef = (absCol ? '$' : '') + colName(Math.max(0, col)) + (absRow ? '$' : '') + (row + 1);
+        replacements.push({ start: t.pos, end: t.pos + t.value.length, text: newRef });
+      }
+    }
+  }
+  // Apply replacements from end to start
+  let result = expr;
+  replacements.sort((a,b) => b.start - a.start);
+  for (const r of replacements) { result = result.slice(0, r.start) + r.text + result.slice(r.end); }
+  return '=' + result;
+}
+
+// === EVENT HANDLING ===
+function initEvents() {
+  const gridContainer = document.getElementById('grid-container');
+  const fb = document.getElementById('formula-bar');
+
+  gridContainer.addEventListener('mousedown', function(e) {
+    const td = e.target.closest('td[data-cell]');
+    if (!td) return;
+    e.preventDefault();
+    const addr = td.getAttribute('data-cell');
+    if (isEditing) { commitEdit(); }
+    selectCell(addr);
+  });
+
+  gridContainer.addEventListener('dblclick', function(e) {
+    const td = e.target.closest('td[data-cell]');
+    if (!td) return;
+    const addr = td.getAttribute('data-cell');
+    if (addr !== selectedCell) selectCell(addr);
+    startEditing(cellData[addr] || '');
+  });
+
+  fb.addEventListener('focus', function() { if (!isEditing && selectedCell) { startEditing(cellData[selectedCell] || ''); } });
+  fb.addEventListener('input', function() { if (isEditing) updateRefHighlight(); });
+  fb.addEventListener('keydown', function(e) {
+    if (!isEditing) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const target = moveSelection(e.shiftKey ? -1 : 1, 0);
+      commitEdit();
+      if (target) selectCell(target);
+      fb.blur();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      const target = moveSelection(0, e.shiftKey ? -1 : 1);
+      commitEdit();
+      if (target) selectCell(target);
+      fb.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEdit();
+      fb.blur();
+    }
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (isEditing) return;
+    if (e.target === fb) return;
+
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      let dr = 0, dc = 0;
+      if (e.key === 'ArrowUp') dr = -1;
+      else if (e.key === 'ArrowDown') dr = 1;
+      else if (e.key === 'ArrowLeft') dc = -1;
+      else if (e.key === 'ArrowRight') dc = 1;
+      const target = moveSelection(dr, dc);
+      if (target) selectCell(target);
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      if (selectedCell) {
+        delete cellData[selectedCell];
+        delete parsedASTs[selectedCell];
+        delete computedValues[selectedCell];
+        recalculate();
+        updateAllDisplays();
+        updateFormulaBarDisplay();
+        saveState();
+      }
+    } else if (e.key === 'F2') {
+      e.preventDefault();
+      startEditing(cellData[selectedCell] || '');
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+      e.preventDefault();
+      copyCell();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+      e.preventDefault();
+      pasteCell();
+    } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Printable character: start editing with this character
+      e.preventDefault();
+      startEditing(e.key);
+    }
+  });
+}
+
+function moveSelection(dr, dc) {
+  const p = parseAddr(selectedCell);
+  if (!p) return null;
+  const newCol = p.col + dc;
+  const newRow = p.row + dr;
+  if (newCol < 0 || newCol >= COLS || newRow < 0 || newRow >= ROWS) return null;
+  return cellAddress(newCol, newRow);
+}
+
+// === INIT ===
+function init() {
+  buildGrid();
+  loadState();
+  updateAllDisplays();
+  selectCell('A1');
+  initEvents();
+}
+
+init();
+
+})();
+</script>
+</body>
+</html>
+```

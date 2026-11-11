@@ -124,6 +124,8 @@ tr:first-child .rank { color: var(--ink); }
 .meter { height: 4px; background: var(--rule-soft); border-radius: 2px; margin-top: 7px; overflow: hidden; min-width: 54px; }
 .meter > i { display: block; height: 100%; background: var(--ink); }
 .none { color: var(--rule); }
+.cell-sub { display: block; font-size: 12px; color: var(--graphite); white-space: nowrap; }
+.standings-wrap { overflow-x: auto; }
 .v2-badge {
   font: 600 10px/1 var(--text); letter-spacing: 0.04em; vertical-align: 2px;
   padding: 2px 5px; border-radius: 99px; border: 1px solid var(--rule);
@@ -171,9 +173,12 @@ tr:first-child .rank { color: var(--ink); }
 .subs { display: flex; flex-direction: column; gap: 20px; }
 .sub {
   display: grid; grid-template-columns: minmax(0, 46%) minmax(0, 1fr); gap: 0;
-  background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden;
+  background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; overflow: clip;
+  scroll-margin-top: 76px; /* clear the sticky bar when jumping to a model */
 }
-.sub-media { background: var(--stage); display: flex; flex-direction: column; }
+/* overflow: clip (not hidden) on .sub keeps this sticky: the video stays in view
+   while you scroll a long check list. */
+.sub-media { background: var(--stage); display: flex; flex-direction: column; align-self: start; position: sticky; top: 60px; }
 .sub-media video, .sub-media img.hero { width: 100%; aspect-ratio: 16 / 10; display: block; object-fit: contain; background: var(--stage); }
 .thumbs { display: flex; gap: 6px; padding: 8px; overflow-x: auto; }
 .thumbs button { padding: 0; border: 1px solid transparent; border-radius: 3px; background: none; cursor: pointer; flex: 0 0 auto; }
@@ -186,6 +191,12 @@ tr:first-child .rank { color: var(--ink); }
 .sub-top .of { color: var(--graphite); font: 500 16px var(--numeric); }
 .sub-meta { font-size: 12px; color: var(--graphite); margin: 2px 0 14px; }
 .sub-links { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.run { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0 0 6px; }
+.run dt { font-size: 11px; color: var(--graphite); text-transform: uppercase; letter-spacing: 0.05em; }
+.run dd { margin: 0; font: 500 17px/1.25 var(--numeric); font-variant-numeric: tabular-nums; }
+.run-src { font-size: 12px; color: var(--graphite); margin: 0 0 14px; overflow-wrap: anywhere; }
+.run-src a { color: inherit; }
+.run-warn { color: var(--partial); font-size: 13px; margin: -8px 0 14px; }
 
 .checks { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule-soft); }
 .checks > li { border-bottom: 1px solid var(--rule-soft); }
@@ -208,6 +219,7 @@ tr:first-child .rank { color: var(--ink); }
 
 /* ── Judge ───────────────────────────────────────────────── */
 .judge { background: var(--stage); color: var(--stage-ink); margin: -32px -28px -80px; padding: 24px 28px 40px; min-height: calc(100vh - 60px); }
+.judge:focus { outline: none; }
 .judge-top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
 .judge-top h2 { margin-right: 6px; }
 .seg { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -216,6 +228,7 @@ tr:first-child .rank { color: var(--ink); }
   padding: 5px 11px; border-radius: 99px; cursor: pointer; font-size: 13px;
 }
 .seg button[aria-pressed='true'] { background: var(--stage-ink); color: var(--stage); }
+.seg button:disabled { opacity: 0.35; cursor: default; }
 .judge-top .count { margin-left: auto; font-size: 13px; opacity: 0.7; }
 .judge .brief { font-size: 14px; opacity: 0.85; margin: 0 0 16px; max-width: 110ch; }
 .judge .brief strong { font-weight: 600; }

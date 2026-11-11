@@ -1,0 +1,1259 @@
+```html
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commander — Notes</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Light theme */
+  --bg: #fafafa;
+  --bg-elevated: #ffffff;
+  --bg-sidebar: #f5f5f7;
+  --bg-input: #ffffff;
+  --border: #e5e5e7;
+  --text: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #98989d;
+  --accent: #5b5bd6;
+  --accent-soft: #e8e8fc;
+  --accent-hover: #4b4bc4;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 12px 32px rgba(0,0,0,0.12);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.1), 0 24px 64px rgba(0,0,0,0.15);
+  --radius: 8px;
+  --radius-lg: 12px;
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --transition-theme: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+[data-theme="dark"] {
+  --bg: #1c1c1e;
+  --bg-elevated: #2c2c2e;
+  --bg-sidebar: #1c1c1e;
+  --bg-input: #2c2c2e;
+  --border: #3a3a3c;
+  --text: #f2f2f7;
+  --text-secondary: #a1a1a6;
+  --text-tertiary: #6e6e73;
+  --accent-soft: #2a2a5a;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2), 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.4), 0 24px 64px rgba(0,0,0,0.5);
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  transition: var(--transition-theme);
+}
+
+/* ===== App Layout ===== */
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* ===== Header ===== */
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  z-index: 100;
+  transition: var(--transition-theme);
+}
+
+.header-title {
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-title svg {
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+}
+
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* ===== Open Palette Button ===== */
+#open-palette {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+#open-palette:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+#open-palette .keycap {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ===== Keycap ===== */
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font);
+  color: var(--text-secondary);
+  box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+}
+
+/* ===== Sidebar ===== */
+.sidebar {
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
+  margin-top: 48px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: var(--transition-theme);
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+}
+
+.note-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 16px;
+}
+
+[data-note] {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  margin-bottom: 2px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+[data-note]:hover {
+  background: var(--bg-elevated);
+}
+
+[data-note].active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+[data-note].active .note-title {
+  font-weight: 600;
+}
+
+.note-title {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.note-preview {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== Editor ===== */
+.editor-container {
+  flex: 1;
+  margin-top: 48px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+  transition: var(--transition-theme);
+}
+
+.editor-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.editor-meta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+#editor {
+  flex: 1;
+  padding: 24px;
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: none;
+  outline: none;
+  resize: none;
+  transition: var(--transition-theme);
+}
+
+#editor::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* ===== Command Palette ===== */
+.palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.palette-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.palette {
+  width: 560px;
+  max-width: 90vw;
+  max-height: 60vh;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  transform: scale(0.95) translateY(-10px);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
+.palette-overlay.open .palette {
+  transform: scale(1) translateY(0);
+}
+
+.palette-search {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+
+.palette-search-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+#palette-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  font-family: var(--font);
+  color: var(--text);
+  background: transparent;
+}
+
+#palette-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.palette-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.palette-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.palette-group-title {
+  padding: 8px 20px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+}
+
+.palette-option {
+  display: flex;
+  align-items: center;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  position: relative;
+}
+
+.palette-option.active {
+  background: var(--accent-soft);
+}
+
+.palette-option.active .palette-option-title {
+  color: var(--accent);
+}
+
+.palette-option-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--text-tertiary);
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.palette-option.active .palette-option-icon {
+  color: var(--accent);
+}
+
+.palette-option-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.palette-option-title {
+  font-size: 14px;
+  color: var(--text);
+  transition: color 0.1s ease;
+}
+
+.palette-option-title mark {
+  background: rgba(91, 91, 214, 0.2);
+  color: var(--accent);
+  font-weight: 600;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.palette-option-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+.palette-option-shortcut {
+  margin-left: 16px;
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.palette-empty {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  display: none;
+}
+
+.palette-empty.show {
+  display: block;
+}
+
+.palette-footer {
+  padding: 8px 20px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.palette-footer-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ===== Toasts ===== */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--bg-elevated);
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: toast-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: auto;
+  min-width: 200px;
+}
+
+.toast.exiting {
+  animation: toast-out 0.2s ease forwards;
+}
+
+.toast-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+@keyframes toast-in {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes toast-out {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(-10px); opacity: 0; }
+}
+
+/* ===== Scrollbars ===== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .palette-overlay,
+  .palette,
+  .palette-list,
+  .toast {
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  .palette-overlay.open .palette {
+    transform: none;
+  }
+  
+  .toast {
+    opacity: 1;
+    transform: none;
+  }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+      Commander
+    </div>
+    <div class="header-actions">
+      <button id="open-palette" type="button" aria-label="Open command palette">
+        <span>Open menu</span>
+        <span class="keycap">⌘</span><span class="keycap">K</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">Notes</div>
+    <div class="note-list" id="note-list"></div>
+  </aside>
+
+  <!-- Editor -->
+  <main class="editor-container">
+    <div class="editor-header">
+      <div class="editor-title" id="editor-title">Welcome to Commander</div>
+      <div class="editor-meta">Today, 2:30 PM</div>
+    </div>
+    <textarea id="editor" placeholder="Start typing your note..."></textarea>
+  </main>
+</div>
+
+<!-- Command Palette -->
+<div class="palette-overlay" id="palette-overlay">
+  <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="palette-search">
+      <svg class="palette-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/>
+        <path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <span class="palette-breadcrumb" id="palette-breadcrumb" style="display:none;"></span>
+      <input type="text" id="palette-input" role="combobox" aria-expanded="true"
+             aria-controls="palette-listbox" aria-activedescendant=""
+             placeholder="Search commands..." autocomplete="off" spellcheck="false"/>
+    </div>
+    <div class="palette-list" id="palette-listbox" role="listbox" aria-label="Commands"></div>
+    <div class="palette-footer">
+      <span class="palette-footer-item"><span class="keycap">↑</span><span class="keycap">↓</span> Navigate</span>
+      <span class="palette-footer-item"><span class="keycap">↵</span> Select</span>
+      <span class="palette-footer-item"><span class="keycap">esc</span> Close</span>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-container" id="toast-container" role="status" aria-live="polite"></div>
+
+<script>
+// ===== Command Data =====
+const COMMANDS = [
+  { id: "go-inbox", title: "Go to Inbox", group: "Navigation", keywords: ["home"] },
+  { id: "go-today", title: "Go to Today", group: "Navigation" },
+  { id: "go-archive", title: "Go to Archive", group: "Navigation" },
+  { id: "go-settings", title: "Go to Settings", group: "Navigation", keywords: ["preferences", "options"], shortcut: "Mod+," },
+  { id: "go-line", title: "Go to Line…", group: "Navigation", keywords: ["jump"], shortcut: "Mod+G" },
+  { id: "go-symbol", title: "Go to Symbol…", group: "Navigation", shortcut: "Mod+Shift+O" },
+  { id: "search-notes", title: "Search Notes…", group: "Navigation", keywords: ["find"], shortcut: "Mod+Shift+F" },
+  { id: "new-note", title: "New Note", group: "Notes", keywords: ["create", "add"], shortcut: "Mod+N" },
+  { id: "new-note-template", title: "New Note from Template…", group: "Notes" },
+  { id: "duplicate-note", title: "Duplicate Note", group: "Notes", keywords: ["copy", "clone"] },
+  { id: "rename-note", title: "Rename Note…", group: "Notes", shortcut: "F2" },
+  { id: "delete-note", title: "Delete Note", group: "Notes", keywords: ["remove", "trash"] },
+  { id: "pin-note", title: "Pin Note", group: "Notes", keywords: ["favorite", "star"] },
+  { id: "move-note", title: "Move Note to Folder…", group: "Notes" },
+  { id: "export-pdf", title: "Export Note as PDF", group: "Notes" },
+  { id: "export-md", title: "Export Note as Markdown", group: "Notes" },
+  { id: "share-note", title: "Share Note Link", group: "Notes", keywords: ["copy", "url"] },
+  { id: "bold", title: "Bold", group: "Editor", shortcut: "Mod+B" },
+  { id: "italic", title: "Italic", group: "Editor", shortcut: "Mod+I" },
+  { id: "insert-link", title: "Insert Link…", group: "Editor", keywords: ["url"] },
+  { id: "insert-table", title: "Insert Table", group: "Editor" },
+  { id: "insert-code", title: "Insert Code Block", group: "Editor", keywords: ["snippet"] },
+  { id: "insert-checklist", title: "Insert Checklist", group: "Editor", keywords: ["todo", "task"] },
+  { id: "word-wrap", title: "Toggle Word Wrap", group: "Editor", shortcut: "Alt+Z" },
+  { id: "format-doc", title: "Format Document", group: "Editor", keywords: ["prettify", "beautify"], shortcut: "Shift+Alt+F" },
+  { id: "sort-asc", title: "Sort Lines Ascending", group: "Editor" },
+  { id: "sort-desc", title: "Sort Lines Descending", group: "Editor" },
+  { id: "toggle-dark-mode", title: "Toggle Dark Mode", group: "View", keywords: ["theme", "night", "appearance"], shortcut: "Mod+Shift+L" },
+  { id: "change-accent", title: "Change Accent Color…", group: "View", keywords: ["theme", "color"], page: "accent" },
+  { id: "toggle-sidebar", title: "Toggle Sidebar", group: "View", shortcut: "Mod+\\" },
+  { id: "toggle-focus-mode", title: "Toggle Focus Mode", group: "View", keywords: ["zen", "distraction free"] },
+  { id: "zoom-in", title: "Zoom In", group: "View", shortcut: "Mod+=" },
+  { id: "zoom-out", title: "Zoom Out", group: "View", shortcut: "Mod+-" },
+  { id: "zoom-reset", title: "Reset Zoom", group: "View", shortcut: "Mod+0" },
+  { id: "shortcuts", title: "Keyboard Shortcuts", group: "Help", keywords: ["keys", "hotkeys"], shortcut: "Mod+/" },
+  { id: "release-notes", title: "Release Notes", group: "Help", keywords: ["changelog", "what's new"] },
+  { id: "feedback", title: "Send Feedback", group: "Help" },
+  { id: "about", title: "About Commander", group: "Help" }
+];
+
+const ACCENTS = [
+  { id: "accent-indigo", title: "Indigo", value: "#5b5bd6" },
+  { id: "accent-emerald", title: "Emerald", value: "#10b981" },
+  { id: "accent-rose", title: "Rose", value: "#e11d48" },
+  { id: "accent-amber", title: "Amber", value: "#f59e0b" },
+  { id: "accent-sky", title: "Sky", value: "#0ea5e9" }
+];
+
+// ===== State =====
+let paletteOpen = false;
+let palettePage = "root"; // "root" or "accent"
+let activeIndex = 0;
+let results = [];
+let prevFocused = null;
+let isMac = navigator.platform.includes("Mac");
+
+// ===== DOM Elements =====
+const overlay = document.getElementById("palette-overlay");
+const paletteInput = document.getElementById("palette-input");
+const paletteListbox = document.getElementById("palette-listbox");
+const paletteBreadcrumb = document.getElementById("palette-breadcrumb");
+const editor = document.getElementById("editor");
+const openPaletteBtn = document.getElementById("open-palette");
+const noteList = document.getElementById("note-list");
+const toastContainer = document.getElementById("toast-container");
+const editorTitle = document.getElementById("editor-title");
+
+// ===== Recent Commands =====
+function getRecentCommands() {
+  try {
+    return JSON.parse(localStorage.getItem("commander-recent") || "[]");
+  } catch { return []; }
+}
+
+function addRecentCommand(id) {
+  let recent = getRecentCommands();
+  recent = recent.filter(r => r !== id);
+  recent.unshift(id);
+  recent = recent.slice(0, 5);
+  localStorage.setItem("commander-recent", JSON.stringify(recent));
+}
+
+// ===== Theme =====
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem("commander-theme", theme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.dataset.theme;
+  setTheme(current === "dark" ? "light" : "dark");
+  showToast("Toggle Dark Mode");
+}
+
+function loadTheme() {
+  const saved = localStorage.getItem("commander-theme");
+  if (saved) setTheme(saved);
+}
+
+// ===== Accent =====
+function setAccent(value) {
+  document.documentElement.style.setProperty("--accent", value);
+  document.documentElement.style.setProperty("--accent-soft", hexToSoft(value));
+}
+
+function hexToSoft(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, 0.15)`;
+}
+
+// ===== Notes =====
+let noteCounter = 0;
+const initialNotes = [
+  { title: "Welcome to Commander", preview: "Your new command-driven notes app..." },
+  { title: "Meeting Notes", preview: "Discuss Q4 roadmap and priorities..." },
+  { title: "Ideas", preview: "Brainstorm new feature concepts..." }
+];
+
+function createNoteElement(note, index) {
+  const el = document.createElement("div");
+  el.setAttribute("data-note", index);
+  el.innerHTML = `
+    <div class="note-title">${note.title}</div>
+    <div class="note-preview">${note.preview}</div>
+  `;
+  el.addEventListener("click", () => {
+    noteList.querySelectorAll("[data-note]").forEach(n => n.classList.remove("active"));
+    el.classList.add("active");
+    editorTitle.textContent = note.title;
+    editor.value = "";
+    editor.focus();
+  });
+  return el;
+}
+
+function initNotes() {
+  initialNotes.forEach((note, i) => {
+    noteList.appendChild(createNoteElement(note, i));
+  });
+  noteList.querySelector("[data-note]").classList.add("active");
+  editor.value = "Welcome to Commander!\n\nUse ⌘K to open the command palette and explore all the available commands.\n\nTry searching for \"dark mode\" or \"accent\" to see the palette in action.";
+}
+
+function newNote() {
+  noteCounter++;
+  const note = {
+    title: `New Note ${noteCounter}`,
+    preview: "Untitled note..."
+  };
+  const el = createNoteElement(note, noteCounter);
+  noteList.prepend(el);
+  el.classList.add("active");
+  noteList.querySelectorAll("[data-note]").forEach((n, i) => {
+    if (i > 0) n.classList.remove("active");
+  });
+  editorTitle.textContent = note.title;
+  editor.value = "";
+  editor.focus();
+}
+
+// ===== Fuzzy Matching =====
+function fuzzyMatch(query, text) {
+  const q = query.toLowerCase();
+  const t = text.toLowerCase();
+  
+  if (q.length === 0) return { matched: true, score: 0, indices: [] };
+  
+  let qi = 0;
+  let ti = 0;
+  const indices = [];
+  let consecutive = 0;
+  let wordStart = 0;
+  
+  while (ti < t.length && qi < q.length) {
+    if (t[ti] === q[qi]) {
+      indices.push(ti);
+      qi++;
+      if (consecutive > 0) wordStart++;
+      consecutive++;
+    } else {
+      consecutive = 0;
+    }
+    ti++;
+  }
+  
+  if (qi < q.length) return { matched: false, score: 0, indices: [] };
+  
+  // Score calculation
+  let score = 0;
+  const exact = q === t;
+  const prefix = t.startsWith(q);
+  
+  if (exact) score += 1000;
+  else if (prefix) score += 800;
+  else score += 600;
+  
+  // Word starts bonus
+  for (let i = 0; i < indices.length; i++) {
+    if (i === 0 || t[indices[i] - 1] === " " || t[indices[i] - 1] === "-" || t[indices[i] - 1] === "_" || t[indices[i] - 1] === ".") {
+      score += 50;
+    }
+  }
+  
+  // Contiguous bonus
+  let maxContig = 0;
+  let contig = 1;
+  for (let i = 1; i < indices.length; i++) {
+    if (indices[i] === indices[i - 1] + 1) {
+      contig++;
+      maxContig = Math.max(maxContig, contig);
+    } else {
+      contig = 1;
+    }
+  }
+  score += maxContig * 10;
+  
+  // Length penalty
+  score -= (t.length - q.length) * 2;
+  
+  return { matched: true, score, indices };
+}
+
+function rankAndFilter(query, commands) {
+  if (!query || query.length === 0) {
+    return commands.map(cmd => ({ cmd, score: 0, titleMatch: null, keywordMatch: null }));
+  }
+  
+  const results = [];
+  
+  for (const cmd of commands) {
+    const titleMatch = fuzzyMatch(query, cmd.title);
+    let keywordMatch = null;
+    
+    if (!titleMatch.matched && cmd.keywords) {
+      for (const kw of cmd.keywords) {
+        keywordMatch = fuzzyMatch(query, kw);
+        if (keywordMatch.matched) break;
+      }
+    }
+    
+    if (titleMatch.matched || keywordMatch) {
+      let score = titleMatch.matched ? titleMatch.score : keywordMatch.score;
+      if (!titleMatch.matched) score -= 200; // Keyword matches rank lower
+      results.push({ cmd, score, titleMatch, keywordMatch });
+    }
+  }
+  
+  results.sort((a, b) => b.score - a.score);
+  return results.slice(0, 50);
+}
+
+// ===== Palette Rendering =====
+function getCommandIcon(id) {
+  // Simple icon mapping
+  if (id.startsWith("go-")) return "📂";
+  if (id.startsWith("new-")) return "📝";
+  if (id.startsWith("delete-")) return "🗑️";
+  if (id.startsWith("duplicate-")) return "📋";
+  if (id.startsWith("export-")) return "📄";
+  if (id.startsWith("share-")) return "🔗";
+  if (id === "toggle-dark-mode") return "🌙";
+  if (id === "change-accent") return "🎨";
+  if (id === "toggle-sidebar") return "📊";
+  if (id === "bold") return "𝐁";
+  if (id === "italic") return "𝐼";
+  return "⚡";
+}
+
+function formatShortcut(shortcut) {
+  if (!shortcut) return "";
+  const parts = shortcut.split("+");
+  let html = "";
+  for (const part of parts) {
+    if (part === "Mod") {
+      html += `<span class="keycap">${isMac ? "⌘" : "Ctrl"}</span>`;
+    } else {
+      html += `<span class="keycap">${part}</span>`;
+    }
+  }
+  return html;
+}
+
+function renderPalette(query) {
+  paletteListbox.innerHTML = "";
+  results = [];
+  activeIndex = 0;
+  
+  if (palettePage === "accent") {
+    // Sub-page: accent colors
+    renderAccentPage(query);
+    return;
+  }
+  
+  // Check for recent commands
+  const recent = getRecentCommands();
+  const recentCommands = recent.map(id => COMMANDS.find(c => c.id === id)).filter(Boolean);
+  
+  if (!query || query.length === 0) {
+    // Show Recent group first
+    if (recentCommands.length > 0) {
+      const groupTitle = document.createElement("div");
+      groupTitle.className = "palette-group-title";
+      groupTitle.textContent = "Recent";
+      paletteListbox.appendChild(groupTitle);
+      
+      for (const cmd of recentCommands) {
+        results.push(renderOption(cmd, null));
+      }
+    }
+    
+    // Group all commands
+    const groups = {};
+    for (const cmd of COMMANDS) {
+      if (!groups[cmd.group]) groups[cmd.group] = [];
+      groups[cmd.group].push(cmd);
+    }
+    
+    const groupOrder = ["Navigation", "Notes", "Editor", "View", "Help"];
+    for (const group of groupOrder) {
+      if (groups[group]) {
+        const groupTitle = document.createElement("div");
+        groupTitle.className = "palette-group-title";
+        groupTitle.textContent = group;
+        paletteListbox.appendChild(groupTitle);
+        
+        for (const cmd of groups[group]) {
+          results.push(renderOption(cmd, null));
+        }
+      }
+    }
+  } else {
+    // Ranked results
+    const filtered = rankAndFilter(query, COMMANDS);
+    
+    for (const item of filtered) {
+      results.push(renderOption(item.cmd, item.titleMatch));
+    }
+  }
+  
+  // Set active
+  if (results.length > 0) {
+    setActive(0);
+  } else {
+    showEmpty(true);
+  }
+}
+
+function renderAccentPage(query) {
+  const filtered = query ? rankAndFilter(query, ACCENTS.map(a => ({
+    id: a.id, title: a.title, group: "", keywords: []
+  }))) : ACCENTS.map(a => ({ cmd: { id: a.id, title: a.title }, score: 0, titleMatch: null }));
+  
+  if (query) {
+    filtered.forEach(f => results.push(renderOption(f.cmd, f.titleMatch)));
+  } else {
+    for (const accent of ACCENTS) {
+      results.push(renderOption(accent, null));
+    }
+  }
+  
+  if (results.length > 0) {
+    setActive(0);
+  } else {
+    showEmpty(true);
+  }
+}
+
+function renderOption(cmd, matchInfo) {
+  const el = document.createElement("div");
+  el.className = "palette-option";
+  el.setAttribute("role", "option");
+  el.setAttribute("id", `option-${cmd.id}`);
+  el.setAttribute("data-command", cmd.id);
+  el.setAttribute("aria-selected", "false");
+  
+  let titleHtml = "";
+  if (matchInfo && matchInfo.matched && matchInfo.indices.length > 0) {
+    // Highlight matched characters
+    let i = 0;
+    let lastIdx = 0;
+    for (const idx of matchInfo.indices) {
+      if (idx > lastIdx) {
+        titleHtml += cmd.title.slice(lastIdx, idx);
+      }
+      titleHtml += `<mark>${cmd.title[idx]}</mark>`;
+      lastIdx = idx + 1;
+    }
+    if (lastIdx < cmd.title.length) {
+      titleHtml += cmd.title.slice(lastIdx);
+    }
+  } else {
+    titleHtml = cmd.title;
+  }
+  
+  el.innerHTML = `
+    <span class="palette-option-icon">${getCommandIcon(cmd.id)}</span>
+    <div class="palette-option-body">
+      <div class="palette-option-title">${titleHtml}</div>
+    </div>
+    ${cmd.shortcut ? `<div class="palette-option-shortcut">${formatShortcut(cmd.shortcut)}</div>` : ""}
+  `;
+  
+  el.addEventListener("click", () => {
+    executeCommand(cmd.id);
+  });
+  
+  el.addEventListener("mouseenter", () => {
+    const idx = results.findIndex(r => r === el);
+    if (idx >= 0) setActive(idx);
+  });
+  
+  paletteListbox.appendChild(el);
+  return el;
+}
+
+function setActive(index) {
+  if (index < 0 || index >= results.length) return;
+  
+  results.forEach(el => {
+    el.classList.remove("active");
+    el.setAttribute("aria-selected", "false");
+  });
+  
+  const el = results[index];
+  el.classList.add("active");
+  el.setAttribute("aria-selected", "true");
+  activeIndex = index;
+  
+  paletteInput.setAttribute("aria-activedescendant", el.id);
+  
+  // Scroll into view
+  const listboxRect = paletteListbox.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  
+  if (elRect.bottom > listboxRect.bottom) {
+    el.scrollIntoView({ block: "end" });
+  } else if (elRect.top < listboxRect.top) {
+    el.scrollIntoView({ block: "start" });
+  }
+}
+
+function showEmpty(show) {
+  let empty = document.getElementById("palette-empty");
+  if (!empty) {
+    empty = document.createElement("div");
+    empty.id = "palette-empty";
+    empty.className = "palette-empty";
+    empty.textContent = "No commands found";
+    paletteListbox.appendChild(empty);
+  }
+  empty.classList.toggle("show", show);
+}
+
+// ===== Command Execution =====
+function executeCommand(id) {
+  addRecentCommand(id);
+  closePalette();
+  
+  if (id === "toggle-dark-mode") {
+    toggleTheme();
+  } else if (id === "change-accent") {
+    openPalette("accent");
+  } else if (id === "new-note") {
+    newNote();
+    showToast("New Note");
+  } else if (id.startsWith("accent-")) {
+    const accent = ACCENTS.find(a => a.id === id);
+    if (accent) {
+      setAccent(accent.value);
+      showToast("Change Accent Color…");
+    }
+  } else {
+    const cmd = COMMANDS.find(c => c.id === id) || ACCENTS.find(a => a.id === id);
+    if (cmd) {
+      showToast(cmd.title);
+    }
+  }
+}
+
+// ===== Palette Open/Close =====
+function openPalette(page) {
+  palettePage = page || "root";
+  paletteOpen = true;
+  paletteInput.value = "";
+  overlay.classList.add("open");
+  
+  if (palettePage === "accent") {
+    paletteBreadcrumb.style.display = "inline-flex";
+    paletteBreadcrumb.textContent = "Change Accent Color…";
+  } else {
+    paletteBreadcrumb.style.display = "none";
+  }
+  
+  renderPalette("");
+  
+  setTimeout(() => paletteInput.focus(), 50);
+}
+
+function closePalette() {
+  paletteOpen = false;
+  overlay.classList.remove("open");
+  paletteInput.blur();
+  
+  // Wait for animation, then hide
+  setTimeout(() => {
+    if (!paletteOpen) {
+      overlay.style.display = "none";
+      overlay.style.visibility = "hidden";
+    }
+  }, 250);
+  
+  // Reset page
+  palettePage = "root";
+  
+  // Restore focus
+  if (prevFocused) {
+    prevFocused.focus();
+  }
+}
+
+function togglePalette() {
+  if (paletteOpen) {
+    closePalette();
+  } else {
+    prevFocused = document.activeElement;
+    openPalette("root");
+  }
+}
+
+// ===== Toast System =====
+function showToast(title) {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.setAttribute("data-toast", title);
+  toast.innerHTML = `
+    <svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M20 6L9 17l-5-5"/>
+    </svg>
+    <span>${title}</span>
+  `;
+  
+  toastContainer.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.classList.add("exiting");
+    setTimeout(() => {
+      toast.remove();
+    }, 200);
+  }, 3000);
+}
+
+// ===== Keyboard Handlers =====
+document.addEventListener("keydown", (e) => {
+  // Toggle palette with Cmd/Ctrl+K
+  if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+    e.preventDefault();
+    togglePalette();
+    return;
+  }
+  
+  if (!paletteOpen) return;
+  
+  // Escape to close or go back
+  if (e.key === "Escape") {
+    e.preventDefault();
+    if (palettePage === "accent") {
+      // Go back to root
+      palettePage = "root";
+      paletteBreadcrumb.style.display = "none";
+      renderPalette("");
+    } else {
+      closePalette();
+    }
+    return;
+  }
+  
+  // Arrow navigation
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    const next = (activeIndex + 1) % results.length;
+    setActive(next);
+    return;
+  }
+  
+  if (e.key === "ArrowUp") {
+    e.preventDefault();
+    const prev = (activeIndex - 1 + results.length) % results.length;
+    setActive(prev);
+    return;
+  }
+  
+  if (e.key === "Home") {
+    e.preventDefault();
+    setActive(0);
+    return;
+  }
+  
+  if (e.key === "End") {
+    e.preventDefault();
+    setActive(results.length - 1);
+    return;
+  }
+  
+  // Enter to execute
+  if (e.key === "Enter") {
+    e.preventDefault();
+    if (results.length > 0 && activeIndex >= 0 && activeIndex < results.length) {
+      const id = results[activeIndex].getAttribute("data-command");
+      executeCommand(id);
+    }
+    return;
+  }
+  
+  // Backspace on empty query in sub-page goes back
+  if (e.key === "Backspace" && palettePage === "accent" && paletteInput.value.length === 0) {
+    e.preventDefault();
+    palettePage = "root";
+    paletteBreadcrumb.style.display = "none";
+    renderPalette("");
+    return;
+  }
+});
+
+// Palette input handler
+paletteInput.addEventListener("input", (e) => {
+  const query = e.target.value;
+  if (palettePage === "accent") {
+    renderAccentPage(query);
+  } else {
+    renderPalette(query);
+  }
+});
+
+// Overlay click to close
+overlay.addEventListener("click", (e) => {
+  if (e.target === overlay) {
+    closePalette();
+  }
+});
+
+// Open palette button
+openPaletteBtn.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (!paletteOpen) {
+    prevFocused = openPaletteBtn;
+    openPalette("root");
+  }
+});
+
+// ===== Initialize =====
+loadTheme();
+initNotes();
+
+// Set initial overlay state
+overlay.style.display = "none";
+overlay.style.visibility = "hidden";
+</script>
+</body>
+</html>
+```

@@ -1,0 +1,574 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Silk</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#08080f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+canvas{display:block;position:fixed;top:0;left:0}
+#panel{position:fixed;top:16px;right:16px;background:rgba(12,12,24,0.88);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:18px 20px;color:#bbb;font-size:13px;min-width:210px;user-select:none;z-index:10}
+#panel h3{font-size:15px;color:#fff;margin-bottom:14px;font-weight:600;letter-spacing:0.5px}
+#panel .row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+#panel .row label{flex-shrink:0;width:62px;font-size:12px;color:#999}
+#panel input[type="range"]{flex:1;accent-color:#7c6df0;height:4px}
+#panel input[type="checkbox"]{accent-color:#7c6df0;width:16px;height:16px;cursor:pointer}
+#panel button{background:#6c5ce7;color:#fff;border:none;padding:7px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:background 0.15s}
+#panel button:hover{background:#5a4bd1}
+#stats{margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.07);font-family:'SF Mono','Fira Code','Courier New',monospace;font-size:11px;color:#666;line-height:1.7}
+#stats span{color:#999}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="panel">
+<h3>Silk</h3>
+<div class="row"><input type="checkbox" id="wind"><label style="width:auto;cursor:pointer">Wind</label></div>
+<div class="row"><label>Gravity</label><input type="range" id="gravity" min="0" max="2000" value="980" step="10"></div>
+<div class="row"><label>Solver</label><input type="range" id="iterations" min="1" max="15" value="6"></div>
+<div class="row"><button id="reset">Reset Cloth</button></div>
+<div id="stats"><span id="s-fps">FPS: --</span><br><span id="s-particles">Particles: --</span><br><span id="s-constraints">Constraints: --</span></div>
+</div>
+<script>
+(function(){
+"use strict";
+
+const COLS = 55, ROWS = 37;
+const N = COLS * ROWS;
+const CLOTH_W = 480, CLOTH_H = 340;
+const SPACING_X = CLOTH_W / (COLS - 1);
+const SPACING_Y = CLOTH_H / (ROWS - 1);
+const FIXED_DT = 1 / 60;
+const MAX_FRAME = 0.1;
+const DAMPING = 0.965;
+const TEAR_RATIO = 2.8;
+const REST_VEL_THRESHOLD = 0.004;
+const REST_FRAMES = 8;
+const GRAB_RADIUS = 40;
+
+let gravity = 980;
+let solverIters = 6;
+let paused = false;
+let windOn = false;
+let grabbedIdx = -1;
+let cutting = false;
+let mouseX = 0, mouseY = 0, prevMX = 0, prevMY = 0;
+let restCounter = 0;
+let simTime = 0;
+
+// Particle arrays
+const px = new Float32Array(N);
+const py = new Float32Array(N);
+const ppx = new Float32Array(N);
+const ppy = new Float32Array(N);
+const pinned = new Uint8Array(N);
+
+// Constraints
+const MAX_CONS = 13000;
+const consA = new Int32Array(MAX_CONS);
+const consB = new Int32Array(MAX_CONS);
+const consRest = new Float32Array(MAX_CONS);
+const consIntact = new Uint8Array(MAX_CONS);
+let consCount = 0;
+
+// Shear indices for rendering
+const shear1Idx = new Int32Array((COLS-1)*(ROWS-1));
+const shear2Idx = new Int32Array((COLS-1)*(ROWS-1));
+let shear1Base, shear2Base;
+
+function initConstraints() {
+    consCount = 0;
+    let idx = 0;
+    // Structural horizontal
+    for (let j = 0; j < ROWS; j++) {
+        for (let i = 0; i < COLS - 1; i++) {
+            const a = j * COLS + i, b = a + 1;
+            consA[idx] = a; consB[idx] = b;
+            consRest[idx] = SPACING_X;
+            consIntact[idx] = 1;
+            idx++;
+        }
+    }
+    // Structural vertical
+    for (let j = 0; j < ROWS - 1; j++) {
+        for (let i = 0; i < COLS; i++) {
+            const a = j * COLS + i, b = (j+1) * COLS + i;
+            consA[idx] = a; consB[idx] = b;
+            consRest[idx] = SPACING_Y;
+            consIntact[idx] = 1;
+            idx++;
+        }
+    }
+    // Shear 1: (i,j) to (i+1,j+1)
+    shear1Base = idx;
+    for (let j = 0; j < ROWS - 1; j++) {
+        for (let i = 0; i < COLS - 1; i++) {
+            const a = j * COLS + i, b = (j+1) * COLS + i + 1;
+            const dx = SPACING_X, dy = SPACING_Y;
+            consA[idx] = a; consB[idx] = b;
+            consRest[idx] = Math.sqrt(dx*dx + dy*dy);
+            consIntact[idx] = 1;
+            shear1Idx[j*(COLS-1)+i] = idx;
+            idx++;
+        }
+    }
+    // Shear 2: (i+1,j) to (i,j+1)
+    shear2Base = idx;
+    for (let j = 0; j < ROWS - 1; j++) {
+        for (let i = 0; i < COLS - 1; i++) {
+            const a = j * COLS + i + 1, b = (j+1) * COLS + i;
+            const dx = SPACING_X, dy = SPACING_Y;
+            consA[idx] = a; consB[idx] = b;
+            consRest[idx] = Math.sqrt(dx*dx + dy*dy);
+            consIntact[idx] = 1;
+            shear2Idx[j*(COLS-1)+i] = idx;
+            idx++;
+        }
+    }
+    // Bending horizontal
+    for (let j = 0; j < ROWS; j++) {
+        for (let i = 0; i < COLS - 2; i++) {
+            const a = j * COLS + i, b = a + 2;
+            consA[idx] = a; consB[idx] = b;
+            consRest[idx] = SPACING_X * 2;
+            consIntact[idx] = 1;
+            idx++;
+        }
+    }
+    // Bending vertical
+    for (let j = 0; j < ROWS - 2; j++) {
+        for (let i = 0; i < COLS; i++) {
+            const a = j * COLS + i, b = (j+2) * COLS + i;
+            consA[idx] = a; consB[idx] = b;
+            consRest[idx] = SPACING_Y * 2;
+            consIntact[idx] = 1;
+            idx++;
+        }
+    }
+    consCount = idx;
+}
+
+function initCloth() {
+    const cx = (canvasW / dpr) / 2;
+    const topY = 80;
+    const left = cx - CLOTH_W / 2;
+    for (let j = 0; j < ROWS; j++) {
+        for (let i = 0; i < COLS; i++) {
+            const idx = j * COLS + i;
+            const x = left + i * SPACING_X;
+            const y = topY + j * SPACING_Y;
+            px[idx] = x; py[idx] = y;
+            ppx[idx] = x; ppy[idx] = y;
+            pinned[idx] = (j === 0) ? 1 : 0;
+        }
+    }
+    initConstraints();
+    grabbedIdx = -1;
+    cutting = false;
+    restCounter = 0;
+    simTime = 0;
+}
+
+function windForce(x, y, t) {
+    const gust = 0.5 + 0.5 * Math.sin(t * 0.7 + 0.5) * Math.sin(t * 0.31 + 1.2);
+    const t1 = Math.sin(x * 0.008 + t * 1.8) * Math.cos(y * 0.006 - t * 1.3);
+    const t2 = Math.sin(x * 0.015 - t * 2.5) * Math.sin(y * 0.012 + t * 1.7);
+    const wx = gust * 35 * (1 + 0.6 * t1) + 8 * t2;
+    const wy = gust * 12 * Math.sin(x * 0.01 + t * 2.1) + 5 * Math.cos(y * 0.015 - t * 1.9);
+    return [wx, wy];
+}
+
+function step(dt) {
+    simTime += dt;
+    const dt2 = dt * dt;
+    const g = gravity * dt2;
+
+    // Verlet integration
+    let maxVel = 0;
+    for (let i = 0; i < N; i++) {
+        if (pinned[i]) continue;
+        let vx = (px[i] - ppx[i]) * DAMPING;
+        let vy = (py[i] - ppy[i]) * DAMPING;
+
+        let ax = 0, ay = g;
+        if (windOn) {
+            const [wx, wy] = windForce(px[i], py[i], simTime);
+            ax += wx * dt2;
+            ay += wy * dt2;
+        }
+
+        if (i === grabbedIdx) {
+            px[i] = mouseX;
+            py[i] = mouseY;
+            ppx[i] = mouseX;
+            ppy[i] = mouseY;
+            continue;
+        }
+
+        ppx[i] = px[i];
+        ppy[i] = py[i];
+        px[i] += vx + ax;
+        py[i] += vy + ay;
+
+        const spd = Math.abs(vx) + Math.abs(vy);
+        if (spd > maxVel) maxVel = spd;
+    }
+
+    // Solve constraints
+    for (let iter = 0; iter < solverIters; iter++) {
+        for (let c = 0; c < consCount; c++) {
+            if (!consIntact[c]) continue;
+            const a = consA[c], b = consB[c];
+            const rest = consRest[c];
+            let dx = px[b] - px[a];
+            let dy = py[b] - py[a];
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 1e-6) continue;
+
+            // Check tearing
+            if (dist > rest * TEAR_RATIO) {
+                consIntact[c] = 0;
+                continue;
+            }
+
+            const diff = (dist - rest) / dist;
+            const mx = dx * diff * 0.5;
+            const my = dy * diff * 0.5;
+
+            if (!pinned[a]) {
+                px[a] += mx;
+                py[a] += my;
+            }
+            if (!pinned[b]) {
+                px[b] -= mx;
+                py[b] -= my;
+            }
+        }
+    }
+
+    // Rest detection
+    if (maxVel < REST_VEL_THRESHOLD) {
+        restCounter++;
+        if (restCounter > REST_FRAMES) {
+            for (let i = 0; i < N; i++) {
+                ppx[i] = px[i];
+                ppy[i] = py[i];
+            }
+            restCounter = 100;
+        }
+    } else {
+        restCounter = 0;
+    }
+}
+
+// Cutting: line segment intersection
+function segIntersect(ax,ay,bx,by,cx,cy,dx,dy) {
+    const d1 = (dx-cx)*(ay-cy) - (dy-cy)*(ax-cx);
+    const d2 = (dx-cx)*(by-cy) - (dy-cy)*(bx-cx);
+    const d3 = (bx-ax)*(cy-ay) - (by-ay)*(cx-ax);
+    const d4 = (bx-ax)*(dy-ay) - (by-ay)*(dx-ax);
+    return ((d1>0&&d2<0)||(d1<0&&d2>0)) && ((d3>0&&d4<0)||(d3<0&&d4>0));
+}
+
+function doCut() {
+    if (prevMX === mouseX && prevMY === mouseY) return;
+    for (let c = 0; c < consCount; c++) {
+        if (!consIntact[c]) continue;
+        const a = consA[c], b = consB[c];
+        if (segIntersect(prevMX, prevMY, mouseX, mouseY, px[a], py[a], px[b], py[b])) {
+            consIntact[c] = 0;
+        }
+    }
+    prevMX = mouseX;
+    prevMY = mouseY;
+}
+
+function findNearest(mx, my) {
+    let best = -1, bestD = GRAB_RADIUS * GRAB_RADIUS;
+    for (let i = 0; i < N; i++) {
+        const dx = px[i] - mx, dy = py[i] - my;
+        const d = dx*dx + dy*dy;
+        if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+}
+
+// Rendering
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let dpr = 1, canvasW = 0, canvasH = 0;
+
+function resize() {
+    dpr = window.devicePixelRatio || 1;
+    canvasW = window.innerWidth;
+    canvasH = window.innerHeight;
+    canvas.width = canvasW * dpr;
+    canvas.height = canvasH * dpr;
+    canvas.style.width = canvasW + 'px';
+    canvas.style.height = canvasH + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// Precompute rest triangle areas for shading
+const restTriArea1 = new Float32Array((COLS-1)*(ROWS-1));
+const restTriArea2 = new Float32Array((COLS-1)*(ROWS-1));
+
+function initRestAreas() {
+    for (let j = 0; j < ROWS-1; j++) {
+        for (let i = 0; i < COLS-1; i++) {
+            const idx = j*(COLS-1)+i;
+            // Triangle 1: (i,j), (i+1,j), (i+1,j+1)
+            const ax=0, ay=0, bx=SPACING_X, by=0, cx2=SPACING_X, cy2=SPACING_Y;
+            restTriArea1[idx] = Math.abs((bx-ax)*(cy2-ay)-(by-ay)*(cx2-ax)) * 0.5;
+            // Triangle 2: (i,j), (i+1,j+1), (i,j+1)
+            const ax2=0, ay2=0, bx2=SPACING_X, by2=SPACING_Y, cx3=0, cy3=SPACING_Y;
+            restTriArea2[idx] = Math.abs((bx2-ax2)*(cy3-ay2)-(by2-ay2)*(cx3-ax2)) * 0.5;
+        }
+    }
+}
+
+function triArea(ax,ay,bx,by,cx,by2) {
+    return Math.abs((bx-ax)*(by2-ay)-(by-ay)*(cx-ax)) * 0.5;
+}
+
+function render() {
+    const w = canvasW, h = canvasH;
+    ctx.clearRect(0, 0, w, h);
+
+    // Background gradient
+    const bg = ctx.createRadialGradient(w*0.5, h*0.4, 0, w*0.5, h*0.5, w*0.7);
+    bg.addColorStop(0, '#12121e');
+    bg.addColorStop(1, '#06060a');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw cloth triangles
+    const lightX = -0.4, lightY = -0.6, lightZ = 0.7;
+    const lightLen = Math.sqrt(lightX*lightX + lightY*lightY + lightZ*lightZ);
+    const lx = lightX/lightLen, ly = lightY/lightLen, lz = lightZ/lightLen;
+
+    for (let j = 0; j < ROWS - 1; j++) {
+        for (let i = 0; i < COLS - 1; i++) {
+            const qi = j * (COLS-1) + i;
+            const a = j * COLS + i;
+            const b = j * COLS + i + 1;
+            const c = (j+1) * COLS + i + 1;
+            const d = (j+1) * COLS + i;
+
+            const s1 = consIntact[shear1Idx[qi]];
+            const s2 = consIntact[shear2Idx[qi]];
+
+            if (s1) {
+                // Triangle: a, b, c
+                const ax2=px[a], ay2=py[a], bx2=px[b], by2=py[b], cx2=px[c], cy2=py[c];
+                const area = triArea(ax2,ay2,bx2,by2,cx2,cy2);
+                const areaRatio = Math.min(area / restTriArea1[qi], 1.8);
+                const facing = Math.sqrt(areaRatio);
+                const front = (ax2*(by2-ay2)+bx2*(cy2-by2)+cx2*(ay2-cy2)) > 0;
+
+                // Estimate normal z from area ratio
+                const nz = Math.min(areaRatio, 1.0);
+                // Approximate normal direction from centroid position
+                const cenX = (ax2+bx2+cx2)/3 - w/2;
+                const cenY = (ay2+by2+cy2)/3 - h/2;
+                const dot = lz * nz + lx * (cenX/w)*0.3 + ly * (cenY/h)*0.3;
+                const brightness = 0.25 + 0.75 * Math.max(0, dot) * facing;
+
+                if (front) {
+                    const L = 18 + 42 * brightness;
+                    const S = 45 + 15 * brightness;
+                    ctx.fillStyle = `hsl(270,${S}%,${L}%)`;
+                } else {
+                    const L = 25 + 35 * brightness;
+                    ctx.fillStyle = `hsl(285,30%,${L}%)`;
+                }
+                ctx.beginPath();
+                ctx.moveTo(ax2, ay2);
+                ctx.lineTo(bx2, by2);
+                ctx.lineTo(cx2, cy2);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            if (s2) {
+                // Triangle: a, c, d
+                const ax2=px[a], ay2=py[a], cx2=px[c], cy2=py[c], dx2=px[d], dy2=py[d];
+                const area = triArea(ax2,ay2,cx2,cy2,dx2,dy2);
+                const areaRatio = Math.min(area / restTriArea2[qi], 1.8);
+                const facing = Math.sqrt(areaRatio);
+                const front = (ax2*(cy2-ay2)+cx2*(dy2-cy2)+dx2*(ay2-dy2)) > 0;
+
+                const nz = Math.min(areaRatio, 1.0);
+                const cenX = (ax2+cx2+dx2)/3 - w/2;
+                const cenY = (ay2+cy2+dy2)/3 - h/2;
+                const dot = lz * nz + lx * (cenX/w)*0.3 + ly * (cenY/h)*0.3;
+                const brightness = 0.25 + 0.75 * Math.max(0, dot) * facing;
+
+                if (front) {
+                    const L = 18 + 42 * brightness;
+                    const S = 45 + 15 * brightness;
+                    ctx.fillStyle = `hsl(270,${S}%,${L}%)`;
+                } else {
+                    const L = 25 + 35 * brightness;
+                    ctx.fillStyle = `hsl(285,30%,${L}%)`;
+                }
+                ctx.beginPath();
+                ctx.moveTo(ax2, ay2);
+                ctx.lineTo(cx2, cy2);
+                ctx.lineTo(dx2, dy2);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+    }
+
+    // Draw pin points (subtle)
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    for (let i = 0; i < COLS; i++) {
+        const idx = i;
+        ctx.beginPath();
+        ctx.arc(px[idx], py[idx], 2, 0, Math.PI*2);
+        ctx.fill();
+    }
+}
+
+// FPS tracking
+let frameTimes = [];
+let lastFPSUpdate = 0;
+
+function updateStats(now) {
+    frameTimes.push(now);
+    if (frameTimes.length > 30) frameTimes.shift();
+    if (now - lastFPSUpdate > 500) {
+        lastFPSUpdate = now;
+        let fps = 0;
+        if (frameTimes.length > 2) {
+            const elapsed = (frameTimes[frameTimes.length-1] - frameTimes[0]) / 1000;
+            fps = Math.round((frameTimes.length - 1) / elapsed);
+        }
+        let intactCount = 0;
+        for (let i = 0; i < consCount; i++) intactCount += consIntact[i];
+        let pinnedCount = 0;
+        for (let i = 0; i < N; i++) pinnedCount += pinned[i];
+
+        document.getElementById('s-fps').textContent = 'FPS: ' + fps;
+        document.getElementById('s-particles').textContent = 'Particles: ' + N;
+        document.getElementById('s-constraints').textContent = 'Constraints: ' + intactCount;
+    }
+}
+
+// Main loop
+let lastTime = performance.now();
+let accumulator = 0;
+
+function loop(now) {
+    let frameTime = (now - lastTime) / 1000;
+    lastTime = now;
+    if (frameTime > MAX_FRAME) frameTime = MAX_FRAME;
+
+    if (!paused) {
+        accumulator += frameTime;
+        while (accumulator >= FIXED_DT) {
+            step(FIXED_DT);
+            accumulator -= FIXED_DT;
+            if (cutting && !paused) doCut();
+        }
+    }
+
+    render();
+    updateStats(now);
+    requestAnimationFrame(loop);
+}
+
+// Input handling
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('mousedown', e => {
+    e.preventDefault();
+    mouseX = e.clientX; mouseY = e.clientY;
+    prevMX = e.clientX; prevMY = e.clientY;
+
+    if (e.button === 2 || (e.button === 0 && e.shiftKey)) {
+        cutting = true;
+        prevMX = mouseX;
+        prevMY = mouseY;
+    } else if (e.button === 0) {
+        grabbedIdx = findNearest(mouseX, mouseY);
+    }
+});
+
+canvas.addEventListener('mousemove', e => {
+    prevMX = mouseX;
+    prevMY = mouseY;
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+});
+
+window.addEventListener('mouseup', e => {
+    if (e.button === 2 || (e.button === 0 && e.shiftKey)) {
+        cutting = false;
+    } else if (e.button === 0) {
+        grabbedIdx = -1;
+    }
+});
+
+window.addEventListener('keydown', e => {
+    if (e.code === 'Space') {
+        const tag = document.activeElement.tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
+            e.preventDefault();
+            paused = !paused;
+        }
+    }
+});
+
+// Controls
+document.getElementById('wind').addEventListener('change', function() {
+    windOn = this.checked;
+});
+document.getElementById('gravity').addEventListener('input', function() {
+    gravity = parseInt(this.value, 10);
+});
+document.getElementById('iterations').addEventListener('input', function() {
+    solverIters = parseInt(this.value, 10);
+});
+document.getElementById('reset').addEventListener('click', function() {
+    initCloth();
+});
+
+// Arena stats
+window.__arena = {
+    stats: function() {
+        let intactCount = 0;
+        for (let i = 0; i < consCount; i++) intactCount += consIntact[i];
+        let pinnedCount = 0;
+        let sumX = 0, sumY = 0;
+        for (let i = 0; i < N; i++) {
+            pinnedCount += pinned[i];
+            sumX += px[i];
+            sumY += py[i];
+        }
+        return {
+            particles: N,
+            constraints: intactCount,
+            pinned: pinnedCount,
+            centroid: { x: sumX / N, y: sumY / N }
+        };
+    }
+};
+
+// Init
+resize();
+window.addEventListener('resize', function() {
+    resize();
+});
+initRestAreas();
+initCloth();
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
+```

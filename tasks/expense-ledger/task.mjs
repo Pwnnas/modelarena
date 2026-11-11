@@ -3,7 +3,7 @@ import fs from 'node:fs';
 export const meta = {
   title: 'Tally',
   subtitle: 'Data-faithful expense ledger',
-  order: 7,
+  order: 8,
   suite: 'v2',
   skills: ['tool use: file reading', 'CSV parsing', 'aggregation', 'filter/sort UI'],
   summary:

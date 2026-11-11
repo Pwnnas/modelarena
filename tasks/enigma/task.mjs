@@ -1,7 +1,7 @@
 export const meta = {
   title: 'Enigma',
   subtitle: 'Enigma M3 simulator',
-  order: 9,
+  order: 10,
   suite: 'v2',
   skills: ['exact simulation', 'state machines', 'the double-step anomaly', 'ring settings'],
   summary:

@@ -1,0 +1,874 @@
+```html
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Horizon — Infinite Terrain</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --glass: rgba(13, 24, 35, .54);
+    --line: rgba(228, 239, 242, .15);
+    --text: #eef3f1;
+    --muted: rgba(226, 237, 235, .64);
+    --accent: #efc99a;
+  }
+  * { box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #101923; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--text);
+    user-select: none;
+  }
+  canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    outline: none;
+    touch-action: none;
+  }
+  .topbar {
+    position: fixed;
+    top: 25px;
+    left: 30px;
+    right: 30px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-shadow: 0 2px 18px rgba(0,0,0,.45);
+  }
+  .brand-mark {
+    width: 29px;
+    height: 29px;
+    border: 1px solid rgba(255,255,255,.66);
+    border-radius: 50%;
+    position: relative;
+  }
+  .brand-mark::before, .brand-mark::after {
+    content: "";
+    position: absolute;
+    background: rgba(255,255,255,.76);
+  }
+  .brand-mark::before { left: 5px; right: 5px; top: 13px; height: 1px; }
+  .brand-mark::after { top: 5px; bottom: 5px; left: 13px; width: 1px; }
+  .brand-name { font-size: 12px; letter-spacing: .24em; font-weight: 600; }
+  .brand-sub { margin-top: 3px; color: var(--muted); font-size: 9px; letter-spacing: .16em; }
+  .readout {
+    display: flex;
+    gap: 17px;
+    color: rgba(245,248,247,.83);
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    text-shadow: 0 1px 10px rgba(0,0,0,.5);
+  }
+  .readout span { display: flex; align-items: center; gap: 7px; }
+  .readout b { color: var(--accent); font-weight: 500; }
+  .panel {
+    position: fixed;
+    left: 30px;
+    bottom: 28px;
+    width: 274px;
+    padding: 16px 17px 14px;
+    background: linear-gradient(135deg, rgba(15,26,36,.72), rgba(19,30,39,.45));
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 12px 42px rgba(0,0,0,.13);
+  }
+  .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .eyebrow { font-size: 9px; letter-spacing: .18em; color: var(--muted); text-transform: uppercase; }
+  #timeLabel { font-variant-numeric: tabular-nums; color: #f4e4cf; font-size: 12px; letter-spacing: .08em; }
+  input[type="range"] {
+    display: block;
+    appearance: none;
+    width: 100%;
+    height: 14px;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 2px;
+    background: linear-gradient(90deg, #8da9b9, #f1c487 53%, #8da9b9);
+    border-radius: 4px;
+  }
+  input[type="range"]::-moz-range-track {
+    height: 2px;
+    background: linear-gradient(90deg, #8da9b9, #f1c487 53%, #8da9b9);
+    border-radius: 4px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    margin-top: -4px;
+    background: #f2d7b1;
+    border: 1px solid rgba(255,255,255,.8);
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(242,215,177,.45);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 8px;
+    height: 8px;
+    background: #f2d7b1;
+    border: 1px solid rgba(255,255,255,.8);
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(242,215,177,.45);
+  }
+  .range-ends {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    color: rgba(220,231,231,.45);
+    font-size: 8px;
+    letter-spacing: .12em;
+  }
+  .seed-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 17px;
+    padding-top: 13px;
+    border-top: 1px solid rgba(255,255,255,.1);
+  }
+  #seed {
+    width: 105px;
+    padding: 5px 7px;
+    border: 1px solid rgba(255,255,255,.17);
+    border-radius: 3px;
+    outline: none;
+    background: rgba(255,255,255,.055);
+    color: #f0eee8;
+    font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+    text-align: right;
+    user-select: text;
+  }
+  #seed:focus { border-color: rgba(240,205,163,.65); }
+  .hint {
+    position: fixed;
+    left: 50%;
+    bottom: 33px;
+    transform: translateX(-50%);
+    color: rgba(242,246,245,.65);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-shadow: 0 1px 12px rgba(0,0,0,.65);
+    pointer-events: none;
+  }
+  .hint kbd {
+    display: inline-block;
+    min-width: 17px;
+    margin: 0 2px;
+    padding: 3px 4px;
+    border: 1px solid rgba(255,255,255,.27);
+    border-radius: 3px;
+    color: rgba(255,255,255,.88);
+    font: inherit;
+    text-align: center;
+  }
+  @media (max-width: 650px) {
+    .topbar { top: 18px; left: 18px; right: 18px; }
+    .panel { left: 18px; bottom: 18px; width: 246px; }
+    .hint { display: none; }
+    .readout { gap: 9px; font-size: 8px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="world" aria-label="Procedural terrain flyover"></canvas>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <div>
+      <div class="brand-name">HORIZON</div>
+      <div class="brand-sub">A WORLD IN MOTION</div>
+    </div>
+  </div>
+  <div class="readout">
+    <span><i id="autoDot" style="width:6px;height:6px;border-radius:50%;background:#e9c79e;display:inline-block;box-shadow:0 0 8px #e9c79e"></i><b id="autoText">AUTOPILOT</b></span>
+    <span>FPS <b id="fps">60</b></span>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <span class="eyebrow">Time of day</span>
+    <span id="timeLabel">16:00</span>
+  </div>
+  <input id="time" type="range" min="0" max="24" step="0.01" value="16">
+  <div class="range-ends"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+  <div class="seed-row">
+    <span class="eyebrow">World seed</span>
+    <input id="seed" type="number" step="1" value="73129" aria-label="World seed">
+  </div>
+</div>
+
+<div class="hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> FLY &nbsp; <kbd>Q</kbd><kbd>E</kbd> ALTITUDE &nbsp; DRAG TO LOOK &nbsp; <kbd>F</kbd> AUTOPILOT</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const canvas = document.getElementById("world");
+  const gl = canvas.getContext("webgl", {
+    antialias: true, alpha: false, depth: true, stencil: false,
+    powerPreference: "high-performance", preserveDrawingBuffer: false
+  });
+  if (!gl) {
+    document.body.style.background = "linear-gradient(#273849,#bb9b77)";
+    return;
+  }
+
+  const vertexSky = `
+    attribute vec2 aPosition;
+    varying vec2 vUv;
+    void main() {
+      vUv = aPosition * 0.5 + 0.5;
+      gl_Position = vec4(aPosition, 0.0, 1.0);
+    }
+  `;
+  const fragmentSky = `
+    precision highp float;
+    varying vec2 vUv;
+    uniform vec3 uForward;
+    uniform vec3 uRight;
+    uniform vec3 uUp;
+    uniform float uAspect;
+    uniform float uTanHalf;
+    uniform vec3 uSunDir;
+    uniform float uSunHeight;
+    uniform float uDay;
+    uniform float uWarm;
+    float hash21(vec2 p) {
+      p = fract(p * vec2(123.34, 456.21));
+      p += dot(p, p + 45.32);
+      return fract(p.x * p.y);
+    }
+    void main() {
+      vec2 q = (vUv * 2.0 - 1.0);
+      vec3 ray = normalize(uForward + uRight * (q.x * uAspect * uTanHalf) + uUp * (q.y * uTanHalf));
+      float h = clamp(ray.y * 0.5 + 0.5, 0.0, 1.0);
+      vec3 nightH = vec3(0.018, 0.030, 0.060);
+      vec3 nightZ = vec3(0.006, 0.012, 0.030);
+      vec3 dayH = mix(vec3(0.55,0.70,0.78), vec3(0.93,0.47,0.27), uWarm);
+      vec3 dayZ = mix(vec3(0.19,0.43,0.69), vec3(0.48,0.25,0.34), uWarm);
+      vec3 horizon = mix(nightH, dayH, uDay);
+      vec3 zenith = mix(nightZ, dayZ, uDay);
+      float gradient = pow(h, 0.68);
+      vec3 sky = mix(horizon, zenith, gradient);
+      float sunDot = max(dot(ray, normalize(uSunDir)), 0.0);
+      float disc = smoothstep(cos(0.010), cos(0.004), sunDot);
+      float halo = pow(sunDot, 22.0) * (0.18 + 0.5 * uDay);
+      float wideGlow = pow(sunDot, 5.0) * 0.07 * uDay;
+      vec3 sunColor = mix(vec3(1.0,0.68,0.39), vec3(1.0,0.94,0.78), smoothstep(0.05,0.7,uSunHeight));
+      sky += sunColor * (disc * (0.75 + 0.25 * uDay) + halo + wideGlow);
+      float starCell = hash21(floor(ray.xz / max(0.018, ray.y + 1.2) * 430.0));
+      float star = step(0.9978, starCell) * smoothstep(0.18,0.02,uSunHeight) * smoothstep(-0.04,0.18,ray.y);
+      sky += vec3(0.62,0.76,1.0) * star * (0.5 + 0.5 * hash21(floor(ray.xz * 1700.0)));
+      gl_FragColor = vec4(sky, 1.0);
+    }
+  `;
+  const vertexTerrain = `
+    attribute vec3 aPosition;
+    attribute vec3 aNormal;
+    uniform mat4 uViewProjection;
+    varying vec3 vWorld;
+    varying vec3 vNormal;
+    void main() {
+      vWorld = aPosition;
+      vNormal = aNormal;
+      gl_Position = uViewProjection * vec4(aPosition, 1.0);
+    }
+  `;
+  const fragmentTerrain = `
+    precision highp float;
+    varying vec3 vWorld;
+    varying vec3 vNormal;
+    uniform vec3 uCamera;
+    uniform vec3 uSunDir;
+    uniform vec3 uSunColor;
+    uniform vec3 uFogColor;
+    uniform float uSunLight;
+    uniform float uFogStart;
+    uniform float uFogEnd;
+    float sm(float a, float b, float x) {
+      float t = clamp((x-a)/(b-a),0.0,1.0);
+      return t*t*(3.0-2.0*t);
+    }
+    void main() {
+      vec3 n = normalize(vNormal);
+      float slope = 1.0 - clamp(n.y,0.0,1.0);
+      float h = vWorld.y;
+      vec3 grass = mix(vec3(0.16,0.24,0.16), vec3(0.25,0.34,0.20), sm(0.0,180.0,h));
+      vec3 sand = vec3(0.55,0.43,0.29);
+      vec3 rock = mix(vec3(0.31,0.32,0.30), vec3(0.48,0.48,0.45), sm(100.0,330.0,h));
+      vec3 snow = vec3(0.78,0.81,0.79);
+      vec3 color = mix(sand, grass, sm(-5.0,18.0,h));
+      color = mix(color, rock, sm(0.17,0.53,slope) * sm(7.0,35.0,h));
+      color = mix(color, snow, sm(275.0,390.0,h) * (1.0-sm(0.25,0.55,slope)*0.35));
+      float diffuse = max(dot(n, normalize(uSunDir)), 0.0);
+      float skyFill = 0.22 + 0.17 * clamp(n.y,0.0,1.0);
+      vec3 lit = color * (skyFill + diffuse * uSunLight) * uSunColor;
+      float distanceToEye = length(vWorld-uCamera);
+      float fog = smoothstep(uFogStart,uFogEnd,distanceToEye);
+      gl_FragColor = vec4(mix(lit,uFogColor,fog),1.0);
+    }
+  `;
+  const vertexWater = `
+    attribute vec2 aPosition;
+    uniform mat4 uViewProjection;
+    uniform vec2 uWaterCenter;
+    uniform float uWaterScale;
+    varying vec2 vWorldXZ;
+    void main() {
+      vWorldXZ = uWaterCenter + aPosition * uWaterScale;
+      gl_Position = uViewProjection * vec4(vWorldXZ.x, 0.0, vWorldXZ.y, 1.0);
+    }
+  `;
+  const fragmentWater = `
+    precision highp float;
+    varying vec2 vWorldXZ;
+    uniform vec3 uCamera;
+    uniform vec3 uSunDir;
+    uniform vec3 uSunColor;
+    uniform vec3 uFogColor;
+    uniform float uSunLight;
+    uniform float uTime;
+    uniform float uFogStart;
+    uniform float uFogEnd;
+    void main() {
+      vec2 p = vWorldXZ;
+      float a = p.x*0.020 + p.y*0.013 + uTime*0.72;
+      float b = p.x*-0.009 + p.y*0.027 - uTime*0.48;
+      float c = p.x*0.034 - p.y*0.018 + uTime*0.92;
+      float wa = sin(a), wb = sin(b), wc = sin(c);
+      vec3 n = normalize(vec3(
+        -(0.020*cos(a) + -0.009*cos(b) - 0.034*cos(c)),
+        1.0,
+        -(0.013*cos(a) + 0.027*cos(b) + 0.018*cos(c))
+      ));
+      vec3 viewDir = normalize(uCamera - vec3(p.x,0.0,p.y));
+      float fresnel = pow(1.0-max(dot(n,viewDir),0.0),5.0);
+      float diffuse = max(dot(n,normalize(uSunDir)),0.0);
+      float sparkle = pow(max(dot(reflect(-normalize(uSunDir),n),viewDir),0.0),90.0);
+      float ripple = (wa*0.5 + wb*0.3 + wc*0.2);
+      vec3 deep = vec3(0.018,0.085,0.105);
+      vec3 water = deep + vec3(0.012,0.026,0.027)*(ripple+0.5);
+      water *= (0.28 + 0.24*uSunLight + diffuse*0.20);
+      water += uSunColor * sparkle * (0.15 + 0.7*uSunLight);
+      vec3 reflectedSky = mix(vec3(0.08,0.14,0.20),uFogColor,0.6);
+      vec3 color = mix(water,reflectedSky,clamp(fresnel*0.8,0.0,0.75));
+      float distanceToEye = length(vec3(p.x,0.0,p.y)-uCamera);
+      float fog = smoothstep(uFogStart,uFogEnd,distanceToEye);
+      gl_FragColor = vec4(mix(color,uFogColor,fog),1.0);
+    }
+  `;
+
+  function makeShader(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      gl.deleteShader(shader);
+      throw new Error("Shader compilation failed");
+    }
+    return shader;
+  }
+  function makeProgram(vsSource, fsSource) {
+    const program = gl.createProgram();
+    gl.attachShader(program, makeShader(gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(program, makeShader(gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error("Program link failed");
+    return program;
+  }
+
+  const skyProgram = makeProgram(vertexSky, fragmentSky);
+  const terrainProgram = makeProgram(vertexTerrain, fragmentTerrain);
+  const waterProgram = makeProgram(vertexWater, fragmentWater);
+
+  function locations(program, names) {
+    const result = {};
+    for (const name of names) result[name] = gl.getUniformLocation(program, name);
+    return result;
+  }
+  const skyU = locations(skyProgram, ["uForward","uRight","uUp","uAspect","uTanHalf","uSunDir","uSunHeight","uDay","uWarm"]);
+  const terrainU = locations(terrainProgram, ["uViewProjection","uCamera","uSunDir","uSunColor","uFogColor","uSunLight","uFogStart","uFogEnd"]);
+  const waterU = locations(waterProgram, ["uViewProjection","uWaterCenter","uWaterScale","uCamera","uSunDir","uSunColor","uFogColor","uSunLight","uTime","uFogStart","uFogEnd"]);
+
+  const skyBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, skyBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+
+  const waterBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, waterBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+
+  const CHUNK_SIZE = 384;
+  const GRID = 32;
+  const CHUNK_RADIUS = 7;
+  const DRAW_DISTANCE = 3400;
+  const trianglesPerChunk = GRID * GRID * 2;
+  const indexBuffer = gl.createBuffer();
+  const indices = new Uint16Array(GRID * GRID * 6);
+  {
+    let k = 0;
+    for (let z=0; z<GRID; z++) {
+      for (let x=0; x<GRID; x++) {
+        const a = z*(GRID+1)+x;
+        const b = a+1;
+        const c = a+GRID+1;
+        const d = c+1;
+        indices[k++]=a; indices[k++]=c; indices[k++]=b;
+        indices[k++]=b; indices[k++]=c; indices[k++]=d;
+      }
+    }
+  }
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+  let worldSeed = 73129;
+  const chunks = new Map();
+
+  function hashGrid(ix, iz) {
+    let n = (Math.imul(ix, 374761393) + Math.imul(iz, 668265263) + Math.imul(worldSeed, 1442695041)) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    n = (n ^ (n >>> 16)) >>> 0;
+    return n / 4294967295;
+  }
+  function noise2(x, z) {
+    const ix = Math.floor(x), iz = Math.floor(z);
+    let fx = x-ix, fz = z-iz;
+    fx = fx*fx*(3-2*fx);
+    fz = fz*fz*(3-2*fz);
+    const a = hashGrid(ix,iz), b = hashGrid(ix+1,iz);
+    const c = hashGrid(ix,iz+1), d = hashGrid(ix+1,iz+1);
+    const top = a+(b-a)*fx;
+    const bottom = c+(d-c)*fx;
+    return top+(bottom-top)*fz;
+  }
+  function fbm(x,z,octaves) {
+    let sum=0, amplitude=0.5, total=0, frequency=1;
+    for (let i=0;i<octaves;i++) {
+      sum += noise2(x*frequency,z*frequency)*amplitude;
+      total += amplitude;
+      amplitude *= 0.5;
+      frequency *= 2.03;
+    }
+    return sum/total;
+  }
+  function smoothstep(a,b,x) {
+    const t = Math.max(0,Math.min(1,(x-a)/(b-a)));
+    return t*t*(3-2*t);
+  }
+  function terrainHeight(x,z) {
+    const continent = fbm(x*0.00043,z*0.00043,4);
+    const warpX = (fbm(x*0.0011+37,z*0.0011-19,3)-0.5)*210;
+    const warpZ = (fbm(x*0.0011-53,z*0.0011+71,3)-0.5)*210;
+    const wx = x+warpX, wz = z+warpZ;
+    const mask = smoothstep(0.425,0.68,continent);
+    const foothills = (fbm(wx*0.0025,wz*0.0025,4)-0.5)*175;
+    const ridgedNoise = 1.0-Math.abs(fbm(wx*0.0037+21,wz*0.0037-14,4)*2.0-1.0);
+    const ridges = (ridgedNoise-0.38)*190;
+    const plains = (fbm(x*0.009,z*0.009,3)-0.5)*21;
+    const broad = (continent-0.46)*310;
+    return Math.max(-70,Math.min(410,broad+mask*(foothills+ridges)+plains));
+  }
+
+  function makeChunk(cx,cz) {
+    const startX = cx*CHUNK_SIZE, startZ=cz*CHUNK_SIZE;
+    const stride=GRID+1;
+    const data = new Float32Array(stride*stride*6);
+    let ptr=0;
+    const spacing=CHUNK_SIZE/GRID;
+    for (let z=0;z<=GRID;z++) {
+      const wz=startZ+z*spacing;
+      for (let x=0;x<=GRID;x++) {
+        const wx=startX+x*spacing;
+        const y=terrainHeight(wx,wz);
+        const e=4;
+        const dx=(terrainHeight(wx+e,wz)-terrainHeight(wx-e,wz))/(2*e);
+        const dz=(terrainHeight(wx,wz+e)-terrainHeight(wx,wz-e))/(2*e);
+        const inv=1/Math.sqrt(dx*dx+1+dz*dz);
+        data[ptr++]=wx; data[ptr++]=y; data[ptr++]=wz;
+        data[ptr++]=-dx*inv; data[ptr++]=inv; data[ptr++]=-dz*inv;
+      }
+    }
+    const buffer=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
+    gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);
+    return {cx,cz,buffer};
+  }
+  function updateChunks() {
+    const centerX=Math.floor(camera.x/CHUNK_SIZE);
+    const centerZ=Math.floor(camera.z/CHUNK_SIZE);
+    const wanted=new Set();
+    for(let z=-CHUNK_RADIUS;z<=CHUNK_RADIUS;z++) {
+      for(let x=-CHUNK_RADIUS;x<=CHUNK_RADIUS;x++) {
+        const cx=centerX+x, cz=centerZ+z, key=cx+","+cz;
+        wanted.add(key);
+        if(!chunks.has(key)) chunks.set(key,makeChunk(cx,cz));
+      }
+    }
+    for(const [key,chunk] of chunks) {
+      if(!wanted.has(key)) {
+        gl.deleteBuffer(chunk.buffer);
+        chunks.delete(key);
+      }
+    }
+  }
+  function clearChunks() {
+    for(const chunk of chunks.values()) gl.deleteBuffer(chunk.buffer);
+    chunks.clear();
+  }
+
+  function matMultiply(a,b) {
+    const out=new Float32Array(16);
+    for(let c=0;c<4;c++) for(let r=0;r<4;r++) {
+      out[c*4+r]=a[r]*b[c*4]+a[4+r]*b[c*4+1]+a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3];
+    }
+    return out;
+  }
+  function perspective(fovy,aspect,near,far) {
+    const f=1/Math.tan(fovy/2), nf=1/(near-far);
+    const out=new Float32Array(16);
+    out[0]=f/aspect; out[5]=f; out[10]=(far+near)*nf; out[11]=-1;
+    out[14]=2*far*near*nf;
+    return out;
+  }
+  function normalize(v) {
+    const l=Math.hypot(v[0],v[1],v[2])||1;
+    return [v[0]/l,v[1]/l,v[2]/l];
+  }
+  function cross(a,b) { return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]; }
+  function dot(a,b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
+  function lookAt(eye,center,up) {
+    const z=normalize([eye[0]-center[0],eye[1]-center[1],eye[2]-center[2]]);
+    const x=normalize(cross(up,z));
+    const y=cross(z,x);
+    const out=new Float32Array(16);
+    out[0]=x[0]; out[1]=y[0]; out[2]=z[0]; out[3]=0;
+    out[4]=x[1]; out[5]=y[1]; out[6]=z[1]; out[7]=0;
+    out[8]=x[2]; out[9]=y[2]; out[10]=z[2]; out[11]=0;
+    out[12]=-dot(x,eye); out[13]=-dot(y,eye); out[14]=-dot(z,eye); out[15]=1;
+    return out;
+  }
+
+  const camera={x:0,y:150,z:0,yaw:0,pitch:-0.035};
+  let timeOfDay=16;
+  let frozen=false;
+  let autopilot=true;
+  let simTime=0;
+  let verticalVelocity=0;
+  let velocity=[0,0,0];
+  let lastFrame=performance.now();
+  let fpsAccumulator=0, fpsFrames=0, fpsLast=performance.now();
+  let lastStats={chunks:0,triangles:0};
+  let viewProjection=new Float32Array(16);
+  let aspect=1;
+  const FOV=Math.PI/3;
+
+  function clampCamera() {
+    const minimum=Math.max(8,terrainHeight(camera.x,camera.z)+9);
+    if(!Number.isFinite(camera.y) || camera.y<minimum) camera.y=minimum;
+  }
+  camera.y=terrainHeight(0,0)+145;
+  clampCamera();
+
+  function updateTimeLabel() {
+    document.getElementById("time").value=String(timeOfDay);
+    let total=Math.round(timeOfDay*60);
+    if(total>=1440) total=0;
+    const hh=String(Math.floor(total/60)).padStart(2,"0");
+    const mm=String(total%60).padStart(2,"0");
+    document.getElementById("timeLabel").textContent=hh+":"+mm;
+  }
+  function setTime(hours) {
+    timeOfDay=Math.max(0,Math.min(24,Number(hours)||0));
+    updateTimeLabel();
+  }
+  function setSeed(value) {
+    const n=Math.trunc(Number(value));
+    if(!Number.isFinite(n)) return;
+    worldSeed=n|0;
+    document.getElementById("seed").value=String(worldSeed);
+    clearChunks();
+    updateChunks();
+    clampCamera();
+  }
+
+  document.getElementById("time").addEventListener("input",e=>setTime(e.target.value));
+  document.getElementById("seed").addEventListener("change",e=>setSeed(e.target.value));
+  updateTimeLabel();
+
+  const pressed=new Set();
+  window.addEventListener("keydown",e=>{
+    const key=e.key.toLowerCase();
+    if(["w","a","s","d","q","e","f"," ","shift"].includes(key)) {
+      if(!/INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName || "")) e.preventDefault();
+      pressed.add(key);
+    }
+    if(key==="f" && !e.repeat) setAutopilot(!autopilot);
+  });
+  window.addEventListener("keyup",e=>pressed.delete(e.key.toLowerCase()));
+  window.addEventListener("blur",()=>pressed.clear());
+  function setAutopilot(value) {
+    autopilot=!!value;
+    document.getElementById("autoText").textContent=autopilot?"AUTOPILOT":"MANUAL";
+    document.getElementById("autoDot").style.background=autopilot?"#e9c79e":"#8eb5c5";
+    document.getElementById("autoDot").style.boxShadow=autopilot?"0 0 8px #e9c79e":"0 0 8px #8eb5c5";
+    if(!autopilot) velocity=[0,0,0];
+  }
+
+  let dragging=false, dragX=0, dragY=0;
+  canvas.addEventListener("pointerdown",e=>{
+    dragging=true; dragX=e.clientX; dragY=e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener("pointermove",e=>{
+    if(!dragging) return;
+    const dx=e.clientX-dragX, dy=e.clientY-dragY;
+    dragX=e.clientX; dragY=e.clientY;
+    camera.yaw-=dx*0.0032;
+    camera.pitch=Math.max(-1.48,Math.min(1.48,camera.pitch+dy*0.0027));
+  });
+  canvas.addEventListener("pointerup",()=>dragging=false);
+  canvas.addEventListener("pointercancel",()=>dragging=false);
+
+  function resize() {
+    const ratio=Math.min(window.devicePixelRatio||1,1.5);
+    const w=Math.max(1,Math.floor(window.innerWidth*ratio));
+    const h=Math.max(1,Math.floor(window.innerHeight*ratio));
+    if(canvas.width!==w || canvas.height!==h) {
+      canvas.width=w; canvas.height=h;
+      gl.viewport(0,0,w,h);
+    }
+    aspect=w/h;
+  }
+  window.addEventListener("resize",resize);
+  resize();
+
+  function updateCamera(dt) {
+    const fwd=[Math.sin(camera.yaw)*Math.cos(camera.pitch),Math.sin(camera.pitch),-Math.cos(camera.yaw)*Math.cos(camera.pitch)];
+    const right=[Math.cos(camera.yaw),0,Math.sin(camera.yaw)];
+    if(autopilot) {
+      const speed=21;
+      camera.x+=fwd[0]*speed*dt;
+      camera.z+=fwd[2]*speed*dt;
+      let ahead=terrainHeight(camera.x,camera.z);
+      for(let d=100;d<=360;d+=100) {
+        const h=terrainHeight(camera.x+fwd[0]*d,camera.z+fwd[2]*d);
+        if(h>ahead) ahead=h;
+      }
+      const target=ahead+140;
+      camera.y+=(target-camera.y)*(1-Math.exp(-dt*0.72));
+      clampCamera();
+    } else {
+      const forwardInput=(pressed.has("w")?1:0)-(pressed.has("s")?1:0);
+      const sideInput=(pressed.has("d")?1:0)-(pressed.has("a")?1:0);
+      const upInput=(pressed.has("e")||pressed.has(" ")||pressed.has("shift")?1:0)-(pressed.has("q")?1:0);
+      let dx=fwd[0]*forwardInput+right[0]*sideInput;
+      let dy=fwd[1]*forwardInput+upInput;
+      let dz=fwd[2]*forwardInput+right[2]*sideInput;
+      const magnitude=Math.hypot(dx,dy,dz);
+      if(magnitude>1) { dx/=magnitude; dy/=magnitude; dz/=magnitude; }
+      const acceleration=88;
+      velocity[0]+=dx*acceleration*dt;
+      velocity[1]+=dy*acceleration*dt;
+      velocity[2]+=dz*acceleration*dt;
+      const damping=Math.exp(-dt*2.7);
+      if(!forwardInput&&!sideInput&&!upInput) {
+        velocity[0]*=damping; velocity[1]*=damping; velocity[2]*=damping;
+      }
+      const speed=Math.hypot(velocity[0],velocity[1],velocity[2]);
+      if(speed>145) { const scale=145/speed; velocity[0]*=scale; velocity[1]*=scale; velocity[2]*=scale; }
+      camera.x+=velocity[0]*dt;
+      camera.y+=velocity[1]*dt;
+      camera.z+=velocity[2]*dt;
+      clampCamera();
+      if(camera.y<=Math.max(8,terrainHeight(camera.x,camera.z)+9)+0.01 && velocity[1]<0) velocity[1]=0;
+    }
+  }
+
+  function sunState(hours) {
+    const angle=(hours-6)*Math.PI/12;
+    const height=Math.sin(angle);
+    const horizontal=Math.cos(angle);
+    const azimuth=hours/24*Math.PI*2;
+    const sun=normalize([Math.cos(azimuth)*horizontal,height,Math.sin(azimuth)*horizontal]);
+    const daylight=smoothstep(-0.17,0.20,height);
+    const warm=1-smoothstep(0.015,0.53,height);
+    const sunColor=[
+      0.82+0.18*warm,
+      0.86-0.23*warm,
+      0.92-0.48*warm
+    ];
+    const light=0.12+0.95*daylight;
+    const horizonDay=[0.55+(0.93-0.55)*warm,0.70+(0.47-0.70)*warm,0.78+(0.27-0.78)*warm];
+    const horizonNight=[0.018,0.030,0.060];
+    const fogColor=[
+      horizonNight[0]*(1-daylight)+horizonDay[0]*daylight,
+      horizonNight[1]*(1-daylight)+horizonDay[1]*daylight,
+      horizonNight[2]*(1-daylight)+horizonDay[2]*daylight
+    ];
+    return {sun,height,daylight,warm,sunColor,light,fogColor};
+  }
+
+  function drawSky(state) {
+    const forward=normalize([
+      Math.sin(camera.yaw)*Math.cos(camera.pitch),
+      Math.sin(camera.pitch),
+      -Math.cos(camera.yaw)*Math.cos(camera.pitch)
+    ]);
+    const right=normalize([Math.cos(camera.yaw),0,Math.sin(camera.yaw)]);
+    const up=normalize(cross(right,forward));
+    gl.disable(gl.DEPTH_TEST);
+    gl.depthMask(false);
+    gl.useProgram(skyProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER,skyBuffer);
+    const pos=gl.getAttribLocation(skyProgram,"aPosition");
+    gl.enableVertexAttribArray(pos);
+    gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
+    gl.uniform3fv(skyU.uForward,forward);
+    gl.uniform3fv(skyU.uRight,right);
+    gl.uniform3fv(skyU.uUp,up);
+    gl.uniform1f(skyU.uAspect,aspect);
+    gl.uniform1f(skyU.uTanHalf,Math.tan(FOV/2));
+    gl.uniform3fv(skyU.uSunDir,state.sun);
+    gl.uniform1f(skyU.uSunHeight,state.height);
+    gl.uniform1f(skyU.uDay,state.daylight);
+    gl.uniform1f(skyU.uWarm,state.warm);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    gl.depthMask(true);
+    gl.enable(gl.DEPTH_TEST);
+  }
+
+  function drawWater(state) {
+    gl.useProgram(waterProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER,waterBuffer);
+    const pos=gl.getAttribLocation(waterProgram,"aPosition");
+    gl.enableVertexAttribArray(pos);
+    gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
+    gl.uniformMatrix4fv(waterU.uViewProjection,false,viewProjection);
+    gl.uniform2f(waterU.uWaterCenter,camera.x,camera.z);
+    gl.uniform1f(waterU.uWaterScale,6500);
+    gl.uniform3f(waterU.uCamera,camera.x,camera.y,camera.z);
+    gl.uniform3fv(waterU.uSunDir,state.sun);
+    gl.uniform3fv(waterU.uSunColor,state.sunColor);
+    gl.uniform3fv(waterU.uFogColor,state.fogColor);
+    gl.uniform1f(waterU.uSunLight,state.light);
+    gl.uniform1f(waterU.uTime,simTime);
+    gl.uniform1f(waterU.uFogStart,850);
+    gl.uniform1f(waterU.uFogEnd,2850);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  }
+
+  function drawTerrain(state) {
+    gl.useProgram(terrainProgram);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer);
+    gl.uniformMatrix4fv(terrainU.uViewProjection,false,viewProjection);
+    gl.uniform3f(terrainU.uCamera,camera.x,camera.y,camera.z);
+    gl.uniform3fv(terrainU.uSunDir,state.sun);
+    gl.uniform3fv(terrainU.uSunColor,state.sunColor);
+    gl.uniform3fv(terrainU.uFogColor,state.fogColor);
+    gl.uniform1f(terrainU.uSunLight,state.light);
+    gl.uniform1f(terrainU.uFogStart,850);
+    gl.uniform1f(terrainU.uFogEnd,2850);
+    const p=gl.getAttribLocation(terrainProgram,"aPosition");
+    const n=gl.getAttribLocation(terrainProgram,"aNormal");
+    let triangles=0;
+    for(const chunk of chunks.values()) {
+      const centerX=(chunk.cx+0.5)*CHUNK_SIZE;
+      const centerZ=(chunk.cz+0.5)*CHUNK_SIZE;
+      const dx=centerX-camera.x, dz=centerZ-camera.z;
+      if(dx*dx+dz*dz>(DRAW_DISTANCE+CHUNK_SIZE)* (DRAW_DISTANCE+CHUNK_SIZE)) continue;
+      gl.bindBuffer(gl.ARRAY_BUFFER,chunk.buffer);
+      gl.enableVertexAttribArray(p);
+      gl.vertexAttribPointer(p,3,gl.FLOAT,false,24,0);
+      gl.enableVertexAttribArray(n);
+      gl.vertexAttribPointer(n,3,gl.FLOAT,false,24,12);
+      gl.drawElements(gl.TRIANGLES,indices.length,gl.UNSIGNED_SHORT,0);
+      triangles+=trianglesPerChunk;
+    }
+    lastStats={chunks:chunks.size,triangles};
+  }
+
+  function frame(now) {
+    resize();
+    let dt=Math.min(0.05,Math.max(0,(now-lastFrame)/1000));
+    lastFrame=now;
+    if(!frozen) {
+      timeOfDay=(timeOfDay+dt*0.2)%24;
+      simTime+=dt;
+      updateTimeLabel();
+      updateCamera(dt);
+    }
+    updateChunks();
+
+    const projection=perspective(FOV,aspect,0.5,5000);
+    const forward=[Math.sin(camera.yaw)*Math.cos(camera.pitch),Math.sin(camera.pitch),-Math.cos(camera.yaw)*Math.cos(camera.pitch)];
+    const center=[camera.x+forward[0],camera.y+forward[1],camera.z+forward[2]];
+    const view=lookAt([camera.x,camera.y,camera.z],center,[0,1,0]);
+    viewProjection=matMultiply(projection,view);
+    const state=sunState(timeOfDay);
+
+    gl.clearColor(state.fogColor[0],state.fogColor[1],state.fogColor[2],1);
+    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    drawSky(state);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LESS);
+    drawWater(state);
+    drawTerrain(state);
+
+    fpsAccumulator+=1000/Math.max(1,now-lastFrame+1000/60);
+    fpsFrames++;
+    if(now-fpsLast>500) {
+      document.getElementById("fps").textContent=String(Math.round(fpsFrames*1000/(now-fpsLast)));
+      fpsLast=now; fpsFrames=0; fpsAccumulator=0;
+    }
+    requestAnimationFrame(frame);
+  }
+
+  window.__arena = {
+    freeze(on) { frozen=!!on; },
+    setSeed(n) { setSeed(n); },
+    setTime(hours) { setTime(hours); },
+    setCamera(value) {
+      if(value && Number.isFinite(value.x)) camera.x=value.x;
+      if(value && Number.isFinite(value.y)) camera.y=value.y;
+      if(value && Number.isFinite(value.z)) camera.z=value.z;
+      if(value && Number.isFinite(value.yaw)) camera.yaw=value.yaw;
+      if(value && Number.isFinite(value.pitch)) camera.pitch=Math.max(-1.48,Math.min(1.48,value.pitch));
+      clampCamera();
+      updateChunks();
+    },
+    getCamera() { return {x:camera.x,y:camera.y,z:camera.z,yaw:camera.yaw,pitch:camera.pitch}; },
+    terrainHeight(x,z) { return terrainHeight(Number(x)||0,Number(z)||0); },
+    stats() { return {chunks:lastStats.chunks,triangles:lastStats.triangles}; }
+  };
+
+  updateChunks();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
+```

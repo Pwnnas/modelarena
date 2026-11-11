@@ -1,0 +1,25 @@
+{
+  "source": "arena run",
+  "endpoint": "openrouter.ai",
+  "apiModel": "qwen/qwen3.8-flash",
+  "servedModel": "qwen/qwen3.8-flash",
+  "provider": "Alibaba",
+  "params": {
+    "thinking": "low"
+  },
+  "startedAt": "2026-10-28T11:59:47.390Z",
+  "wallMs": 1443624,
+  "ttftMs": 757,
+  "thinkingMs": 1266255,
+  "promptTokens": 1327,
+  "completionTokens": 95678,
+  "reasoningTokens": 78493,
+  "tokensEstimated": false,
+  "genTokensPerSec": 66.3,
+  "promptTokensPerSec": null,
+  "finishReason": "stop",
+  "replyChars": 48075,
+  "reasoningChars": 283529,
+  "extracted": "fenced",
+  "htmlBytes": 48071
+}

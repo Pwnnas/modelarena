@@ -1,0 +1,26 @@
+{
+  "source": "arena run",
+  "endpoint": "openrouter.ai",
+  "apiModel": "deepseek/deepseek-v4.1-flash-1017",
+  "servedModel": "deepseek/deepseek-v4.1-flash-1017",
+  "provider": "DeepSeek",
+  "params": {
+    "thinking": "medium"
+  },
+  "startedAt": "2026-10-30T00:15:59.152Z",
+  "wallMs": 183746,
+  "ttftMs": 1075,
+  "thinkingMs": 144709,
+  "promptTokens": 1277,
+  "completionTokens": 42635,
+  "reasoningTokens": 30466,
+  "tokensEstimated": false,
+  "genTokensPerSec": 233.4,
+  "promptTokensPerSec": null,
+  "finishReason": "stop",
+  "replyChars": 38542,
+  "reasoningChars": 101018,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 36675
+}

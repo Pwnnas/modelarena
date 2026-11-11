@@ -1,0 +1,1146 @@
+```html
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silk — a cloth study</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #eaf1f3;
+    --muted: #94a6b0;
+    --line: rgba(205, 231, 237, .13);
+    --glass: rgba(16, 24, 35, .76);
+    --mint: #85e4d2;
+    --gold: #e7c995;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: #101720;
+    color: var(--ink);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  canvas {
+    position: fixed;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: crosshair;
+  }
+
+  .interface {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .panel {
+    position: absolute;
+    top: 25px;
+    left: 25px;
+    width: 252px;
+    padding: 19px 18px 16px;
+    pointer-events: auto;
+    background: linear-gradient(145deg, rgba(25, 36, 49, .88), rgba(15, 23, 33, .77));
+    border: 1px solid rgba(220, 239, 241, .14);
+    border-radius: 15px;
+    box-shadow: 0 18px 55px rgba(0, 0, 0, .26), inset 0 1px rgba(255,255,255,.035);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    margin-bottom: 18px;
+  }
+
+  .brand-mark {
+    width: 29px;
+    height: 29px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(133, 228, 210, .46);
+    border-radius: 9px;
+    color: var(--mint);
+    background: rgba(133, 228, 210, .08);
+  }
+
+  .brand-mark svg { width: 18px; height: 18px; }
+
+  .brand-name {
+    font-size: 13px;
+    font-weight: 720;
+    letter-spacing: .22em;
+    line-height: 1.2;
+  }
+
+  .brand-caption {
+    margin-top: 3px;
+    color: #8fa2ac;
+    font-size: 9px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+  }
+
+  .eyebrow {
+    margin: 0 0 11px;
+    color: #728994;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 37px;
+  }
+
+  .control-label {
+    color: #d9e3e5;
+    font-size: 11px;
+    font-weight: 550;
+  }
+
+  .wind-state {
+    margin-left: auto;
+    margin-right: 10px;
+    color: #8498a2;
+    font-size: 9px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .switch {
+    position: relative;
+    width: 35px;
+    height: 20px;
+    flex: 0 0 auto;
+  }
+
+  .switch input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+
+  .switch-track {
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(215, 234, 235, .2);
+    border-radius: 20px;
+    background: rgba(255,255,255,.08);
+    cursor: pointer;
+    transition: background .18s, border-color .18s;
+  }
+
+  .switch-track::after {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    content: "";
+    border-radius: 50%;
+    background: #9aaab0;
+    box-shadow: 0 1px 4px rgba(0,0,0,.25);
+    transition: transform .18s, background .18s;
+  }
+
+  .switch input:checked + .switch-track {
+    border-color: rgba(133, 228, 210, .68);
+    background: rgba(92, 192, 174, .32);
+  }
+
+  .switch input:checked + .switch-track::after {
+    transform: translateX(15px);
+    background: #a1f0df;
+  }
+
+  .switch input:focus-visible + .switch-track,
+  button:focus-visible,
+  input[type="range"]:focus-visible {
+    outline: 2px solid rgba(133, 228, 210, .8);
+    outline-offset: 3px;
+  }
+
+  .divider {
+    height: 1px;
+    margin: 10px 0 12px;
+    background: var(--line);
+  }
+
+  .range-block { margin: 12px 0 14px; }
+
+  .range-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 7px;
+  }
+
+  .range-heading label {
+    color: #d9e3e5;
+    font-size: 10px;
+    font-weight: 550;
+  }
+
+  .range-value {
+    color: #a7c8c6;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    height: 14px;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 3px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, rgba(133,228,210,.72), rgba(133,228,210,.16));
+  }
+
+  input[type="range"]::-moz-range-track {
+    height: 3px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, rgba(133,228,210,.72), rgba(133,228,210,.16));
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    width: 11px;
+    height: 11px;
+    margin-top: -4px;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 2px solid #d9fff6;
+    border-radius: 50%;
+    background: #6acdbb;
+    box-shadow: 0 0 9px rgba(115, 222, 202, .35);
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 8px;
+    height: 8px;
+    border: 2px solid #d9fff6;
+    border-radius: 50%;
+    background: #6acdbb;
+    box-shadow: 0 0 9px rgba(115, 222, 202, .35);
+  }
+
+  .reset-button {
+    width: 100%;
+    height: 34px;
+    margin-top: 2px;
+    border: 1px solid rgba(208, 228, 232, .17);
+    border-radius: 8px;
+    background: rgba(255,255,255,.045);
+    color: #dce6e7;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    cursor: pointer;
+    transition: background .16s, border-color .16s, transform .16s;
+  }
+
+  .reset-button:hover {
+    border-color: rgba(133, 228, 210, .44);
+    background: rgba(133, 228, 210, .09);
+  }
+
+  .reset-button:active { transform: translateY(1px); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .stat {
+    min-width: 0;
+    padding: 8px 7px 7px;
+    border: 1px solid rgba(210, 230, 232, .08);
+    border-radius: 7px;
+    background: rgba(255,255,255,.025);
+  }
+
+  .stat-value {
+    display: block;
+    color: #e6efee;
+    font-size: 12px;
+    font-weight: 620;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-label {
+    display: block;
+    margin-top: 3px;
+    color: #80939c;
+    font-size: 8px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+
+  .hint {
+    position: absolute;
+    bottom: 25px;
+    left: 50%;
+    display: flex;
+    align-items: center;
+    gap: 19px;
+    padding: 10px 16px;
+    transform: translateX(-50%);
+    border: 1px solid rgba(213, 234, 236, .1);
+    border-radius: 30px;
+    background: rgba(16, 24, 34, .55);
+    color: #93a6ad;
+    font-size: 9px;
+    letter-spacing: .035em;
+    white-space: nowrap;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .hint-item { display: flex; align-items: center; gap: 7px; }
+
+  .key {
+    min-width: 19px;
+    height: 18px;
+    display: inline-grid;
+    place-items: center;
+    padding: 0 5px;
+    border: 1px solid rgba(218, 235, 235, .2);
+    border-radius: 5px;
+    color: #c5d4d4;
+    font-size: 9px;
+    line-height: 1;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 8px rgba(133,228,210,.45);
+  }
+
+  .corner-note {
+    position: absolute;
+    right: 27px;
+    bottom: 27px;
+    color: rgba(173, 193, 198, .62);
+    font-size: 9px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+  }
+
+  .pause-badge {
+    position: absolute;
+    top: 27px;
+    right: 28px;
+    padding: 8px 11px;
+    border: 1px solid rgba(222, 232, 230, .13);
+    border-radius: 20px;
+    background: rgba(15, 23, 32, .55);
+    color: #8fa2a9;
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    opacity: .78;
+  }
+
+  .pause-badge.paused {
+    border-color: rgba(231, 201, 149, .45);
+    color: var(--gold);
+    opacity: 1;
+  }
+
+  @media (max-width: 600px) {
+    .panel { top: 12px; left: 12px; width: 225px; padding: 14px; }
+    .hint { bottom: 12px; gap: 10px; padding: 8px 11px; font-size: 8px; }
+    .corner-note { display: none; }
+    .pause-badge { top: 14px; right: 13px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="silk" aria-label="Interactive cloth simulation"></canvas>
+
+<div class="interface">
+  <section class="panel" aria-label="Simulation controls">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M4 6c5.2 0 5.2 12 10.4 12S19.6 6 22 6M2 12c5.1 0 5.1-6 10.2-6s5.1 12 10.2 12" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">SILK</div>
+        <div class="brand-caption">A small study in motion</div>
+      </div>
+    </div>
+
+    <p class="eyebrow">Environment</p>
+
+    <div class="control-row">
+      <span class="control-label">Atmospheric wind</span>
+      <span class="wind-state" id="windLabel">still air</span>
+      <label class="switch" aria-label="Toggle atmospheric wind">
+        <input id="wind" type="checkbox">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="range-block">
+      <div class="range-heading">
+        <label for="gravity">Gravity</label>
+        <span class="range-value" id="gravityValue">900</span>
+      </div>
+      <input id="gravity" type="range" min="0" max="1800" step="50" value="900">
+    </div>
+
+    <div class="range-block">
+      <div class="range-heading">
+        <label for="iterations">Solver iterations</label>
+        <span class="range-value" id="iterationsValue">7</span>
+      </div>
+      <input id="iterations" type="range" min="3" max="12" step="1" value="7">
+    </div>
+
+    <button class="reset-button" id="reset" type="button">↺ &nbsp; Restore the cloth</button>
+
+    <div class="stats" aria-label="Live simulation statistics">
+      <div class="stat">
+        <span class="stat-value" id="fps">—</span>
+        <span class="stat-label">FPS</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="particleCount">—</span>
+        <span class="stat-label">Particles</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="constraintCount">—</span>
+        <span class="stat-label">Links</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="pause-badge" id="pauseBadge">Space &nbsp;·&nbsp; pause</div>
+
+  <div class="hint" aria-label="Interaction instructions">
+    <span class="hint-item"><span class="dot"></span> drag to gather</span>
+    <span class="hint-item"><span class="key">RMB</span> cut a seam</span>
+    <span class="hint-item"><span class="key">SPACE</span> pause</span>
+  </div>
+
+  <div class="corner-note">Touch the weave</div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const canvas = document.getElementById("silk");
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const windControl = document.getElementById("wind");
+  const gravityControl = document.getElementById("gravity");
+  const iterationsControl = document.getElementById("iterations");
+  const gravityValue = document.getElementById("gravityValue");
+  const iterationsValue = document.getElementById("iterationsValue");
+  const windLabel = document.getElementById("windLabel");
+  const fpsElement = document.getElementById("fps");
+  const particleCountElement = document.getElementById("particleCount");
+  const constraintCountElement = document.getElementById("constraintCount");
+  const pauseBadge = document.getElementById("pauseBadge");
+
+  const FIXED_DT = 1 / 60;
+  const COLUMNS = 55;
+  const ROWS = 39;
+  const PARTICLE_DAMPING = 0.986;
+
+  let width = 0;
+  let height = 0;
+  let dpr = 1;
+  let particles = [];
+  let constraints = [];
+  let triangles = [];
+  let grid = [];
+  let time = 0;
+  let windOn = false;
+  let paused = false;
+  let accumulator = 0;
+  let lastFrameTime = 0;
+  let fpsElapsed = 0;
+  let fpsFrames = 0;
+  let texturePattern = null;
+  let pointerMode = null;
+  let grabbed = null;
+  let pointerX = 0;
+  let pointerY = 0;
+  let lastPointerX = 0;
+  let lastPointerY = 0;
+  let resizeTimer = 0;
+
+  function makeTexture() {
+    const tile = document.createElement("canvas");
+    tile.width = 24;
+    tile.height = 24;
+    const t = tile.getContext("2d");
+
+    t.strokeStyle = "rgba(224, 248, 241, .16)";
+    t.lineWidth = 1;
+    t.beginPath();
+    t.moveTo(4.5, 0); t.lineTo(4.5, 24);
+    t.moveTo(16.5, 0); t.lineTo(16.5, 24);
+    t.stroke();
+
+    t.strokeStyle = "rgba(10, 21, 39, .13)";
+    t.beginPath();
+    t.moveTo(0, 7.5); t.lineTo(24, 7.5);
+    t.moveTo(0, 19.5); t.lineTo(24, 19.5);
+    t.stroke();
+
+    t.strokeStyle = "rgba(255, 255, 255, .07)";
+    t.lineWidth = .6;
+    t.beginPath();
+    t.moveTo(10.5, 0); t.lineTo(10.5, 24);
+    t.moveTo(0, 13.5); t.lineTo(24, 13.5);
+    t.stroke();
+
+    texturePattern = ctx.createPattern(tile, "repeat");
+  }
+
+  function particleIndex(row, col) {
+    return row * COLUMNS + col;
+  }
+
+  function addConstraint(a, b, type, stiffness, tearRatio) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const c = {
+      a, b,
+      rest: Math.hypot(dx, dy),
+      type,
+      stiffness,
+      tearRatio,
+      active: true,
+      torn: false
+    };
+    constraints.push(c);
+    return c;
+  }
+
+  function buildCloth() {
+    particles = [];
+    constraints = [];
+    triangles = [];
+    grid = Array.from({ length: ROWS }, () => new Array(COLUMNS));
+
+    const clothWidth = Math.min(680, Math.max(310, width - 70));
+    const clothHeight = Math.min(470, Math.max(250, height * 0.62));
+    const startX = (width - clothWidth) * 0.5;
+    const startY = Math.max(82, (height - clothHeight) * 0.5 - 2);
+    const dx = clothWidth / (COLUMNS - 1);
+    const dy = clothHeight / (ROWS - 1);
+
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLUMNS; col++) {
+        const x = startX + col * dx;
+        const y = startY + row * dy;
+        const pinned = row === 0 && (col % 4 === 0 || col === COLUMNS - 1);
+        const p = {
+          x, y, px: x, py: y,
+          ox: x, oy: y,
+          row, col,
+          pinned,
+          invMass: pinned ? 0 : 1
+        };
+        grid[row][col] = p;
+        particles.push(p);
+      }
+    }
+
+    const horizontal = Array.from({ length: ROWS }, () => new Array(COLUMNS - 1));
+    const vertical = Array.from({ length: ROWS - 1 }, () => new Array(COLUMNS));
+    const diagonalDown = Array.from({ length: ROWS - 1 }, () => new Array(COLUMNS - 1));
+
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLUMNS - 1; col++) {
+        horizontal[row][col] = addConstraint(
+          grid[row][col], grid[row][col + 1], "structural", 1, 2.35
+        );
+      }
+    }
+
+    for (let row = 0; row < ROWS - 1; row++) {
+      for (let col = 0; col < COLUMNS; col++) {
+        vertical[row][col] = addConstraint(
+          grid[row][col], grid[row + 1][col], "structural", 1, 2.35
+        );
+      }
+    }
+
+    for (let row = 0; row < ROWS - 1; row++) {
+      for (let col = 0; col < COLUMNS - 1; col++) {
+        diagonalDown[row][col] = addConstraint(
+          grid[row][col], grid[row + 1][col + 1], "shear", .9, 2.55
+        );
+        addConstraint(
+          grid[row][col + 1], grid[row + 1][col], "shear", .9, 2.55
+        );
+      }
+    }
+
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLUMNS - 2; col++) {
+        addConstraint(grid[row][col], grid[row][col + 2], "bend", .14, 3.2);
+      }
+    }
+
+    for (let row = 0; row < ROWS - 2; row++) {
+      for (let col = 0; col < COLUMNS; col++) {
+        addConstraint(grid[row][col], grid[row + 2][col], "bend", .14, 3.2);
+      }
+    }
+
+    for (let row = 0; row < ROWS - 1; row++) {
+      for (let col = 0; col < COLUMNS - 1; col++) {
+        const a = grid[row][col];
+        const b = grid[row][col + 1];
+        const c = grid[row + 1][col];
+        const d = grid[row + 1][col + 1];
+        const diag = diagonalDown[row][col];
+
+        triangles.push({
+          a, b, c,
+          links: [horizontal[row][col], vertical[row][col], diag]
+        });
+        triangles.push({
+          a: b, b: d, c,
+          links: [vertical[row][col + 1], horizontal[row + 1][col], diag]
+        });
+      }
+    }
+
+    time = 0;
+    accumulator = 0;
+    updateStats();
+  }
+
+  function resizeCanvas() {
+    const oldWidth = width;
+    const oldHeight = height;
+    width = window.innerWidth;
+    height = window.innerHeight;
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+
+    canvas.width = Math.max(1, Math.round(width * dpr));
+    canvas.height = Math.max(1, Math.round(height * dpr));
+    canvas.style.width = width + "px";
+    canvas.style.height = height + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    makeTexture();
+
+    if (oldWidth && oldHeight) {
+      buildCloth();
+      if (paused) draw();
+    } else {
+      buildCloth();
+    }
+  }
+
+  function updateStats() {
+    let count = 0;
+    for (let i = 0; i < constraints.length; i++) {
+      if (constraints[i].active) count++;
+    }
+    particleCountElement.textContent = particles.length.toLocaleString();
+    constraintCountElement.textContent = count.toLocaleString();
+  }
+
+  function solveConstraint(c) {
+    if (!c.active) return;
+
+    const a = c.a;
+    const b = c.b;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const distance = Math.hypot(dx, dy);
+
+    if (distance < 1e-6) return;
+
+    if (distance > c.rest * c.tearRatio) {
+      c.active = false;
+      c.torn = true;
+      return;
+    }
+
+    const totalWeight = a.invMass + b.invMass;
+    if (totalWeight === 0) return;
+
+    const correction = ((distance - c.rest) / distance) * c.stiffness;
+    const cx = dx * correction;
+    const cy = dy * correction;
+
+    if (a.invMass) {
+      const share = a.invMass / totalWeight;
+      a.x += cx * share;
+      a.y += cy * share;
+    }
+    if (b.invMass) {
+      const share = b.invMass / totalWeight;
+      b.x -= cx * share;
+      b.y -= cy * share;
+    }
+  }
+
+  function simulateStep(dt) {
+    time += dt;
+    const gravity = Number(gravityControl.value);
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      if (p.pinned) continue;
+
+      if (p === grabbed && pointerMode === "grab") {
+        p.x = pointerX;
+        p.y = pointerY;
+        p.px = pointerX;
+        p.py = pointerY;
+        continue;
+      }
+
+      let windForce = 0;
+      if (windOn) {
+        const waveA = Math.sin(time * 2.35 + p.row * .22 + p.col * .105);
+        const waveB = Math.sin(time * 1.13 - p.row * .31 + p.col * .19);
+        const gust = Math.sin(time * .62 + p.col * .08) * .5 + .5;
+        windForce = (waveA * .62 + waveB * .38) * (110 + 210 * gust);
+      }
+
+      const vx = (p.x - p.px) * PARTICLE_DAMPING;
+      const vy = (p.y - p.py) * PARTICLE_DAMPING;
+      p.px = p.x;
+      p.py = p.y;
+      p.x += vx + windForce * dt * dt;
+      p.y += vy + gravity * dt * dt;
+    }
+
+    const iterations = Number(iterationsControl.value);
+    for (let i = 0; i < iterations; i++) {
+      for (let j = 0; j < constraints.length; j++) {
+        solveConstraint(constraints[j]);
+      }
+      if (grabbed && pointerMode === "grab") {
+        grabbed.x = pointerX;
+        grabbed.y = pointerY;
+        grabbed.px = pointerX;
+        grabbed.py = pointerY;
+      }
+    }
+  }
+
+  function pointSegmentDistanceSquared(px, py, ax, ay, bx, by) {
+    const abx = bx - ax;
+    const aby = by - ay;
+    const lengthSq = abx * abx + aby * aby;
+    let t = lengthSq > 0 ? ((px - ax) * abx + (py - ay) * aby) / lengthSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    const dx = px - (ax + t * abx);
+    const dy = py - (ay + t * aby);
+    return dx * dx + dy * dy;
+  }
+
+  function segmentDistanceSquared(ax, ay, bx, by, cx, cy, dx, dy) {
+    const pathDX = bx - ax;
+    const pathDY = by - ay;
+    const edgeDX = dx - cx;
+    const edgeDY = dy - cy;
+    const denominator = pathDX * edgeDY - pathDY * edgeDX;
+    const acx = cx - ax;
+    const acy = cy - ay;
+
+    if (Math.abs(denominator) > 1e-9) {
+      const t = (acx * edgeDY - acy * edgeDX) / denominator;
+      const u = (acx * pathDY - acy * pathDX) / denominator;
+      if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return 0;
+    }
+
+    return Math.min(
+      pointSegmentDistanceSquared(ax, ay, cx, cy, dx, dy),
+      pointSegmentDistanceSquared(bx, by, cx, cy, dx, dy),
+      pointSegmentDistanceSquared(cx, cy, ax, ay, bx, by),
+      pointSegmentDistanceSquared(dx, dy, ax, ay, bx, by)
+    );
+  }
+
+  function cutAlong(x1, y1, x2, y2) {
+    const thresholdSq = 5.7 * 5.7;
+    let changed = false;
+
+    for (let i = 0; i < constraints.length; i++) {
+      const c = constraints[i];
+      if (!c.active || c.type === "bend") continue;
+      if (segmentDistanceSquared(
+        x1, y1, x2, y2,
+        c.a.x, c.a.y, c.b.x, c.b.y
+      ) <= thresholdSq) {
+        c.active = false;
+        c.torn = true;
+        changed = true;
+      }
+    }
+    if (changed) updateStats();
+  }
+
+  function nearestParticle(x, y) {
+    let nearest = null;
+    let nearestDistanceSq = 40 * 40;
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      if (p.pinned) continue;
+      const dx = p.x - x;
+      const dy = p.y - y;
+      const dSq = dx * dx + dy * dy;
+      if (dSq <= nearestDistanceSq) {
+        nearestDistanceSq = dSq;
+        nearest = p;
+      }
+    }
+    return nearest;
+  }
+
+  canvas.addEventListener("contextmenu", event => event.preventDefault());
+
+  canvas.addEventListener("pointerdown", event => {
+    if (event.button !== 0 && event.button !== 2) return;
+    event.preventDefault();
+    pointerX = lastPointerX = event.clientX;
+    pointerY = lastPointerY = event.clientY;
+
+    if (event.button === 2 || (event.button === 0 && event.shiftKey)) {
+      pointerMode = "cut";
+      cutAlong(pointerX, pointerY, pointerX, pointerY);
+    } else {
+      pointerMode = "grab";
+      grabbed = nearestParticle(pointerX, pointerY);
+    }
+
+    try { canvas.setPointerCapture(event.pointerId); } catch (_) {}
+  });
+
+  canvas.addEventListener("pointermove", event => {
+    if (!pointerMode) return;
+    pointerX = event.clientX;
+    pointerY = event.clientY;
+
+    if (pointerMode === "cut") {
+      cutAlong(lastPointerX, lastPointerY, pointerX, pointerY);
+    }
+    lastPointerX = pointerX;
+    lastPointerY = pointerY;
+  });
+
+  function endPointer(event) {
+    if (pointerMode === "grab" && grabbed) {
+      grabbed.px = grabbed.x;
+      grabbed.py = grabbed.y;
+    }
+    pointerMode = null;
+    grabbed = null;
+    if (event && canvas.hasPointerCapture && canvas.hasPointerCapture(event.pointerId)) {
+      try { canvas.releasePointerCapture(event.pointerId); } catch (_) {}
+    }
+  }
+
+  canvas.addEventListener("pointerup", endPointer);
+  canvas.addEventListener("pointercancel", endPointer);
+  canvas.addEventListener("lostpointercapture", () => {
+    pointerMode = null;
+    grabbed = null;
+  });
+
+  function colorForFace(triangle, normalX, normalY, normalZ) {
+    const x = (triangle.a.x + triangle.b.x + triangle.c.x) / 3;
+    const y = (triangle.a.y + triangle.b.y + triangle.c.y) / 3;
+    const u = Math.max(0, Math.min(1, (x - width * .23) / (width * .54)));
+    const v = Math.max(0, Math.min(1, (y - height * .15) / (height * .65)));
+
+    const left = [51, 177, 178];
+    const right = [123, 112, 211];
+    const mix = u * .82 + v * .18;
+    const lightX = -.34;
+    const lightY = -.48;
+    const lightZ = .81;
+    const directional = Math.max(0, normalX * lightX + normalY * lightY + normalZ * lightZ);
+    let shade = .70 + directional * .46;
+
+    const strain = (
+      Math.hypot(triangle.b.x - triangle.a.x, triangle.b.y - triangle.a.y) +
+      Math.hypot(triangle.c.x - triangle.a.x, triangle.c.y - triangle.a.y) +
+      Math.hypot(triangle.c.x - triangle.b.x, triangle.c.y - triangle.b.y)
+    ) / 3;
+
+    if (strain > 14) shade += Math.min(.07, (strain - 14) * .004);
+    shade = Math.max(.62, Math.min(1.19, shade));
+
+    const r = Math.round((left[0] * (1 - mix) + right[0] * mix) * shade);
+    const g = Math.round((left[1] * (1 - mix) + right[1] * mix) * shade);
+    const b = Math.round((left[2] * (1 - mix) + right[2] * mix) * shade);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function drawBackground() {
+    const bg = ctx.createLinearGradient(0, 0, width, height);
+    bg.addColorStop(0, "#111a24");
+    bg.addColorStop(.52, "#17202b");
+    bg.addColorStop(1, "#101821");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, width, height);
+
+    const glowA = ctx.createRadialGradient(width * .56, height * .46, 5, width * .56, height * .46, Math.max(width, height) * .58);
+    glowA.addColorStop(0, "rgba(75, 113, 126, .17)");
+    glowA.addColorStop(.48, "rgba(42, 67, 82, .075)");
+    glowA.addColorStop(1, "rgba(10, 16, 23, 0)");
+    ctx.fillStyle = glowA;
+    ctx.fillRect(0, 0, width, height);
+
+    const glowB = ctx.createRadialGradient(width * .83, height * .15, 0, width * .83, height * .15, width * .45);
+    glowB.addColorStop(0, "rgba(93, 89, 142, .10)");
+    glowB.addColorStop(1, "rgba(93, 89, 142, 0)");
+    ctx.fillStyle = glowB;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.save();
+    ctx.globalAlpha = .11;
+    ctx.fillStyle = "#9fb5b7";
+    for (let i = 0; i < 34; i++) {
+      const x = (i * 197 + 31) % width;
+      const y = (i * 113 + 47) % height;
+      const radius = i % 5 === 0 ? 1.2 : .65;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function faceNormal(triangle) {
+    const a = triangle.a;
+    const b = triangle.b;
+    const c = triangle.c;
+
+    const za = 5 * Math.sin(a.ox * .018 + a.oy * .013) +
+               2 * Math.sin(a.oy * .04 - a.ox * .01) +
+               (a.y - a.oy) * .14 + (a.x - a.ox) * .08;
+    const zb = 5 * Math.sin(b.ox * .018 + b.oy * .013) +
+               2 * Math.sin(b.oy * .04 - b.ox * .01) +
+               (b.y - b.oy) * .14 + (b.x - b.ox) * .08;
+    const zc = 5 * Math.sin(c.ox * .018 + c.oy * .013) +
+               2 * Math.sin(c.oy * .04 - c.ox * .01) +
+               (c.y - c.oy) * .14 + (c.x - c.ox) * .08;
+
+    const abx = b.x - a.x;
+    const aby = b.y - a.y;
+    const abz = zb - za;
+    const acx = c.x - a.x;
+    const acy = c.y - a.y;
+    const acz = zc - za;
+
+    let nx = aby * acz - abz * acy;
+    let ny = abz * acx - abx * acz;
+    let nz = abx * acy - aby * acx;
+
+    if (nz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+    const length = Math.hypot(nx, ny, nz) || 1;
+    return [nx / length, ny / length, nz / length];
+  }
+
+  function draw() {
+    drawBackground();
+
+    for (let i = 0; i < triangles.length; i++) {
+      const tri = triangles[i];
+      if (!tri.links[0].active || !tri.links[1].active || !tri.links[2].active) continue;
+
+      const a = tri.a;
+      const b = tri.b;
+      const c = tri.c;
+      const normal = faceNormal(tri);
+
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.lineTo(c.x, c.y);
+      ctx.closePath();
+      ctx.fillStyle = colorForFace(tri, normal[0], normal[1], normal[2]);
+      ctx.fill();
+
+      if (texturePattern) {
+        ctx.globalAlpha = .38;
+        ctx.fillStyle = texturePattern;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.strokeStyle = "rgba(231, 249, 243, .075)";
+      ctx.lineWidth = .42;
+      ctx.stroke();
+    }
+
+    ctx.save();
+    ctx.lineCap = "round";
+    for (let i = 0; i < constraints.length; i++) {
+      const c = constraints[i];
+      if (c.active || !c.torn || c.type === "bend") continue;
+      ctx.beginPath();
+      ctx.moveTo(c.a.x, c.a.y);
+      ctx.lineTo(c.b.x, c.b.y);
+      ctx.strokeStyle = c.type === "shear"
+        ? "rgba(255, 220, 190, .20)"
+        : "rgba(255, 230, 204, .32)";
+      ctx.lineWidth = c.type === "shear" ? .75 : 1.05;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function togglePause() {
+    paused = !paused;
+    pauseBadge.textContent = paused ? "Paused  ·  space to resume" : "Space  ·  pause";
+    pauseBadge.classList.toggle("paused", paused);
+    if (!paused) {
+      lastFrameTime = performance.now();
+      accumulator = 0;
+    }
+  }
+
+  window.addEventListener("keydown", event => {
+    const target = event.target;
+    const isTextEntry = target && (
+      target.isContentEditable ||
+      target.tagName === "TEXTAREA" ||
+      (target.tagName === "INPUT" && /^(text|search|email|url|password)$/i.test(target.type))
+    );
+
+    if (event.code === "Space" && !isTextEntry) {
+      event.preventDefault();
+      if (!event.repeat) togglePause();
+    }
+  });
+
+  windControl.addEventListener("change", () => {
+    windOn = windControl.checked;
+    windLabel.textContent = windOn ? "breeze on" : "still air";
+  });
+
+  gravityControl.addEventListener("input", () => {
+    gravityValue.textContent = gravityControl.value;
+  });
+
+  iterationsControl.addEventListener("input", () => {
+    iterationsValue.textContent = iterationsControl.value;
+  });
+
+  document.getElementById("reset").addEventListener("click", () => {
+    paused = false;
+    pauseBadge.textContent = "Space  ·  pause";
+    pauseBadge.classList.remove("paused");
+    buildCloth();
+    lastFrameTime = performance.now();
+    accumulator = 0;
+    draw();
+  });
+
+  function frame(now) {
+    if (!lastFrameTime) lastFrameTime = now;
+    let elapsed = Math.min((now - lastFrameTime) / 1000, .05);
+    lastFrameTime = now;
+
+    fpsFrames++;
+    fpsElapsed += elapsed;
+    if (fpsElapsed >= .5) {
+      fpsElement.textContent = Math.round(fpsFrames / fpsElapsed).toString();
+      fpsFrames = 0;
+      fpsElapsed = 0;
+    }
+
+    if (!paused) {
+      accumulator += elapsed;
+      let steps = 0;
+      while (accumulator >= FIXED_DT && steps < 3) {
+        simulateStep(FIXED_DT);
+        accumulator -= FIXED_DT;
+        steps++;
+      }
+      if (steps >= 3) accumulator = Math.min(accumulator, FIXED_DT);
+      draw();
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(resizeCanvas, 80);
+  });
+
+  window.__arena = {
+    stats() {
+      let x = 0;
+      let y = 0;
+      let pinned = 0;
+      for (let i = 0; i < particles.length; i++) {
+        x += particles[i].x;
+        y += particles[i].y;
+        if (particles[i].pinned) pinned++;
+      }
+      let intact = 0;
+      for (let i = 0; i < constraints.length; i++) {
+        if (constraints[i].active) intact++;
+      }
+      const count = particles.length || 1;
+      return {
+        particles: particles.length,
+        constraints: intact,
+        pinned,
+        centroid: { x: x / count, y: y / count }
+      };
+    }
+  };
+
+  resizeCanvas();
+  draw();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
+```

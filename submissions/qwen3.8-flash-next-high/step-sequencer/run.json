@@ -1,0 +1,25 @@
+{
+  "source": "arena run",
+  "endpoint": "192.168.1.172:8080",
+  "apiModel": "qwen3.8-flash-next-iq3_xxs",
+  "servedModel": "qwen3.8-flash-next-iq3_xxs",
+  "params": {
+    "thinking": "high"
+  },
+  "startedAt": "2026-10-29T15:23:17.867Z",
+  "wallMs": 1114707,
+  "ttftMs": 4392,
+  "thinkingMs": 955481,
+  "promptTokens": 1327,
+  "completionTokens": 83519,
+  "reasoningTokens": 69876,
+  "tokensEstimated": false,
+  "genTokensPerSec": 75.2,
+  "promptTokensPerSec": 304.5,
+  "finishReason": "stop",
+  "replyChars": 47181,
+  "reasoningChars": 250975,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 47179
+}

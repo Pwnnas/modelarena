@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings · Harbor</title>
+<style>
+  :root {
+    --navy: #1a2332;
+    --navy-deep: #141c28;
+    --panel: #222e40;
+    --panel-2: #2b3a4e;
+    --line: #3a4a5e;
+    --teal: #2d8b8b;
+    --seafoam: #a8dadc;
+    --seafoam-hover: #c6eaeb;
+    --cream: #f1faee;
+    --field: #8fb9bd;
+    --err: #ffb4a8;
+    --ok-bg: #173a3d;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: var(--navy);
+    color: var(--cream);
+    font-family: "DejaVu Sans", Verdana, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  :focus-visible { outline: 3px solid var(--seafoam); outline-offset: 2px; }
+  h1:focus { outline: none; }
+
+  .skip-link {
+    position: absolute;
+    left: 12px;
+    top: -100px;
+    background: var(--seafoam);
+    color: var(--navy);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 700;
+    z-index: 20;
+    text-decoration: none;
+  }
+  .skip-link:focus { top: 12px; }
+
+  .app {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 100vh;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--navy-deep);
+    border-right: 1px solid var(--line);
+    padding: 28px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+  .brand { display: flex; gap: 12px; align-items: center; padding: 0 8px; }
+  .logo {
+    width: 42px; height: 42px; border-radius: 10px;
+    background: var(--seafoam); color: var(--navy);
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 20px; flex: none;
+  }
+  .brand strong { display: block; font-size: 18px; }
+  .brand span { color: var(--seafoam); font-size: 14px; }
+
+  .nav { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .nav button {
+    width: 100%;
+    min-height: 44px;
+    background: transparent;
+    color: var(--cream);
+    border: 0;
+    border-left: 4px solid transparent;
+    border-radius: 6px;
+    text-align: left;
+    padding: 8px 12px;
+    font: inherit;
+    cursor: pointer;
+  }
+  .nav button:hover { background: var(--panel); }
+  .nav button[aria-current="page"] {
+    background: var(--panel-2);
+    border-left-color: var(--seafoam);
+    font-weight: 700;
+  }
+
+  /* Main */
+  main {
+    padding: 40px 48px 64px;
+    width: 100%;
+    max-width: 920px;
+  }
+  h1 { font-size: 30px; font-weight: 700; margin: 0 0 8px; line-height: 1.2; }
+  h2 { font-size: 20px; font-weight: 700; margin: 0 0 12px; }
+  .lede { color: var(--seafoam); margin: 0 0 20px; max-width: 640px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 24px;
+    margin-top: 20px;
+  }
+  .card.danger { border-color: var(--err); }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .toolbar h2 { margin-bottom: 0; }
+  .slot { display: flex; }
+  .count { color: var(--seafoam); font-weight: 400; font-size: 16px; margin-left: 8px; }
+
+  label { display: block; font-weight: 700; margin-bottom: 6px; }
+  .hint { color: var(--seafoam); font-size: 14px; }
+
+  input {
+    width: 100%;
+    max-width: 420px;
+    min-height: 44px;
+    padding: 10px 12px;
+    background: var(--navy-deep);
+    color: var(--cream);
+    border: 2px solid var(--field);
+    border-radius: 8px;
+    font: inherit;
+  }
+  input::placeholder { color: #9fb3b8; opacity: 1; }
+  .field { margin-bottom: 16px; }
+  fieldset { border: 0; padding: 0; margin: 0 0 16px; }
+  legend { font-weight: 700; font-size: 18px; margin-bottom: 12px; padding: 0; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .grid-3 .field { margin-bottom: 0; }
+  .grid-3 input { max-width: none; }
+
+  .btn {
+    min-height: 44px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background: var(--seafoam);
+    color: var(--navy);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--seafoam-hover); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-secondary { background: transparent; color: var(--cream); border-color: var(--field); }
+  .btn-secondary:hover { background: var(--panel-2); }
+  .btn-danger { background: var(--err); color: var(--navy); }
+  .btn-danger:hover { background: #ffc7bd; }
+
+  .message {
+    margin: 0 0 16px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border-left: 4px solid;
+  }
+  .message:empty { display: none; }
+  .message.error { background: #3b2528; color: var(--cream); border-color: var(--err); }
+  .message.success { background: var(--ok-bg); color: var(--cream); border-color: var(--seafoam); }
+
+  .list { list-style: none; margin: 0; padding: 0; }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .row:last-child { border-bottom: 0; }
+  .person { display: flex; gap: 14px; align-items: center; min-width: 0; }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--teal); color: var(--cream);
+    display: grid; place-items: center; font-weight: 700; flex: none;
+  }
+  .role-tag {
+    border: 1px solid var(--seafoam);
+    color: var(--seafoam);
+    border-radius: 999px;
+    padding: 2px 12px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .empty {
+    text-align: center;
+    padding: 40px 24px;
+    border: 2px dashed var(--field);
+    background: transparent;
+  }
+  .empty p { color: var(--seafoam); max-width: 460px; margin: 0 auto 20px; }
+  .empty .slot { justify-content: center; }
+
+  .switch-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 24px;
+    padding: 18px 0; border-bottom: 1px solid var(--line);
+  }
+  .switch-row:last-of-type { border-bottom: 0; }
+  .switch-label { font-weight: 700; display: block; }
+  .switch {
+    position: relative;
+    width: 60px; height: 34px;
+    border-radius: 17px;
+    border: 2px solid var(--seafoam);
+    background: var(--navy-deep);
+    cursor: pointer;
+    flex: none;
+    padding: 0;
+  }
+  .switch .knob {
+    position: absolute;
+    top: 4px; left: 4px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--seafoam);
+    transition: transform 0.15s ease;
+  }
+  .switch[aria-checked="true"] { background: var(--teal); }
+  .switch[aria-checked="true"] .knob { transform: translateX(26px); background: var(--cream); }
+
+  .plan {
+    display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap;
+  }
+  .plan-name { font-size: 28px; font-weight: 700; color: var(--seafoam); }
+  .plan-price { font-size: 18px; text-align: right; }
+
+  /* Dialog */
+  .scrim {
+    position: fixed; inset: 0;
+    background: rgba(10, 15, 24, 0.72);
+    display: grid; place-items: center;
+    padding: 24px;
+    z-index: 10;
+  }
+  .dialog {
+    background: var(--panel);
+    border: 1px solid var(--seafoam);
+    border-radius: 12px;
+    padding: 28px;
+    max-width: 480px;
+    width: 100%;
+  }
+  .dialog h2 { margin-bottom: 12px; }
+  .dialog p { margin: 0; color: var(--cream); }
+  .dialog .actions { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; margin-top: 24px; }
+
+  @media (max-width: 820px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; gap: 16px; }
+    .nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    main { padding: 28px 20px 48px; }
+    .grid-3 { grid-template-columns: 1fr; }
+    .row { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">H</span>
+      <div>
+        <strong>Harbor</strong>
+        <span>Northwind workspace</span>
+      </div>
+    </div>
+    <nav aria-label="Settings">
+      <ul class="nav">
+        <li><button type="button" data-nav="profile" aria-current="page">Profile</button></li>
+        <li><button type="button" data-nav="notifications">Notifications</button></li>
+        <li><button type="button" data-nav="team">Team</button></li>
+        <li><button type="button" data-nav="projects">Projects</button></li>
+        <li><button type="button" data-nav="billing">Billing</button></li>
+        <li><button type="button" data-nav="danger">Danger zone</button></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main id="main" tabindex="-1">
+
+    <!-- Profile -->
+    <section data-panel="profile" aria-labelledby="h-profile">
+      <h1 id="h-profile" tabindex="-1">Profile</h1>
+      <p class="lede">This is how you appear to people in Northwind.</p>
+      <div class="card">
+        <form id="profile-form" novalidate>
+          <div class="field">
+            <label for="f-name">Full name</label>
+            <input id="f-name" data-field="name" type="text" autocomplete="name" value="Maya Chen" aria-describedby="profile-error">
+          </div>
+          <div class="field">
+            <label for="f-email">Email address</label>
+            <input id="f-email" data-field="email" type="email" autocomplete="email" value="maya@northwind.co" aria-describedby="profile-error">
+          </div>
+          <p class="message error" id="profile-error" data-error role="alert"></p>
+          <button class="btn" type="submit" data-action="save-profile">Save profile</button>
+        </form>
+      </div>
+      <p class="message success" id="profile-status" role="status"></p>
+    </section>
+
+    <!-- Notifications -->
+    <section data-panel="notifications" aria-labelledby="h-notifications" hidden>
+      <h1 id="h-notifications" tabindex="-1">Notifications</h1>
+      <p class="lede">Choose which emails and alerts you get. These settings only affect your account.</p>
+      <p class="message success" id="notif-status" role="status"></p>
+      <div class="card">
+        <div class="switch-row">
+          <div>
+            <span class="switch-label" id="l-product">Product updates</span>
+            <span class="hint" id="d-product">New features and changes to Harbor</span>
+          </div>
+          <button type="button" class="switch" role="switch" aria-checked="true" data-switch="product" aria-labelledby="l-product" aria-describedby="d-product"><span class="knob"></span></button>
+        </div>
+        <div class="switch-row">
+          <div>
+            <span class="switch-label" id="l-comments">Comments</span>
+            <span class="hint" id="d-comments">Replies on tasks and documents you follow</span>
+          </div>
+          <button type="button" class="switch" role="switch" aria-checked="true" data-switch="comments" aria-labelledby="l-comments" aria-describedby="d-comments"><span class="knob"></span></button>
+        </div>
+        <div class="switch-row">
+          <div>
+            <span class="switch-label" id="l-mentions">Mentions</span>
+            <span class="hint" id="d-mentions">When someone mentions you with @</span>
+          </div>
+          <button type="button" class="switch" role="switch" aria-checked="true" data-switch="mentions" aria-labelledby="l-mentions" aria-describedby="d-mentions"><span class="knob"></span></button>
+        </div>
+        <div class="switch-row">
+          <div>
+            <span class="switch-label" id="l-digest">Weekly digest</span>
+            <span class="hint" id="d-digest">A summary of team activity every Monday morning</span>
+          </div>
+          <button type="button" class="switch" role="switch" aria-checked="false" data-switch="digest" aria-labelledby="l-digest" aria-describedby="d-digest"><span class="knob"></span></button>
+        </div>
+        <div style="margin-top:20px">
+          <button class="btn" type="button" data-action="save-notifications">Save notification settings</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Team -->
+    <section data-panel="team" aria-labelledby="h-team" hidden>
+      <h1 id="h-team" tabindex="-1">Team</h1>
+      <p class="lede">People on your team see the projects they have access to. Admins can also manage billing.</p>
+      <p class="message success" id="team-status" role="status"></p>
+      <div class="card">
+        <h2>Members <span class="count" id="team-count"></span></h2>
+        <ul class="list" id="member-list"></ul>
+      </div>
+      <div class="card">
+        <h2 id="h-invite">Invite someone</h2>
+        <p class="hint" style="margin:0 0 16px">New people join as Members. You can change their role later.</p>
+        <form id="invite-form" novalidate>
+          <div class="field">
+            <label for="invite-email">Email address</label>
+            <input id="invite-email" data-field="invite-email" type="email" autocomplete="off" placeholder="name@company.com" aria-describedby="invite-error">
+          </div>
+          <p class="message error" id="invite-error" data-error role="alert"></p>
+          <button class="btn" type="submit" data-action="invite">Send invite</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Projects -->
+    <section data-panel="projects" aria-labelledby="h-projects" hidden>
+      <h1 id="h-projects" tabindex="-1">Projects</h1>
+      <p class="lede">Projects bring together the files, tasks and conversations for one piece of work.</p>
+      <p class="message success" id="projects-status" role="status"></p>
+
+      <div class="card empty" data-empty>
+        <h2>No projects yet</h2>
+        <p>Create a project to group files, tasks and conversations for your team. Everyone in Northwind can join it.</p>
+        <div class="slot" id="slot-empty">
+          <button class="btn" type="button" data-action="create-project">Create project</button>
+        </div>
+      </div>
+
+      <div class="card" id="project-card" hidden>
+        <div class="toolbar">
+          <h2>Your projects</h2>
+          <div class="slot" id="slot-list"></div>
+        </div>
+        <ul class="list" id="project-list" style="margin-top:12px"></ul>
+      </div>
+    </section>
+
+    <!-- Billing -->
+    <section data-panel="billing" aria-labelledby="h-billing" hidden>
+      <h1 id="h-billing" tabindex="-1">Billing</h1>
+      <p class="lede">Your plan and payment details for Northwind.</p>
+      <p class="message success" id="billing-status" role="status"></p>
+
+      <div class="card">
+        <div class="plan">
+          <div>
+            <p class="hint" style="margin:0">Current plan</p>
+            <div class="plan-name">Team</div>
+          </div>
+          <div class="plan-price">
+            $12 per member per month<br>
+            <span class="hint">3 members · Next payment $36.00 on 1 July</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <form id="billing-form" novalidate>
+          <fieldset>
+            <legend>Payment details</legend>
+            <div class="field">
+              <label for="f-card">Card number</label>
+              <input id="f-card" data-field="card-number" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="1234 1234 1234 1234" aria-describedby="billing-error">
+            </div>
+            <div class="grid-3">
+              <div class="field">
+                <label for="f-exp">Expiry date</label>
+                <input id="f-exp" data-field="card-expiry" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" aria-describedby="billing-error">
+              </div>
+              <div class="field">
+                <label for="f-cvc">Security code</label>
+                <input id="f-cvc" data-field="card-cvc" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="3 or 4 digits" aria-describedby="billing-error">
+              </div>
+            </div>
+          </fieldset>
+          <p class="message error" id="billing-error" data-error role="alert"></p>
+          <button class="btn" type="submit" data-action="pay">Pay $36.00 now</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Danger zone -->
+    <section data-panel="danger" aria-labelledby="h-danger" hidden>
+      <h1 id="h-danger" tabindex="-1">Danger zone</h1>
+      <p class="lede">Actions here can’t be undone. Read each one before you continue.</p>
+      <p class="message success" id="danger-status" role="status"></p>
+      <div class="card danger">
+        <h2>Delete workspace</h2>
+        <p class="hint" style="font-size:16px;color:var(--cream);margin:0 0 20px">Deleting Northwind removes all projects, files, messages and members for everyone. This can’t be undone.</p>
+        <button class="btn btn-danger" type="button" data-action="delete-workspace" id="delete-btn">Delete workspace</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title" aria-describedby="dlg-body">
+    <h2 id="dlg-title"></h2>
+    <p id="dlg-body"></p>
+    <div class="actions">
+      <button class="btn btn-secondary" type="button" id="dlg-cancel"></button>
+      <button class="btn btn-danger" type="button" id="dlg-confirm"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+  function h(tag, attrs, kids) {
+    const n = document.createElement(tag);
+    Object.entries(attrs || {}).forEach(([k, v]) => {
+      if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v);
+    });
+    (kids || []).forEach((c) => n.append(c));
+    return n;
+  }
+  function showError(errEl, field, msg) {
+    errEl.textContent = msg;
+    if (field) {
+      field.setAttribute('aria-invalid', 'true');
+      field.focus();
+    }
+  }
+  function clearError(errEl, field) {
+    errEl.textContent = '';
+    if (field) field.removeAttribute('aria-invalid');
+  }
+  function say(el, msg) { el.textContent = msg; }
+
+  /* ---------- Navigation ---------- */
+  const panels = $$('[data-panel]');
+  function showPanel(name, moveFocus) {
+    panels.forEach((p) => { p.hidden = p.dataset.panel !== name; });
+    $$('[data-nav]').forEach((b) => {
+      if (b.dataset.nav === name) b.setAttribute('aria-current', 'page');
+      else b.removeAttribute('aria-current');
+    });
+    if (moveFocus) document.getElementById('h-' + name).focus();
+  }
+  $$('[data-nav]').forEach((b) => {
+    b.addEventListener('click', () => showPanel(b.dataset.nav, true));
+  });
+
+  /* ---------- Dialog ---------- */
+  const scrim = $('#scrim');
+  const app = $('.app');
+  const dlgTitle = $('#dlg-title');
+  const dlgBody = $('#dlg-body');
+  const dlgCancel = $('#dlg-cancel');
+  const dlgConfirm = $('#dlg-confirm');
+  let pending = null;
+  let lastFocus = null;
+
+  function openDialog(cfg) {
+    lastFocus = document.activeElement;
+    dlgTitle.textContent = cfg.title;
+    dlgBody.textContent = cfg.body;
+    dlgCancel.textContent = cfg.cancel;
+    dlgConfirm.textContent = cfg.confirm;
+    pending = cfg.onConfirm;
+    app.inert = true;
+    scrim.hidden = false;
+    dlgCancel.focus();
+  }
+  function closeDialog() {
+    if (scrim.hidden) return;
+    scrim.hidden = true;
+    app.inert = false;
+    pending = null;
+    const visible = panels.find((p) => !p.hidden);
+    const target = (lastFocus && lastFocus.isConnected && !lastFocus.disabled)
+      ? lastFocus
+      : visible.querySelector('h1');
+    target.focus();
+  }
+  dlgCancel.addEventListener('click', closeDialog);
+  dlgConfirm.addEventListener('click', () => {
+    const fn = pending;
+    pending = null;
+    if (fn) fn();
+    closeDialog();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (scrim.hidden) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeDialog();
+    } else if (e.key === 'Tab') {
+      const f = [dlgCancel, dlgConfirm];
+      const i = f.indexOf(document.activeElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); f[1].focus(); }
+      else if (!e.shiftKey && i === 1) { e.preventDefault(); f[0].focus(); }
+    }
+  });
+
+  /* ---------- Profile ---------- */
+  const nameIn = $('[data-field="name"]');
+  const emailIn = $('[data-field="email"]');
+  const profErr = $('#profile-error');
+  const profStatus = $('#profile-status');
+  $('#profile-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    say(profStatus, '');
+    const n = nameIn.value.trim();
+    const m = emailIn.value.trim();
+    if (!n) {
+      showError(profErr, nameIn, 'Full name is required. Your name appears on comments and invitations. Enter your name and save again.');
+      return;
+    }
+    clearError(profErr, nameIn);
+    if (!EMAIL.test(m)) {
+      showError(profErr, emailIn, 'Enter an email address like name@company.com. Your email is used to sign in and send notifications.');
+      return;
+    }
+    clearError(profErr, emailIn);
+    nameIn.value = n;
+    emailIn.value = m;
+    say(profStatus, 'Profile saved. Your changes are live for everyone in Northwind.');
+  });
+
+  /* ---------- Notifications ---------- */
+  const notifStatus = $('#notif-status');
+  $$('[data-switch]').forEach((s) => {
+    s.addEventListener('click', () => {
+      const on = s.getAttribute('aria-checked') === 'true';
+      s.setAttribute('aria-checked', on ? 'false' : 'true');
+      say(notifStatus, '');
+    });
+  });
+  $('[data-action="save-notifications"]').addEventListener('click', () => {
+    say(notifStatus, 'Notification settings saved. Changes apply to your account.');
+  });
+
+  /* ---------- Team ---------- */
+  let members = [
+    { id: 1, name: 'Ana Lee', email: 'ana@northwind.co', role: 'Admin' },
+    { id: 2, name: 'Ben Ortiz', email: 'ben@northwind.co', role: 'Member' },
+    { id: 3, name: 'Priya Shah', email: 'priya@northwind.co', role: 'Viewer' }
+  ];
+  let nextId = 4;
+  const teamStatus = $('#team-status');
+  const inviteErr = $('#invite-error');
+  const inviteIn = $('#invite-email');
+
+  function initials(n) {
+    return n.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+  }
+
+  function askRemove(id) {
+    const m = members.find((x) => x.id === id);
+    if (!m) return;
+    openDialog({
+      title: 'Remove ' + m.name + ' from Northwind?',
+      body: 'They will lose access to Northwind projects and files. You can invite them again later.',
+      cancel: 'Keep ' + m.name,
+      confirm: 'Remove member',
+      onConfirm: () => {
+        members = members.filter((x) => x.id !== id);
+        renderTeam();
+        say(teamStatus, m.name + ' was removed from Northwind.');
+      }
+    });
+  }
+
+  function renderTeam() {
+    const list = $('#member-list');
+    list.textContent = '';
+    members.forEach((m) => {
+      list.appendChild(h('li', { class: 'row', 'data-member': '', 'data-id': String(m.id) }, [
+        h('div', { class: 'person' }, [
+          h('span', { class: 'avatar', 'aria-hidden': 'true' }, [initials(m.name)]),
+          h('div', {}, [
+            h('strong', {}, [m.name]),
+            h('div', { class: 'hint' }, [m.email])
+          ])
+        ]),
+        h('div', { style: 'display:flex;gap:12px;align-items:center;flex-wrap:wrap' }, [
+          h('span', { class: 'role-tag' }, [m.role]),
+          h('button', {
+            type: 'button',
+            class: 'btn btn-secondary',
+            'data-action': 'remove-member',
+            'aria-label': 'Remove ' + m.name,
+            onclick: () => askRemove(m.id)
+          }, ['Remove'])
+        ])
+      ]));
+    });
+    $('#team-count').textContent = members.length + (members.length === 1 ? ' member' : ' members');
+  }
+
+  $('#invite-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    say(teamStatus, '');
+    const v = inviteIn.value.trim();
+    if (!EMAIL.test(v)) {
+      showError(inviteErr, inviteIn, 'Enter an email address like name@company.com. Check for typos and try again.');
+      return;
+    }
+    if (members.some((m) => m.email.toLowerCase() === v.toLowerCase())) {
+      showError(inviteErr, inviteIn, v + ' is already on the team. Invite someone else, or remove them first.');
+      return;
+    }
+    clearError(inviteErr, inviteIn);
+    const local = v.split('@')[0];
+    const name = local.split(/[._-]+/).filter(Boolean)
+      .map((w) => w[0].toUpperCase() + w.slice(1)).join(' ') || v;
+    members.push({ id: nextId++, name: name, email: v, role: 'Member' });
+    inviteIn.value = '';
+    renderTeam();
+    say(teamStatus, 'Invitation sent to ' + v + '. They join as a Member.');
+  });
+
+  /* ---------- Projects ---------- */
+  let projects = [];
+  let projN = 0;
+  const createBtn = $('[data-action="create-project"]');
+  const slotEmpty = $('#slot-empty');
+  const slotList = $('#slot-list');
+  const emptyCard = $('[data-empty]');
+  const listCard = $('#project-card');
+  const projStatus = $('#projects-status');
+
+  function renderProjects() {
+    const had = document.activeElement === createBtn;
+    const has = projects.length > 0;
+    if (has) {
+      slotList.appendChild(createBtn);
+    } else {
+      slotEmpty.appendChild(createBtn);
+    }
+    emptyCard.hidden = has;
+    listCard.hidden = !has;
+    const list = $('#project-list');
+    list.textContent = '';
+    projects.forEach((p) => {
+      list.appendChild(h('li', { class: 'row', 'data-project': '', 'data-id': String(p.id) }, [
+        h('div', {}, [
+          h('strong', {}, [p.name]),
+          h('div', { class: 'hint' }, ['Owner: you · Created just now'])
+        ]),
+        h('span', { class: 'role-tag' }, ['Active'])
+      ]));
+    });
+    if (had) createBtn.focus();
+  }
+
+  createBtn.addEventListener('click', () => {
+    projN++;
+    projects.push({ id: projN, name: 'Project ' + projN });
+    renderProjects();
+    say(projStatus, 'Project ' + projN + ' created. It is now in your project list.');
+  });
+
+  /* ---------- Billing ---------- */
+  const cardIn = $('[data-field="card-number"]');
+  const expIn = $('[data-field="card-expiry"]');
+  const cvcIn = $('[data-field="card-cvc"]');
+  const billErr = $('#billing-error');
+  const billStatus = $('#billing-status');
+
+  $('#billing-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    say(billStatus, '');
+    const num = cardIn.value.replace(/\s+/g, '');
+    if (!/^\d{16}$/.test(num)) {
+      showError(billErr, cardIn, 'Card number needs 16 digits. Check the number on your card and try again.');
+      return;
+    }
+    if (num === '4000000000000002') {
+      showError(billErr, cardIn, 'Payment declined. Your bank declined this card. Try a different card or contact your bank.');
+      return;
+    }
+    clearError(billErr, cardIn);
+    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expIn.value.trim())) {
+      showError(billErr, expIn, 'Expiry date needs a month and year, like 08/27. Check the front of your card.');
+      return;
+    }
+    clearError(billErr, expIn);
+    if (!/^\d{3,4}$/.test(cvcIn.value.trim())) {
+      showError(billErr, cvcIn, 'Security code needs 3 or 4 digits. You can find it on the back of your card.');
+      return;
+    }
+    clearError(billErr, cvcIn);
+    cardIn.value = '';
+    expIn.value = '';
+    cvcIn.value = '';
+    say(billStatus, 'Payment of $36.00 received. Your receipt will be sent to billing@northwind.co.');
+  });
+
+  /* ---------- Danger zone ---------- */
+  const deleteBtn = $('#delete-btn');
+  const dangerStatus = $('#danger-status');
+  let deleted = false;
+  deleteBtn.addEventListener('click', () => {
+    if (deleted) return;
+    openDialog({
+      title: 'Delete the Northwind workspace?',
+      body: 'All projects, files, messages and billing history will be deleted for every member. This can’t be undone.',
+      cancel: 'Keep workspace',
+      confirm: 'Delete workspace',
+      onConfirm: () => {
+        deleted = true;
+        deleteBtn.disabled = true;
+        say(dangerStatus, 'Northwind was deleted. Nobody can sign in to this workspace now.');
+      }
+    });
+  });
+
+  /* ---------- Init ---------- */
+  renderTeam();
+  renderProjects();
+  showPanel('profile', false);
+})();
+</script>
+</body>
+</html>

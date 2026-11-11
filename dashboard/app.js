@@ -6,9 +6,18 @@ const app = document.getElementById('app');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const fmt = (n, d = 1) => (n == null ? '—' : Number(n).toFixed(d));
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const num = (n) => Math.round(n).toLocaleString('en-US');
+const kTok = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : String(Math.round(n)));
+function dur(ms) {
+  if (ms == null) return '—';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${(ms / 1000).toFixed(1)} s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+  return `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, '0')}m`;
+}
 
 let S = null;
-const J = { filter: 'any', pair: null, revealed: false, busy: false, last: null };
+const J = { filter: 'any', pair: null, revealed: false, busy: false, last: null, guardUntil: 0 };
 
 async function refresh() {
   const res = await fetch('/api/state');
@@ -39,6 +48,19 @@ function standingsView() {
   const head = S.tasks
     .map((t) => `<th class="num task-col" title="${esc(t.subtitle)}">${esc(t.title)}${t.suite === 'v2' ? ' <span class="v2-badge">v2</span>' : ''}</th>`)
     .join('');
+  const anyRun = S.models.some((m) => S.runTotals?.[m]);
+  const genHead = anyRun
+    ? `<th class="num" title="Totals over the tasks generated with arena.mjs run: wall time, output tokens (thinking included) and generation speed">Generation</th>`
+    : '';
+  const genCell = (m) => {
+    const g = S.runTotals?.[m];
+    if (!anyRun) return '';
+    if (!g) return `<td class="num"><span class="none">—</span></td>`;
+    const est = g.estimated ? '~' : '';
+    const tip = `${g.tasks} task(s), ${num(g.completionTokens)} output tokens${g.reasoningTokens ? `, ${num(g.reasoningTokens)} thinking` : ''}${g.truncated ? `, ${g.truncated} cut off at the token limit` : ''}`;
+    return `<td class="num" title="${esc(tip)}"><span class="mid">${dur(g.wallMs)}</span>
+      <small class="cell-sub">${est}${kTok(g.completionTokens)} tok${g.genTokensPerSec ? ` · ${g.genTokensPerSec} tok/s` : ''}</small></td>`;
+  };
   const v2cell = (n) => (n == null ? '<span class="none">—</span>' : `<span class="mid v2-num">${fmt(n)}</span>`);
   const rows = S.board
     .map((r) => {
@@ -65,21 +87,22 @@ function standingsView() {
         <td class="num" title="Mean over all tasks incl. v2">${v2cell(r.auto2)}</td>
         <td class="num">${pref}</td>
         ${cells}
+        ${genCell(r.model)}
       </tr>`;
     })
     .join('');
   const w = S.weights;
   return `<h1>Standings</h1>
-    <p class="lede">Each model builds the same six core browser apps from identical prompts; the v2 suite adds three more (two tool-heavy, one hard simulation). Click a score to see what passed, what failed and a recording of the app.</p>
+    <p class="lede">Each model builds the same core browser apps from identical prompts; the v2 suite adds tool-heavy and simulation tasks. Click a score to see what passed, what failed and a recording of the app. Ranked by Auto.</p>
     <div class="standings-wrap"><table class="standings">
-      <thead><tr><th>#</th><th>Model</th><th class="num">Arena</th><th class="num">Auto</th><th class="num">Arena v2</th><th class="num">Auto v2</th><th class="num">Preference</th>${head}</tr></thead>
+      <thead><tr><th>#</th><th>Model</th><th class="num">Arena</th><th class="num">Auto</th><th class="num">Arena v2</th><th class="num">Auto v2</th><th class="num">Preference</th>${head}${genHead}</tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
     <section class="explain" aria-label="How scoring works">
-      <div><h3>Auto</h3><p>The mean task score from the automated grader over the original six tasks. A headless Chrome drives every page with real mouse, keyboard and audio instrumentation, and awards partial credit per check. Tasks a model skipped count as 0.</p></div>
+      <div><h3>Auto</h3><p>The mean task score from the automated grader over the core (non-v2) tasks. A headless Chrome drives every page with real mouse, keyboard and audio instrumentation, and awards partial credit per check. Tasks a model skipped count as 0. The standings are ranked by Auto.</p></div>
       <div><h3>Preference</h3><p>From blind side-by-side votes on the Judge page, fitted with Bradley–Terry (order-independent Elo). Shown as the expected win rate against an average model, after ${S.minVotes} votes.</p></div>
-      <div><h3>Arena</h3><p>${Math.round(w.auto * 100)}% Auto plus ${Math.round(w.preference * 100)}% Preference once a model has enough votes, otherwise Auto alone. Automated checks are objective; human votes judge what they can't measure: beauty and feel.</p></div>
-      <div><h3>Arena v2 / Auto v2</h3><p>The full suite: the original six tasks plus the three v2 tasks. Auto v2 is the mean over all nine; Arena v2 blends in Preference with the same weights. Shown only once a model has been graded on every v2 task — older runs keep their original scores untouched.</p></div>
+      <div><h3>Arena</h3><p>${Math.round(w.auto * 100)}% Auto plus ${Math.round(w.preference * 100)}% Preference once a model has enough votes, otherwise Auto alone. Kept for reference, but it leans visual (human votes on beauty and feel), so it does not drive the ranking — Auto does.</p></div>
+      <div><h3>Arena v2 / Auto v2</h3><p>The full suite: the core tasks plus the v2 tasks. Auto v2 is the mean over all of them; Arena v2 blends in Preference with the same weights. Shown only once a model has been graded on every v2 task — older runs keep their original scores untouched.</p></div>
     </section>`;
 }
 
@@ -122,13 +145,39 @@ function tasksView(id, focusModel) {
   </div>`;
 }
 
+// How the page was generated, when it came from `arena.mjs run` (or a
+// hand-written run.json).
+function runStats(m, tid) {
+  const r = S.runs?.[m]?.[tid];
+  if (!r) return '';
+  const est = r.tokensEstimated ? '~' : '';
+  const items = [
+    ['Time', dur(r.wallMs)],
+    ['Tokens', est + num(r.completionTokens ?? 0)],
+    r.reasoningTokens ? ['Thinking', est + num(r.reasoningTokens)] : null,
+    r.genTokensPerSec ? ['Speed', `${r.genTokensPerSec} tok/s`] : null,
+    r.ttftMs != null ? ['First token', dur(r.ttftMs)] : null,
+    r.promptTokensPerSec ? ['Prompt', `${r.promptTokensPerSec} tok/s`] : null,
+  ].filter(Boolean);
+  const params = Object.entries(r.params ?? {}).map(([k, v]) => `${k} ${typeof v === 'object' ? JSON.stringify(v) : v}`);
+  const src = [r.servedModel ?? r.apiModel, r.provider && `via ${r.provider}`, r.endpoint, ...params].filter(Boolean).join(' · ');
+  const live = S.urls[m]?.[tid] ?? '';
+  const file = (name) => esc(live.replace(/index\.html$/, name));
+  const links = [r.replyChars ? `<a href="${file('reply.md')}" target="_blank" rel="noopener">reply</a>` : '', r.reasoningChars ? `<a href="${file('thinking.md')}" target="_blank" rel="noopener">thinking</a>` : '']
+    .filter(Boolean)
+    .join(' · ');
+  const warn = r.finishReason === 'length' ? `<p class="run-warn">Cut off at the token limit, so the page is incomplete. Raise --max-tokens or the server's context size.</p>` : '';
+  return `<dl class="run">${items.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+    <p class="run-src">${esc(src)}${links && live ? ` · ${links}` : ''}</p>${warn}`;
+}
+
 function submissionCard(t, m, focused) {
   const r = result(m, t.id);
   const live = S.urls[m]?.[t.id];
   if (!r) {
     return `<article class="sub" id="sub-${esc(m)}"><div class="sub-media"></div><div class="sub-body">
       <div class="sub-top"><span class="model">${esc(m)}</span></div>
-      <p class="muted">Submitted but not graded yet. Run <code>npm run grade</code>.</p>
+      <p class="muted">Submitted but not graded yet. Run <code>npm run grade</code>.</p>${runStats(m, t.id)}
       <div class="sub-links"><a class="btn" href="${esc(live)}" target="_blank" rel="noopener">Open live</a></div></div></article>`;
   }
   const shots = r.media?.shots ?? [];
@@ -159,6 +208,7 @@ function submissionCard(t, m, focused) {
     <div class="sub-body">
       <div class="sub-top"><span class="model">${esc(m)}</span><span class="big">${fmt(r.score)}</span><span class="of">/ 100</span></div>
       <div class="sub-meta">Graded ${esc(when)} in ${Math.round(r.durationMs / 1000)} s, ${(r.submission.bytes / 1024).toFixed(0)} KB page, Chrome ${esc(r.browser)}</div>
+      ${runStats(m, t.id)}
       <div class="sub-links">
         <a class="btn" href="${esc(live)}" target="_blank" rel="noopener">Open live</a>
       </div>
@@ -198,7 +248,9 @@ function nextPair() {
 function judgeView(filter) {
   J.filter = filter && task(filter) ? filter : 'any';
   const valid = J.pair && S.urls[J.pair.a]?.[J.pair.task] && S.urls[J.pair.b]?.[J.pair.task] && (J.filter === 'any' || J.pair.task === J.filter);
-  if (!valid) {
+  // A re-render after voting (e.g. leaving and coming back) would show a
+  // disabled ballot without the reveal overlay, so deal a fresh pair instead.
+  if (!valid || J.revealed) {
     J.pair = nextPair();
     J.revealed = false;
   }
@@ -220,7 +272,7 @@ function judgeView(filter) {
       <div class="screen"><iframe title="Contender ${side.toUpperCase()}" src="${esc(S.urls[J.pair[side]][J.pair.task])}" allow="autoplay; clipboard-read; clipboard-write"></iframe>
         <div class="reveal" data-reveal="${side}"></div></div>
     </div>`;
-  return `<div class="judge">${top}
+  return `<div class="judge" tabindex="-1">${top}
     <p class="brief"><strong>${esc(t.title)}, ${esc(t.subtitle.toLowerCase())}.</strong> ${esc(t.judging.join(' '))}
       Use both apps for a while before voting; each runs live at 1280×800.</p>
     <div class="duel">${pane('a')}${pane('b')}</div>
@@ -294,9 +346,13 @@ function render() {
     if (l.dataset.view === view) l.setAttribute('aria-current', 'page');
     else l.removeAttribute('aria-current');
   }
-  document.querySelector('.meta').textContent = `${plural(S.models.length, 'model')}, ${plural(S.tasks.length, 'task')}, ${plural(S.votes.length, 'vote')}`;
+  document.querySelector('.meta').textContent = `${S.suite === 'v2' ? 'Suite v2 · ' : ''}${plural(S.models.length, 'model')}, ${plural(S.tasks.length, 'task')}, ${plural(S.votes.length, 'vote')}`;
+  document.title = S.suite === 'v2' ? 'Model Arena v2' : 'Model Arena';
   app.innerHTML = view === 'tasks' ? tasksView(a, b) : view === 'judge' ? judgeView(a) : standingsView();
-  if (view === 'judge') fitScreens();
+  if (view === 'judge') {
+    fitScreens();
+    guardFocus();
+  }
   const focus = document.querySelector('[data-focus="1"]');
   if (focus) focus.scrollIntoView({ block: 'start', behavior: 'instant' });
   else window.scrollTo(0, 0);
@@ -342,7 +398,7 @@ app.addEventListener('click', async (e) => {
     J.revealed = false;
     render();
   } else if (action === 'undo') {
-    S = await (await fetch('/api/vote/undo', { method: 'POST' })).json();
+    S = await (await fetch('/api/vote/undo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json();
     toast('Last vote removed');
     J.revealed = false;
     render();
@@ -350,7 +406,10 @@ app.addEventListener('click', async (e) => {
     const f = document.querySelector(`.pane.${el.dataset.side} iframe`);
     const src = f.src;
     f.src = 'about:blank';
-    requestAnimationFrame(() => (f.src = src));
+    requestAnimationFrame(() => {
+      f.src = src;
+      guardFocus([f]);
+    });
   } else if (action === 'expand') {
     const pane = el.closest('.pane');
     const on = !pane.classList.contains('expanded');
@@ -368,6 +427,27 @@ document.addEventListener('keydown', (e) => {
   if (map[e.key]) vote(map[e.key]);
   else if (e.key === 'n' || e.key === 'N') document.querySelector('[data-action="next"]')?.click();
   else if (e.key === 'Escape') document.querySelector('.pane.expanded [data-action="expand"]')?.click();
+});
+
+// Apps that focus themselves on load (a spreadsheet's grid, an editor's canvas)
+// would pull the keyboard into their iframe and silently disable the vote keys.
+// Until the frames have loaded, hand any such focus back to the dashboard;
+// after that, clicking into an app works as usual.
+function guardFocus(frames = [...document.querySelectorAll('.duel iframe')]) {
+  if (!frames.length) return;
+  J.guardUntil = performance.now() + 10000;
+  let pending = frames.length;
+  for (const f of frames)
+    f.addEventListener('load', () => {
+      if (--pending === 0) J.guardUntil = performance.now() + 1000;
+    }, { once: true });
+}
+
+window.addEventListener('blur', () => {
+  if (performance.now() > J.guardUntil) return;
+  setTimeout(() => {
+    if (document.activeElement?.matches?.('.duel iframe')) document.querySelector('.judge')?.focus({ preventScroll: true });
+  });
 });
 
 window.addEventListener('hashchange', render);

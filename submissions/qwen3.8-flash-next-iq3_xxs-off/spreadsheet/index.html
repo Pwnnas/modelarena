@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gridcalc</title>
+<style>
+  :root{
+    --bg:#eef0f3; --panel:#ffffff; --ink:#20242b; --muted:#697080; --faint:#9aa1ad;
+    --line:#d7dbe2; --line-soft:#e6e9ee; --accent:#1a73e8; --accent-bg:#e7f1fd;
+    --sel-line:#1565c0; --err:#b42318; --err-bg:#fdecea;
+    --c-ref:#1a73e8; --c-fn:#7c3aed; --c-num:#0b7285; --c-str:#b02d6f; --c-op:#5b6472;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:13px;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;}
+  #app{height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  /* toolbar */
+  .toolbar{display:flex;align-items:center;gap:14px;padding:8px 12px;background:#fff;
+    border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;letter-spacing:.2px;}
+  .brand svg{color:var(--accent);}
+  .toolbar-actions{display:flex;gap:6px;margin-left:auto;}
+  button.btn{font:inherit;font-size:12.5px;padding:6px 11px;border-radius:7px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);cursor:pointer;}
+  button.btn:hover{background:#f4f6f9;border-color:#c3c9d3;}
+  button.btn:active{transform:translateY(1px);}
+
+  /* formula bar */
+  .formulabar{display:flex;align-items:center;background:#fff;border-bottom:1px solid var(--line);padding:7px 10px;}
+  #cell-ref{font-weight:700;font-size:13px;min-width:52px;text-align:center;padding:6px 8px;border-radius:7px;
+    background:#f1f4f8;color:var(--ink);user-select:none;}
+  .fx{color:var(--muted);font-style:italic;font-weight:600;margin:0 8px;font-size:14px;}
+  #formula-bar{flex:1;border:none;outline:none;background:transparent;font-family:"SF Mono",ui-monospace,Consolas,Menlo,monospace;
+    font-size:13.5px;color:var(--ink);padding:6px 8px;border-radius:7px;}
+  #formula-bar:focus{background:#f4f7fb;box-shadow:inset 0 0 0 2px var(--accent);}
+
+  /* grid */
+  #grid-wrap{flex:1;overflow:auto;background:#fff;}
+  table#grid{border-collapse:separate;border-spacing:0;font-size:13px;color:var(--ink);table-layout:fixed;}
+  th,td{box-sizing:border-box;padding:0;}
+  thead th.corner{position:sticky;left:0;top:0;z-index:6;background:#f1f4f8;border-right:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .corner-inner{display:flex;align-items:center;justify-content:center;height:22px;color:var(--muted);}
+  thead th.colh{position:sticky;top:0;z-index:4;background:#f1f4f8;border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+    height:22px;text-align:center;font-weight:600;color:var(--muted);user-select:none;}
+  thead th.colh.hl{background:var(--accent-bg);color:var(--sel-line);}
+  tbody th.rowh{position:sticky;left:0;z-index:3;background:#f1f4f8;border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+    text-align:center;font-weight:600;color:var(--muted);user-select:none;}
+  tbody th.rowh.hl{background:var(--accent-bg);color:var(--sel-line);}
+  td.cell{height:24px;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);padding:0 6px;cursor:cell;}
+  td.cell.num{text-align:right;font-variant-numeric:tabular-nums;}
+  td.cell.text{text-align:left;}
+  td.cell.err{color:var(--err);background:var(--err-bg);font-weight:600;text-align:center;}
+  td.cell.refhl{box-shadow:inset 0 0 0 2px var(--c-ref);}
+
+  .cell-inner{position:relative;height:100%;display:flex;align-items:center;}
+  td.num .cell-inner,td.err .cell-inner{justify-content:flex-end;}
+  td.text .cell-inner{justify-content:flex-start;}
+  td.err .cell-inner{justify-content:center;}
+
+  #selection-box{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;z-index:15;box-shadow:inset 0 0 0 2px var(--sel-line);background:var(--accent-bg);}
+  td.cell.selected{z-index:2;}
+
+  .editor{position:absolute;left:-2px;top:-2px;right:-2px;bottom:-2px;z-index:30;border:2px solid var(--sel-line);
+    border-radius:2px;background:#fff;padding:1px 5px;font-family:"SF Mono",ui-monospace,Consolas,Menlo,monospace;font-size:13px;color:var(--ink);outline:none;box-shadow:0 3px 12px rgba(20,40,80,.18);}
+  .tok-ref{color:var(--c-ref);font-weight:600;}
+  .tok-fn{color:var(--c-fn);font-weight:600;}
+  .tok-num{color:var(--c-num);}
+  .tok-str{color:var(--c-str);}
+  .tok-op,.tok-paren{color:var(--c-op);}
+
+  /* status bar */
+  #statusbar{display:flex;align-items:center;gap:20px;padding:6px 14px;background:#fff;border-top:1px solid var(--line);font-size:12px;color:var(--muted);}
+  .stat b{color:var(--ink);font-weight:700;}
+  #statusbar .hint{margin-left:auto;font-size:11.5px;color:var(--faint);}
+
+  /* tooltip */
+  #tooltip{position:fixed;z-index:200;background:#20242b;color:#fff;padding:6px 9px;border-radius:7px;font-size:12px;
+    max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,.25);pointer-events:none;display:none;}
+
+  ::-webkit-scrollbar{width:12px;height:12px;}
+  ::-webkit-scrollbar-thumb{background:#c7ccd4;border-radius:6px;border:3px solid #fff;}
+  ::-webkit-scrollbar-thumb:hover{background:#b0b6c0;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="toolbar">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18" stroke="currentColor" stroke-width="1.4"/></svg>
+      Gridcalc
+    </div>
+    <div class="toolbar-actions">
+      <button id="btn-clear" class="btn" type="button">Clear all</button>
+    </div>
+  </div>
+
+  <div class="formulabar">
+    <div id="cell-ref">A1</div>
+    <span class="fx">fx</span>
+    <input id="formula-bar" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" placeholder="Enter a value or =formula">
+  </div>
+
+  <div id="grid-wrap"><table id="grid"></table></div>
+
+  <div id="statusbar">
+    <span><b id="stat-count">0</b>&nbsp;numeric</span>
+    <span>SUM&nbsp;<b id="stat-sum">0</b></span>
+    <span>AVERAGE&nbsp;<b id="stat-avg">0</b></span>
+    <span class="hint">Type to edit · F2 / double-click to edit existing · Ctrl+C / Ctrl+V copy-paste · Esc cancels</span>
+  </div>
+
+  <div id="tooltip"></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- constants & state ---------- */
+var COLS=26, ROWS=100;
+var cellData={}, cellElements={};
+var selR=0, selC=0;                 // 0-based selected row/col
+var editing=false, editRaw='';
+var internalClipboard=null;         // {raw}
+var referenceTokens=[];             // tokens of currently-edited formula (for highlighting)
+var recalcSeq=0;                    // generation counter for cycle detection
+
+/* ---------- lookup maps ---------- */
+function colLetter(c){ return String.fromCharCode(65+c); }
+function colIndex(letter){ var L=letter.toUpperCase().charCodeAt(0)-65; return (L>=0&&L<26)?L:-1; }
+function addr(r,c){ return colLetter(c)+(r+1); }
+
+/* ---------- grid construction ---------- */
+var wrap=document.getElementById('grid-wrap');
+var table=document.getElementById('grid');
+
+function buildGrid(){
+  var thead=document.createElement('thead');
+  var htr=document.createElement('tr');
+  var corner=document.createElement('th'); corner.className='corner';
+  corner.innerHTML='<div class="corner-inner"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 3v18M3 7h18" stroke="currentColor" stroke-width="1.6"/></svg></div>';
+  htr.appendChild(corner);
+  for(var c=0;c<COLS;c++){ var th=document.createElement('th'); th.className='colh'; th.textContent=colLetter(c); htr.appendChild(th); }
+  thead.appendChild(htr); table.appendChild(thead);
+
+  var tbody=document.createElement('tbody');
+  for(var r=0;r<ROWS;r++){
+    var tr=document.createElement('tr');
+    var rh=document.createElement('th'); rh.className='rowh'; rh.textContent=(r+1); tr.appendChild(rh);
+    for(var c2=0;c2<COLS;c2++){
+      var td=document.createElement('td'); td.className='cell text'; td.setAttribute('data-cell',addr(r,c2));
+      var inner=document.createElement('div'); inner.className='cell-inner'; td.appendChild(inner);
+      cellElements[addr(r,c2)]=td;
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+
+  var sel=document.createElement('div'); sel.id='selection-box';
+  document.body.appendChild(sel);
+}
+
+/* ---------- number formatting ---------- */
+function fmtNum(v){
+  if(!isFinite(v)) return '∞';
+  if(v===0) return '0';
+  var s=v.toPrecision(10);
+  if(s.indexOf('e')>=0 || s.indexOf('E')>=0){
+    var dec=(v<0?-1:1)*Math.floor(Math.log10(Math.abs(v)));
+    if(dec>=-5 && dec<=14){ s=parseFloat(v.toPrecision(10)).toString(); }
+  }
+  return s;
+}
+function fmtValue(value){
+  if(typeof value==='boolean') return value?'TRUE':'FALSE';
+  if(typeof value==='number') return fmtNum(value);
+  if(typeof value==='string'){ if(/^#.*!$/.test(value)) return value; return value; }
+  return '';
+}
+
+/* ---------- tokenizer ---------- */
+var FUNCS={SUM:1,AVERAGE:1,MIN:1,MAX:1,COUNT:1,IF:1,ABS:1,ROUND:1};
+function tokenize(s){
+  var t=[], i=0, n=s.length;
+  function err(){ throw {parse:true}; }
+  while(i<n){
+    var ch=s[i];
+    if(ch===' '||ch==='\t'||ch==='\n'){ i++; continue; }
+    if(/[A-Za-z]/.test(ch)){
+      var j=i+1; while(j<n&&/[A-Za-z0-9_]/.test(s[j])) j++;
+      var w=s.slice(i,j); var u=w.toUpperCase();
+      if(FUNCS[u]) t.push({type:'func',name:u});
+      else if(u==='TRUE') t.push({type:'bool',value:true});
+      else if(u==='FALSE') t.push({type:'bool',value:false});
+      else err();
+      i=j; continue;
+    }
+    if(/[0-9]/.test(ch)){
+      var k=i; while(k<n&&/[0-9.eE]/.test(s[k])) k++;
+      var num=s.slice(i,k); if(!/^[0-9]*\.?[0-9]+([eE][+-]?[0-9]+)?$/.test(num)) err();
+      t.push({type:'num',value:parseFloat(num)}); i=k; continue;
+    }
+    if(ch==='"'){ var m=i+1,val=''; while(m<n&&s[m]!=='"'){ val+=s[m]; m++; } if(m>=n) err(); t.push({type:'str',value:val}); i=m+1; continue; }
+    if(ch==='&'){ t.push({type:'op',op:'&'}); i++; continue; }
+    var two=s.substr(i,2);
+    if(two==='<>'||two==='<='||two=='>='){ t.push({type:'op',op:two}); i+=2; continue; }
+    if('+-*/^='.indexOf(ch)>=0){ t.push({type:'op',op:ch}); i++; continue; }
+    if('<>'.indexOf(ch)>=0){ t.push({type:'op',op:ch}); i++; continue; }
+    if(ch==='('){ t.push({type:'paren',p:'('}); i++; continue; }
+    if(ch===')'){ t.push({type:'paren',p:')'}); i++; continue; }
+    if(ch===':'){ t.push({type:'colon'}); i++; continue; }
+    if(ch==='$'||ch===','){ t.push({type:'sep',s:ch}); i++; continue; }
+    err();
+  }
+  return t;
+}
+
+/* ---------- cell ref parsing (single reference) ---------- */
+function parseRef(str){
+  var m=/^\$?([A-Za-z]{1,2})\$?([0-9]+)$/.exec(str); if(!m) return null;
+  var c=colIndex(m[1]); var r=parseInt(m[2],10)-1;
+  if(c<0||r<0||c>=COLS||r>=ROWS) return {oob:true};
+  return {r:r,c:c};
+}
+
+/* ---------- parser (recursive descent) ---------- */
+function parseFormula(src){
+  var toks=tokenize(src); var pos=0;
+  function peek(){ return toks[pos]; }
+  function next(){ return toks[pos++]; }
+  function expect(t,v){ if(!peek()||peek().type!==t||(v!==undefined&&peek()[v]!==v)) throw {parse:true}; return next(); }
+
+  function parseExpr(){ return parseComparison(); }
+  function parseComparison(){ var l=parseConcat(); while(peek()&&peek().type==='op'&&['=','<>','<','>','<=','>='].indexOf(peek().op)>=0){ var op=next().op; var r=parseConcat(); l={k:'cmp',op:op,a:l,b:r}; } return l; }
+  function parseConcat(){ var l=parseAdditive(); while(peek()&&peek().type==='op'&&peek().op==='&'){ next(); var r=parseAdditive(); l={k:'bin',op:'&',a:l,b:r}; } return l; }
+  function parseAdditive(){ var l=parseMulDiv(); while(peek()&&peek().type==='op'&&(peek().op==='+'||peek().op==='-')){ var op=next().op; var r=parseMulDiv(); l={k:'bin',op:op,a:l,b:r}; } return l; }
+  function parseMulDiv(){ var l=parseUnary(); while(peek()&&peek().type==='op'&&(peek().op==='*'||peek().op==='/')){ var op=next().op; var r=parseUnary(); l={k:'bin',op:op,a:l,b:r}; } return l; }
+  function parseUnary(){ if(peek()&&peek().type==='op'&&(peek().op==='-'||peek().op==='+')){ var op=next().op; var e=parseUnary(); return {k:'unary',op:op,a:e}; } return parsePower(); }
+  function parsePower(){ var l=parsePrimary(); if(peek()&&peek().type==='op'&&peek().op==='^'){ next(); var r=parseUnary(); return {k:'bin',op:'^',a:l,b:r}; } return l; }
+  function parsePrimary(){
+    var t=peek(); if(!t) throw {parse:true};
+    if(t.type==='num'){ next(); return {k:'num',value:t.value}; }
+    if(t.type==='str'){ next(); return {k:'str',value:t.value}; }
+    if(t.type==='bool'){ next(); return {k:'bool',value:t.value}; }
+    if(t.type==='paren'&&t.p==='('){ next(); var e=parseExpr(); expect('paren',')'); return e; }
+    if(t.type==='func'){ next(); expect('paren','('); var args=[]; if(peek()&&!(peek().type==='paren'&&peek().p===')')){ args.push(parseExpr()); while(peek()&&peek().type==='sep'&&peek().s===','){ next(); args.push(parseExpr()); } } expect('paren',')'); return {k:'call',name:t.name,args:args}; }
+    if(t.type==='ref'){ next(); var ref=parseRefStr(t.text); if(ref.oob) throw {oob:true}; return {k:'cellref',r:ref.r,c:ref.c}; }
+    if(t.type==='range'){ next(); var rng=parseRangeStr(t.text); if(rng.oob) throw {oob:true}; return {k:'range',a:rng.a,b:rng.b}; }
+    throw {parse:true};
+  }
+
+  // pre-scan for refs/ranges (merge adjacent ref tokens with colon)
+  function scanRefs(){
+    var out=[]; var i=0;
+    while(i<toks.length){
+      var t=toks[i];
+      if(t.type==='ref'){
+        if(i+2<toks.length && toks[i+1].type==='colon' && toks[i+2].type==='ref'){
+          out.push({type:'range',text:t.text+':'+toks[i+2].text}); i+=3; continue;
+        }
+        out.push(t); i++; continue;
+      }
+      out.push(t); i++;
+    }
+    return out;
+  }
+  function parseRefStr(str){ var m=/^\$?([A-Za-z]{1,2})\$?([0-9]+)$/.exec(str); if(!m) throw {parse:true}; var c=colIndex(m[1]); var r=parseInt(m[2],10)-1; if(c<0||r<0||c>=COLS||r>=ROWS) return {oob:true}; return {r:r,c:c}; }
+  function parseRangeStr(str){ var parts=str.split(':'); var a=parseRefStr(parts[0]); var b=parseRefStr(parts[1]); if(a.oob||b.oob) return {oob:true}; return {a:a,b:b}; }
+
+  // convert raw tokens: refs/ranges detection happens by scanning identifier-like tokens
+  function toRefTokens(toks){
+    var out=[]; var i=0;
+    while(i<toks.length){
+      var t=toks[i];
+      if((t.type==='bool')||t.type==='func'){ out.push(t); i++; continue; }
+      // try to read a ref token from raw text: but tokenizer already split letters/numbers.
+      // Instead reconstruct refs from the ORIGINAL string is complex; handle here using tokens:
+      out.push(t); i++;
+    }
+    return out;
+  }
+
+  // The tokenizer doesn't emit 'ref'/'range'. Rebuild them from raw string via regex scan.
+  function parseRaw(src2){
+    var toks2=tokenize(src2);
+    // Replace sequences that form refs/ranges with ref/range tokens by matching original text positions is hard.
+    return toks2;
+  }
+
+  // We need refs in the token stream. Re-tokenize with reference support:
+  function tokenizeWithRefs(s){
+    var t=[], i=0, n=s.length;
+    while(i<n){
+      var ch=s[i];
+      if(ch===' '||ch==='\t'||ch==='\n'){ i++; continue; }
+      // try to match a cell reference or range FIRST (letters optional $)
+      var m=/^\$?([A-Za-z]{1,2})\$?([0-9]+)(?::\$?([A-Za-z]{1,2})\$?([0-9]+))?/.exec(s.slice(i));
+      if(m){
+        // ensure it's not a function/bool keyword followed by '(' or standalone TRUE/FALSE handled below
+        var word=m[1];
+        // Only treat as ref if the matched form is a valid ref pattern (letters then digits). Functions are letters only.
+        // Guard: skip if next char after full match is '(' AND whole leading letters form a known function -> but refs always have digits, functions don't. Safe.
+        var text=m[0];
+        if(m[3]!==undefined){ t.push({type:'range',text:text}); }
+        else { t.push({type:'ref',text:text}); }
+        i+=text.length; continue;
+      }
+      if(/[A-Za-z]/.test(ch)){
+        var j=i+1; while(j<n&&/[A-Za-z0-9_]/.test(s[j])) j++;
+        var w=s.slice(i,j); var u=w.toUpperCase();
+        if(FUNCS[u]) t.push({type:'func',name:u});
+        else if(u==='TRUE') t.push({type:'bool',value:true});
+        else if(u==='FALSE') t.push({type:'bool',value:false});
+        else throw {parse:true};
+        i=j; continue;
+      }
+      if(/[0-9]/.test(ch)){ var k=i; while(k<n&&/[0-9.eE]/.test(s[k])) k++; var num=s.slice(i,k); if(!/^[0-9]*\.?[0-9]+([eE][+-]?[0-9]+)?$/.test(num)) throw {parse:true}; t.push({type:'num',value:parseFloat(num)}); i=k; continue; }
+      if(ch==='"'){ var mm=i+1,val=''; while(mm<n&&s[mm]!=='"'){ val+=s[mm]; mm++; } if(mm>=n) throw {parse:true}; t.push({type:'str',value:val}); i=mm+1; continue; }
+      if(ch==='&'){ t.push({type:'op',op:'&'}); i++; continue; }
+      var two=s.substr(i,2);
+      if(two==='<>'||two==='<='||two=='>='){ t.push({type:'op',op:two}); i+=2; continue; }
+      if('+-*/^='.indexOf(ch)>=0){ t.push({type:'op',op:ch}); i++; continue; }
+      if('<>'.indexOf(ch)>=0){ t.push({type:'op',op:ch}); i++; continue; }
+      if(ch==='('){ t.push({type:'paren',p:'('}); i++; continue; }
+      if(ch===')'){ t.push({type:'paren',p:')'}); i++; continue; }
+      if(ch===','){ t.push({type:'sep',s:','}); i++; continue; }
+      throw {parse:true};
+    }
+    return t;
+  }
+
+  toks=tokenizeWithRefs(src); pos=0;
+  var ast=parseExpr();
+  if(pos<toks.length) throw {parse:true};
+  return ast;
+}
+
+/* ---------- evaluator ---------- */
+var ERROR={DIV0:'#DIV/0!',VALUE:'#VALUE!',REF:'#REF!',ERROR:'#ERROR!',CYCLE:'#CYCLE!'};
+function isErr(v){ return typeof v==='string'&&/^#.*!$/.test(v); }
+
+function coerceNumber(v){
+  if(typeof v==='boolean') return v?1:0;
+  if(typeof v==='number') return v;
+  if(typeof v==='string'){ var n=parseFloat(v); return isNaN(n)?{err:true}:n; }
+  return {err:true};
+}
+
+function collectValues(node,out){
+  if(isErr(node)){ out.push(node); return; }
+  if(node.k==='range'){ for(var r=node.a.r;r<=node.b.r;r++)for(var c=node.a.c;c<=node.b.c;c++){ var v=evalCell(r,c); if(!isErr(v)) out.push(v); else out.push(v);} return; }
+  if(node.k==='cellref'){ var v2=evalCell(node.r,node.c); out.push(v2); return; }
+  if(node.args){ for(var i=0;i<node.args.length;i++) collectValues(node.args[i],out); return; }
+  // single expression -> evaluate it
+  var val=evalNode(node); out.push(val);
+}
+
+function evalNode(node){
+  switch(node.k){
+    case 'num': return node.value;
+    case 'str': return node.value;
+    case 'bool': return node.value;
+    case 'cellref': { var v=evalCell(node.r,node.c); if(isErr(v)) return v; return v; }
+    case 'range': return {__range:node};
+    case 'unary':{
+      var a=evalNode(node.a); if(isErr(a)) return a;
+      var na=coerceNumber(a); if(na.err) return ERROR.VALUE;
+      return node.op==='-'?-na:na;
+    }
+    case 'bin': return evalBin(node);
+    case 'cmp': return evalCmp(node);
+    case 'call': return evalCall(node);
+  }
+  return ERROR.ERROR;
+}
+
+function evalBin(node){
+  var a=evalNode(node.a), b=evalNode(node.b);
+  if(isErr(a)) return a; if(isErr(b)) return b;
+  if(node.op==='&') return toText(a)+toText(b);
+  var na=coerceNumber(a), nb=coerceNumber(b);
+  if(na.err||nb.err) return ERROR.VALUE;
+  switch(node.op){
+    case '+': return na+nb;
+    case '-': return na-nb;
+    case '*': return na*nb;
+    case '/': if(nb===0) return ERROR.DIV0; return na/nb;
+    case '^': var p=Math.pow(na,nb); return isFinite(p)?p:ERROR.VALUE;
+  }
+  return ERROR.ERROR;
+}
+
+function evalCmp(node){
+  var a=evalNode(node.a), b=evalNode(node.b);
+  if(isErr(a)) return a; if(isErr(b)) return b;
+  var na=coerceNumber(a), nb=coerceNumber(b);
+  var bothNum=!na.err&&!nb.err;
+  var x,y;
+  if(bothNum){ x=na; y=nb; }
+  else { x=toText(a).toLowerCase(); y=toText(b).toLowerCase(); }
+  var res=false;
+  switch(node.op){
+    case '=': res=(x===y); break;
+    case '<>': res=(x!==y); break;
+    case '<': res=(x<y); break;
+    case '>': res=(x>y); break;
+    case '<=': res=(x<=y); break;
+    case '>=': res=(x>=y); break;
+  }
+  return res;
+}
+
+function toText(v){
+  if(typeof v==='boolean') return v?'TRUE':'FALSE';
+  if(typeof v==='number') return fmtNum(v);
+  if(typeof v==='string') return v;
+  return '';
+}
+
+function evalCall(node){
+  var name=node.name;
+  // collect args as evaluated values (ranges flattened)
+  var argVals=[];
+  for(var i=0;i<node.args.length;i++){
+    var collected=[]; collectValues(node.args[i],collected);
+    argVals.push(collected);
+  }
+
+  if(name==='IF'){
+    // IF(cond, then, else): use single evaluated values for cond/then/else
+    var c1=evalNode(node.args[0]); if(isErr(c1)) return c1;
+    var truthy=toBool(c1);
+    var branch=node.args[truthy?1:2];
+    if(branch===undefined) return false;
+    var bv=evalNode(branch); return bv;
+  }
+
+  // flatten all arg values into a list of numeric-capable values, preserving errors propagation for SUM etc.
+  var flat=[]; for(var j=0;j<argVals.length;j++){ for(var k=0;k<argVals[j].length;k++) flat.push(argVals[j][k]); }
+
+  if(name==='SUM'||name==='AVERAGE'||name==='MIN'||name==='MAX'||name==='COUNT'){
+    var nums=[];
+    for(var m=0;m<flat.length;m++){ var val=flat[m]; if(isErr(val)) return val; if(typeof val==='boolean'){nums.push(val?1:0);continue;} var nn=coerceNumber(val); if(!nn.err) nums.push(nn); }
+    // ignore text/empty (empty cells become number 0 already, but empty string -> not number -> ignored)
+    if(name==='COUNT') return nums.length;
+    if(nums.length===0){ if(name==='SUM') return 0; if(name==='MIN'||name==='MAX') return 0; return ERROR.DIV0; }
+    var sum=nums.reduce(function(a,b){return a+b;},0);
+    if(name==='SUM') return sum;
+    if(name==='AVERAGE') return sum/nums.length;
+    if(name==='MIN') return Math.min.apply(null,nums);
+    if(name==='MAX') return Math.max.apply(null,nums);
+  }
+
+  if(name==='ABS'||name==='ROUND'){
+    var first=flat[0]; if(first===undefined) return ERROR.ERROR;
+    if(isErr(first)) return first;
+    var nx=coerceNumber(first); if(nx.err) return ERROR.VALUE;
+    if(name==='ABS') return Math.abs(nx);
+    // ROUND(x, digits)
+    var dcollected=[]; if(node.args[1]) collectValues(node.args[1],dcollected);
+    var dv=dcollected.length?coerceNumber(dcollected[0]):0; if(dv.err) return ERROR.VALUE;
+    var f=Math.pow(10,dv); return Math.round(nx*f)/f;
+  }
+
+  return ERROR.ERROR;
+}
+
+function toBool(v){
+  if(typeof v==='boolean') return v;
+  if(typeof v==='number') return v!==0;
+  if(typeof v==='string'){ if(v===''||v==='FALSE') return false; if(v==='TRUE') return true; var n=parseFloat(v); if(!isNaN(n)) return n!==0; return true; }
+  return false;
+}
+
+/* ---------- dependency graph + evaluation with cycle detection ---------- */
+var cellValues={};   // computed display value per address
+var cellAst={};      // parsed AST or null
+var dependents={};   // addr -> Set of addresses that depend on it (dependents[A1] contains cells using A1)
+
+function parseCell(r,c){
+  var ad=addr(r,c);
+  var raw=cellData[ad];
+  if(raw===undefined||raw==='') return null;
+  if(raw.charAt(0)==='='){ try{ var ast=parseFormula(raw.slice(1)); cellAst[ad]=ast; return ast; }catch(e){ cellAst[ad]='ERR'; return 'ERR'; } }
+  cellAst[ad]='LITERAL'; return 'LITERAL';
+}
+
+function collectDeps(node,deps){
+  if(!node||typeof node!=='object') return;
+  if(node.k==='cellref'){ deps.add(addr(node.r,node.c)); return; }
+  if(node.k==='range'){ for(var r=node.a.r;r<=node.b.r;r++)for(var c=node.a.c;c<=node.b.c;c++) deps.add(addr(r,c)); return; }
+  if(node.args){ for(var i=0;i<node.args.length;i++) collectDeps(node.args[i],deps); }
+  if(node.a) collectDeps(node.a,deps);
+  if(node.b) collectDeps(node.b,deps);
+}
+
+function rebuildDependents(){
+  dependents={};
+  for(var ad in cellAst){ var ast=cellAst[ad]; if(ast&&typeof ast==='object'){ var deps=new Set(); collectDeps(ast,deps); for(var d of deps){ (dependents[d]=dependents[d]||new Set()).add(ad); } } }
+}
+
+function evalCell(r,c){
+  var ad=addr(r,c);
+  if(!(ad in cellData)) return 0;   // empty -> 0 in arithmetic
+  var raw=cellData[ad];
+  if(raw==='') return 0;
+  var ast=cellAst[ad];
+  if(ast==='LITERAL'){
+    if(/^[+-]?([0-9]*\.?[0-9]+([eE][+-]?[0-9]+)?)$/.test(raw)) return parseFloat(raw);
+    return raw; // text or already an error string typed literally
+  }
+  if(ast==='ERR') return ERROR.ERROR;
+  var v=evalNodeWithCycle(ad,ast);
+  return v;
+}
+
+var evalGen={}; // ad -> last gen computed in current cycle pass
+var evalStack=new Set();
+function evalNodeWithCycle(ad,ast){
+  var g=recalcSeq;
+  if(evalGen[ad]===g) return cellValues[ad]; // already computed this generation (memo within pass)
+  if(evalStack.has(ad)){ cellValues[ad]=ERROR.CYCLE; return ERROR.CYCLE; }
+  evalStack.add(ad);
+  var res=evalNode(ast);
+  evalStack.delete(ad);
+  evalGen[ad]=g;
+  cellValues[ad]=res;
+  return res;
+}
+
+/* ---------- recalculation engine (topological) ---------- */
+function hasCycle(){
+  // detect any cycle in dependents graph via DFS color marking
+  var state={}; var found=false;
+  function dfs(node){ if(state[node]===2) return; if(state[node]===1){ found=true; return; } state[node]=1; var ds=dependents[node]; if(ds){ for(var d of ds){ dfs(d); if(found){ state[node]=2; return; } } } state[node]=2; }
+  for(var ad in dependents){ if(!state[ad]){ dfs(ad); if(found) break; } }
+  return found;
+}
+
+function topoOrder(){
+  // Kahn's algorithm over dependency edges: cell -> cells it depends on. We order so dependencies computed first.
+  var indeg={}; var nodes=new Set();
+  for(var ad in dependents){ nodes.add(ad); var ds=dependents[ad]; for(var d of ds) nodes.add(d); }
+  // build forward edges: dependency -> dependent (dependents[d] contains ad means ad depends on d, so edge d->ad)
+  for(var n of nodes) indeg[n]=0;
+  for(var dd in dependents){ for(var dep of dependents[dd]){ if(nodes.has(dep)) indeg[dep]=(indeg[dep]||0)+1; } }
+  var q=[]; for(var nn of nodes){ if(indeg[nn]===0) q.push(nn); }
+  var order=[];
+  while(q.length){ var cur=q.shift(); order.push(cur); var ds=dependents[cur]; if(ds){ for(var d2 of ds){ indeg[d2]--; if(indeg[d2]===0) q.push(d2); } } }
+  return order; // cells with no dependencies first, then dependents
+}
+
+var topoCache=null;
+function invalidateTopo(){ topoCache=null; }
+
+function recalcAll(){
+  rebuildDependents();
+  var cyc=hasCycle();
+  if(cyc){ // cycle exists: mark all cells in cycles as #CYCLE!, and their transitive dependents too. Recompute others normally.
+    computeWithCycles();
+  } else {
+    recalcSeq++;
+    evalGen={}; evalStack=new Set();
+    var order=topoOrder(); topoCache=order;
+    for(var ad of order){ evaluateAndRender(ad); }
+  }
+}
+
+function evaluateAndRender(ad){
+  if(!(ad in cellData)) return;
+  var raw=cellData[ad];
+  var val;
+  if(raw===''||raw===undefined) val=0;
+  else {
+    var ast=cellAst[ad];
+    if(ast==='LITERAL'){ val = /^[+-]?([0-9]*\.?[0-9]+([eE][+-]?[0-9]+)?)$/.test(raw)?parseFloat(raw):raw; }
+    else if(ast==='ERR') val=ERROR.ERROR;
+    else { recalcSeq++; evalGen={}; evalStack=new Set(); val=evalNodeWithCycle(ad,ast); }
+  }
+  cellValues[ad]=val; renderCell(ad);
+}
+
+function computeWithCycles(){
+  // Determine cells that are part of a cycle OR transitively depend on a cycle -> #CYCLE! (and propagate errors)
+  // Approach: for each cell, do DFS to see if it can reach itself through dependencies. If yes -> in cycle.
+  var depsOf={}; // ad -> set of addresses it depends on
+  for(var ad in cellAst){ var ast=cellAst[ad]; if(ast&&typeof ast==='object'){ var d=new Set(); collectDeps(ast,d); depsOf[ad]=d; } }
+  var inCycle={};
+  function reach(start){ var seen=new Set(); var stack=[start]; while(stack.length){ var cur=stack.pop(); if(cur===start && seen.has(start)) {} var ds=depsOf[cur]; if(!ds) continue; for(var d of ds){ if(d===start){ inCycle[start]=true; return; } if(!seen.has(d)){ seen.add(d); stack.push(d); } } } }
+  for(var a in depsOf){ reach(a); }
+
+  // cells that depend (transitively) on any cycle cell also show #CYCLE! via error propagation: their dependency value is #CYCLE!.
+  recalcSeq++; evalGen={}; evalStack=new Set();
+  var order=topoOrder();
+  for(var ad2 of order){
+    if(!(ad2 in cellData)) continue;
+    var raw=cellData[ad2];
+    var val;
+    if(raw===''||raw===undefined) val=0;
+    else {
+      var ast2=cellAst[ad2];
+      if(ast2==='LITERAL'){ val=/^[+-]?([0-9]*\.?[0-9]+([eE][+-]?[0-9]+)?)$/.test(raw)?parseFloat(raw):raw; }
+      else if(ast2==='ERR') val=ERROR.ERROR;
+      else { val=evalNodeWithCycle(ad2,ast2); }
+    }
+    cellValues[ad2]=val; renderCell(ad2);
+  }
+}
+
+function recalcAffected(startAddr){
+  // incremental: recompute start and all transitive dependents. Use topological order restricted to affected set.
+  rebuildDependents(); invalidateTopo();
+  var cyc=hasCycle();
+  if(cyc){ computeWithCycles(); }
+  else {
+    recalcSeq++; evalGen={}; evalStack=new Set();
+    // gather affected = start + all transitive dependents (dependents map: dependents[x] contains cells depending on x)
+    var affected=new Set([startAddr]); var stack=[startAddr];
+    while(stack.length){ var cur=stack.pop(); var ds=dependents[cur]; if(ds){ for(var d of ds){ if(!affected.has(d)){ affected.add(d); stack.push(d); } } } }
+    var order=topoOrder();
+    for(var ad of order){ if(affected.has(ad)) evaluateAndRender(ad); }
+  }
+}
+
+/* ---------- rendering ---------- */
+function renderCell(ad){
+  var el=cellElements[ad]; if(!el) return;
+  var inner=el.firstChild;
+  var val=cellValues[ad];
+  var text='';
+  var cls='cell ';
+  if(val===0 && (cellData[ad]===undefined||cellData[ad]==='')){ text=''; }
+  else { text=fmtValue(val); }
+  inner.textContent=text;
+
+  // classes for alignment & error
+  var isErr=isErr(val);
+  var isNum=(typeof val==='number');
+  var isBool=(typeof val==='boolean');
+  if(isErr) cls+='err';
+  else if(isNum||isBool) cls+='num';
+  else cls+='text';
+  // keep selected/refhl classes intact
+  var extra='';
+  if(el.getAttribute('aria-selected')==='true') extra+=' selected';
+  if(el.classList.contains('refhl')) extra+=' refhl';
+  el.className=cls+extra;
+
+  if(isErr){ el.setAttribute('title','Error: '+val); } else { el.removeAttribute('title'); }
+}
+
+function renderAll(){ for(var ad in cellElements) renderCell(ad); }
+
+/* ---------- selection & formula bar ---------- */
+var selBox=document.getElementById('selection-box');
+var cellRefEl=document.getElementById('cell-ref');
+var formulaBar=document.getElementById('formula-bar');
+
+function clearSelectionClasses(){
+  var prev=document.querySelectorAll('.selected'); for(var i=0;i<prev.length;i++){ prev[i].classList.remove('selected'); prev[i].removeAttribute('aria-selected'); }
+  var ph=document.querySelectorAll('.colh.hl,.rowh.hl'); for(var j=0;j<ph.length;j++) ph[j].classList.remove('hl');
+}
+
+function selectCell(r,c){
+  if(editing) commitEdit();
+  r=Math.max(0,Math.min(ROWS-1,r)); c=Math.max(0,Math.min(COLS-1,c));
+  clearSelectionClasses();
+  selR=r; selC=c;
+  var ad=addr(r,c); var el=cellElements[ad];
+  el.classList.add('selected'); el.setAttribute('aria-selected','true');
+  var colh=table.tHead.rows[0].cells[c+1]; if(colh) colh.classList.add('hl');
+  var rowh=table.tBodies[0].rows[r].cells[0]; if(rowh) rowh.classList.add('hl');
+
+  // move selection box
+  var rect=el.getBoundingClientRect(); var wr=wrap.getBoundingClientRect();
+  selBox.style.left=(rect.left-wr.left+wrap.scrollLeft)+'px';
+  selBox.style.top=(rect.top-wr.top+wrap.scrollTop)+'px';
+  selBox.style.width=rect.width+'px'; selBox.style.height=rect.height+'px';
+
+  // scroll into view
+  el.scrollIntoView({block:'nearest',inline:'nearest'});
+
+  updateFormulaBar();
+  updateStatus();
+}
+
+function updateFormulaBar(){
+  var ad=addr(selR,selC); cellRefEl.textContent=ad;
+  formulaBar.value=cellData[ad]||'';
+}
+
+/* ---------- editing ---------- */
+var editor=null;
+function startEdit(initialRaw){
+  if(editing) return;
+  editing=true; editRaw=initialRaw;
+  var ad=addr(selR,selC); var el=cellElements[ad];
+  editor=document.createElement('input'); editor.className='editor'; editor.spellcheck=false; editor.autocomplete='off';
+  editor.value=initialRaw;
+  el.appendChild(editor);
+  editor.focus(); editor.setSelectionRange(initialRaw.length,initialRaw.length);
+  highlightReferences(initialRaw);
+  editor.addEventListener('input',function(){ editRaw=editor.value; highlightReferences(editRaw); });
+  editor.addEventListener('keydown',onEditKey);
+}
+function highlightReferences(text){
+  // clear previous highlights
+  var old=document.querySelectorAll('.refhl'); for(var i=0;i<old.length;i++) old[i].classList.remove('refhl');
+  if(!text||text.charAt(0)!=='='){ referenceTokens=[]; return; }
+  try{ var toks=tokenizeWithRefs(text.slice(1)); }catch(e){ referenceTokens=[]; return; }
+  var colors={}; var palette=['#1a73e8','#d92b6f','#0b7285','#7c3aed']; var ci=0;
+  for(var t of toks){ if(t.type==='ref'){ var ref=parseRefStrSafe(t.text); if(ref&&!ref.oob){ var ad=addr(ref.r,ref.c); var el=cellElements[ad]; if(el) el.classList.add('refhl'); } } else if(t.type==='range'){ var parts=t.text.split(':'); var a=parseRefStrSafe(parts[0]); var b=parseRefStrSafe(parts[1]); if(a&&!a.oob&&b&&!b.oob){ for(var r=a.r;r<=b.r;r++)for(var c=a.c;c<=b.c;c++){ var e2=cellElements[addr(r,c)]; if(e2) e2.classList.add('refhl'); } } } }
+}
+function parseRefStrSafe(str){ return parseRef(str); }
+
+function cancelEdit(){ if(!editing) return; var ad=addr(selR,selC); removeEditor(); editing=false; highlightReferences(''); updateFormulaBar(); }
+function commitEdit(newRaw){ newRaw=(newRaw===undefined)?editRaw:newRaw; var ad=addr(selR,selC); removeEditor(); editing=false; highlightReferences(''); setCellData(ad,newRaw); }
+function removeEditor(){ if(editor){ editor.parentNode&&editor.parentNode.removeChild(editor); editor=null; } }
+
+function onEditKey(e){
+  if(e.key==='Enter'){ e.preventDefault(); var move=e.shiftKey?-1:1; commitEdit(); selectCell(selR+move,selC); }
+  else if(e.key==='Tab'){ e.preventDefault(); var mc=e.shiftKey?-1:1; commitEdit(); selectCell(selR,selC+mc); }
+  else if(e.key==='Escape'){ e.preventDefault(); cancelEdit(); }
+}
+
+function setCellData(ad,raw){
+  raw=String(raw||'');
+  cellData[ad]=raw; persist();
+  parseCell(selRowOf(ad),selColOf(ad)); // parse the changed cell
+  var r=parseInt(ad.replace(/[A-Z]/g,''),10)-1; var c=colIndex(ad.slice(0,ad.length-(String(r+1)).length));
+  parseCellRaw(ad);
+  recalcAffected(ad);
+}
+function selRowOf(){return 0;} function selColOf(){return 0;}
+function parseCellRaw(ad){ var r=rowFromAddr(ad), c=colFromAddr(ad); parseCell(r,c); }
+function rowFromAddr(ad){ return parseInt(ad.replace(/[A-Z]/g,''),10)-1; }
+function colFromAddr(ad){ var letters=ad.match(/^[A-Za-z]+/)[0]; return colIndex(letters); }
+
+/* ---------- clipboard / copy-paste with reference shifting ---------- */
+function shiftFormula(raw,dRow,dCol){
+  if(!raw||raw.charAt(0)!=='=') return raw;
+  var out=''; var i=1; var n=raw.length;
+  // regex scan for refs & ranges, keep everything else literal
+  while(i<n){
+    var m=/^\$?([A-Za-z]{1,2})\$?([0-9]+)(?::\$?([A-Za-z]{1,2})\$?([0-9]+))?/.exec(raw.slice(i));
+    if(m){ out+=shiftRefText(m[0],dRow,dCol); i+=m[0].length; continue; }
+    out+=raw[i]; i++;
+  }
+  return '='+out;
+}
+function shiftRefText(text,dRow,dCol){
+  var m=/^\$?([A-Za-z]{1,2})\$?([0-9]+)(?::(\$?)([A-Za-z]{1,2})\$?([0-9]+))?$/.exec(text); if(!m) return text;
+  // simpler: handle single or range by splitting on ':'
+  var parts=text.split(':');
+  return parts.map(function(p){ return shiftSingleRef(p,dRow,dCol); }).join(':');
+}
+function shiftSingleRef(p,dRow,dCol){
+  var m=/^(\$?)([A-Za-z]{1,2})(\$?)([0-9]+)$/.exec(p); if(!m) return p;
+  var colAbs=m[1]==='$', rowAbs=m[3]==='$';
+  var c=colIndex(m[2]); var r=parseInt(m[4],10)-1;
+  var nc=c+ (colAbs?0:dCol); var nr=r+(rowAbs?0:dRow);
+  var cs=(colAbs?'$':'')+colLetter(Math.max(0,Math.min(COLS-1,nc)));
+  var rs=(rowAbs?'$':'')+(Math.max(1,Math.min(ROWS,nr+1)));
+  return cs+rs;
+}
+
+function copySelection(){ internalClipboard={raw:cellData[addr(selR,selC)]||''}; }
+function pasteIntoSelected(){ if(!internalClipboard) return; var ad=addr(selR,selC); var raw=internalClipboard.raw; var srcAddr=internalClipboard.srcAddr; if(raw&&raw.charAt(0)==='='&&srcAddr){ var sr=rowFromAddr(srcAddr),sc=colFromAddr(srcAddr); raw=shiftFormula(raw,selR-sr,selC-sc); } setCellData(ad,raw); updateFormulaBar(); }
+
+/* ---------- status bar ---------- */
+function fmtNumShort(v){ if(!isFinite(v)) return '∞'; var s=v.toPrecision(8); if(s.indexOf('e')>=0) s=String(Math.round(v*1e6)/1e6); return s; }
+function updateStatus(){
+  var ad=addr(selR,selC); var v=cellValues[ad];
+  var count=0,sum=0;
+  if(typeof v==='number'){ count=1; sum=v; }
+  else if(typeof v==='boolean'){ count=1; sum=v?1:0; }
+  document.getElementById('stat-count').textContent=count;
+  document.getElementById('stat-sum').textContent=fmtNumShort(sum);
+  document.getElementById('stat-avg').textContent=count?fmtNumShort(sum/count):'0';
+}
+
+/* ---------- persistence ---------- */
+var LS_KEY='gridcalc.cells.v1';
+function persist(){ try{ localStorage.setItem(LS_KEY,JSON.stringify(cellData)); }catch(e){} }
+function restore(){ try{ var s=localStorage.getItem(LS_KEY); if(s){ cellData=JSON.parse(s)||{}; } }catch(e){ cellData={}; } }
+
+/* ---------- full recompute from data ---------- */
+function rebuildAll(){ for(var ad in cellData){ parseCellRaw(ad); } recalcAll(); }
+
+/* ---------- input handling (grid keyboard) ---------- */
+function isEditableTarget(el){ return el===formulaBar||el===editor; }
+
+document.addEventListener('keydown',function(e){
+  if(editing) return; // handled by editor's own listener
+  var tag=(e.target.tagName||'').toLowerCase();
+  if(tag==='input'||tag==='textarea') return; // typing in formula bar or elsewhere
+
+  // grid keyboard shortcuts (target is body/cell)
+  var k=e.key;
+  if(k==='ArrowUp'){ e.preventDefault(); selectCell(selR-1,selC); }
+  else if(k==='ArrowDown'){ e.preventDefault(); selectCell(selR+1,selC); }
+  else if(k==='ArrowLeft'){ e.preventDefault(); selectCell(selR,selC-1); }
+  else if(k==='ArrowRight'){ e.preventDefault(); selectCell(selR,selC+1); }
+  else if(k==='Tab'){ e.preventDefault(); selectCell(selR,selC+(e.shiftKey?-1:1)); }
+  else if(k==='Enter'){ e.preventDefault(); startEdit(cellData[addr(selR,selC)]||''); }
+  else if(k==='F2'){ e.preventDefault(); startEdit(cellData[addr(selR,selC)]||''); }
+  else if(k==='Delete'||k==='Backspace'){ e.preventDefault(); setCellData(addr(selR,selC),''); updateFormulaBar(); }
+  else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='c'){ e.preventDefault(); internalClipboard={raw:cellData[addr(selR,selC)]||'',srcAddr:addr(selR,selC)}; }
+  else if((e.ctrlKey||e.metaKey)&&k.toLowerCase()==='v'){ e.preventDefault(); pasteIntoSelected(); }
+  else if(k.length===1 && !e.ctrlKey && !e.metaKey && !e.altKey){
+    // printable -> start editing replacing content
+    e.preventDefault();
+    startEdit(''); editor.value=k; editRaw=k; highlightReferences(k);
+  }
+});
+
+/* ---------- formula bar input ---------- */
+formulaBar.addEventListener('keydown',function(e){
+  if(e.key==='Enter'){ e.preventDefault(); setCellData(addr(selR,selC),formulaBar.value); updateFormulaBar(); }
+});
+
+/* ---------- grid mouse events ---------- */
+table.addEventListener('mousedown',function(e){
+  var td=e.target.closest('td.cell'); if(!td) return;
+  var ad=td.getAttribute('data-cell'); var r=rowFromAddr(ad), c=colFromAddr(ad);
+  selectCell(r,c);
+});
+table.addEventListener('dblclick',function(e){
+  var td=e.target.closest('td.cell'); if(!td) return;
+  var ad=td.getAttribute('data-cell'); selectCell(rowFromAddr(ad),colFromAddr(ad)); startEdit(cellData[ad]||'');
+});
+
+/* ---------- tooltip for errors ---------- */
+var tip=document.getElementById('tooltip');
+table.addEventListener('mousemove',function(e){
+  var td=e.target.closest('td.cell.err'); if(!td){ tip.style.display='none'; return; }
+  var ad=td.getAttribute('data-cell'); var v=cellValues[ad];
+  tip.textContent='Error: '+v+' — check the formula in '+ad;
+  tip.style.display='block';
+  var x=e.clientX+14,y=e.clientY+16; if(x+tip.offsetWidth>innerWidth) x=innerWidth-tip.offsetWidth-8; if(y+tip.offsetHeight>innerHeight) y=innerHeight-tip.offsetHeight-8;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+});
+table.addEventListener('mouseleave',function(){ tip.style.display='none'; });
+
+/* ---------- selection box reposition on scroll/resize ---------- */
+function positionSelBox(){ var ad=addr(selR,selC); var el=cellElements[ad]; if(!el) return; var rect=el.getBoundingClientRect(); var wr=wrap.getBoundingClientRect(); selBox.style.left=(rect.left-wr.left+wrap.scrollLeft)+'px'; selBox.style.top=(rect.top-wr.top+wrap.scrollTop)+'px'; selBox.style.width=rect.width+'px'; selBox.style.height=rect.height+'px'; }
+wrap.addEventListener('scroll',positionSelBox);
+window.addEventListener('resize',function(){ positionSelBox(); });
+
+/* ---------- clear all ---------- */
+document.getElementById('btn-clear').addEventListener('click',function(){ cellData={}; persist(); cellAst={}; cellValues={}; rebuildAll(); renderAll(); selectCell(0,0); });
+
+/* ---------- init ---------- */
+buildGrid();
+restore();
+rebuildAll(); // parse + recalc all restored cells
+selectCell(0,0);
+})();
+</script>
+</body>
+</html>

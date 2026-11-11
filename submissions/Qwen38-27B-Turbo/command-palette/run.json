@@ -1,0 +1,23 @@
+{
+  "source": "arena run",
+  "endpoint": "192.168.1.172:8080",
+  "apiModel": "Qwen38-27B-Turbo",
+  "servedModel": "Qwen38-27B-Turbo",
+  "params": {},
+  "startedAt": "2026-10-29T22:19:37.142Z",
+  "wallMs": 503074,
+  "ttftMs": 4045,
+  "thinkingMs": 53489,
+  "promptTokens": 2998,
+  "completionTokens": 11640,
+  "reasoningTokens": 1046,
+  "tokensEstimated": false,
+  "genTokensPerSec": 23.3,
+  "promptTokensPerSec": 762.8,
+  "finishReason": "stop",
+  "replyChars": 32164,
+  "reasoningChars": 4567,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 32213
+}

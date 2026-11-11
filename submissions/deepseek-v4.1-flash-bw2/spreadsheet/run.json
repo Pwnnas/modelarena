@@ -1,0 +1,25 @@
+{
+  "source": "arena run",
+  "endpoint": "192.168.1.121:8080",
+  "apiModel": "deepseek-v4.1-flash",
+  "servedModel": "deepseek-v4.1-flash",
+  "params": {
+    "thinking": "low"
+  },
+  "startedAt": "2026-11-11T15:51:38.532Z",
+  "wallMs": 3273026,
+  "ttftMs": 36210,
+  "thinkingMs": 2119906,
+  "promptTokens": 1767,
+  "completionTokens": 47018,
+  "reasoningTokens": 32797,
+  "tokensEstimated": false,
+  "genTokensPerSec": 14.5,
+  "promptTokensPerSec": 44.9,
+  "finishReason": "stop",
+  "replyChars": 51494,
+  "reasoningChars": 130797,
+  "reasoningHidden": false,
+  "extracted": "fenced",
+  "htmlBytes": 51498
+}

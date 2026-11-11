@@ -1,0 +1,1909 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gridcalc</title>
+<style>
+  :root {
+    --header-bg: #f5f8fc;
+    --header-border: #d6dee8;
+    --grid-line: #e4e9f0;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --selection: #bfdbfe;
+    --error-bg: #fef2f2;
+    --error-text: #b91c1c;
+    --row-header-width: 42px;
+    --col-width: 92px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text);
+    background: #edf2f8;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+  .app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+    border-bottom: 1px solid var(--header-border);
+    flex-shrink: 0;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    font-size: 18px;
+    color: #0f172a;
+  }
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    display: grid;
+    place-items: center;
+    color: white;
+    font-size: 15px;
+    font-weight: 800;
+    box-shadow: 0 3px 8px rgba(37, 99, 235, 0.25);
+  }
+  .brand-sub {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-left: 2px;
+  }
+  .top-actions {
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    gap: 14px;
+  }
+  .top-actions span {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 4px 9px;
+  }
+  .formula-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--header-border);
+    flex-shrink: 0;
+  }
+  .address-label {
+    min-width: 62px;
+    padding: 6px 10px;
+    font-weight: 700;
+    font-size: 13px;
+    color: #1d4ed8;
+    background: #e0ecff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  #formula-bar {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    font-size: 14px;
+    color: #111827;
+    background: #fff;
+    outline: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  #formula-bar:focus {
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+  }
+  .sheet-scroll {
+    flex: 1;
+    overflow: auto;
+    background: #fff;
+    min-height: 0;
+  }
+  table#sheet {
+    border-collapse: collapse;
+    table-layout: fixed;
+    background: #fff;
+    user-select: none;
+  }
+  th, td {
+    margin: 0;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    height: 30px;
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    background: var(--header-bg);
+    border-right: 1px solid var(--header-border);
+    border-bottom: 1px solid var(--header-border);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+  }
+  th.corner {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 5;
+    width: var(--row-header-width);
+    background: #eef4fb;
+    border-right: 1px solid var(--header-border);
+    border-bottom: 1px solid var(--header-border);
+  }
+  th.column-header {
+    cursor: pointer;
+  }
+  th.col-active {
+    color: #1d4ed8;
+    background: #e6f0ff;
+    border-bottom-color: #93c5fd;
+  }
+  th.row-header {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    width: var(--row-header-width);
+    height: 27px;
+    padding: 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    background: var(--header-bg);
+    border-right: 1px solid var(--header-border);
+    border-bottom: 1px solid var(--header-border);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  th.row-active {
+    color: #1d4ed8;
+    background: #e6f0ff;
+    border-right-color: #93c5fd;
+  }
+  td.cell {
+    position: relative;
+    height: 27px;
+    width: var(--col-width);
+    padding: 0 8px;
+    font-size: 13px;
+    line-height: 27px;
+    color: #111827;
+    background: #fff;
+    border-right: 1px solid var(--grid-line);
+    border-bottom: 1px solid var(--grid-line);
+    white-space: pre;
+    overflow: hidden;
+    text-overflow: clip;
+    cursor: cell;
+  }
+  td.cell.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+  }
+  td.cell.text {
+    text-align: left;
+  }
+  td.cell.bool {
+    text-align: right;
+    font-weight: 600;
+    color: #0f172a;
+  }
+  td.cell.error {
+    background: var(--error-bg);
+    color: var(--error-text);
+    font-weight: 600;
+    text-align: right;
+    cursor: help;
+  }
+  td.cell.selected {
+    background: #eaf3ff;
+    box-shadow: inset 0 0 0 2px var(--accent);
+    border-right-color: #93c5fd;
+    border-bottom-color: #93c5fd;
+    z-index: 1;
+  }
+  td.cell.selected.error {
+    background: #fde8e8;
+    box-shadow: inset 0 0 0 2px #ef4444;
+  }
+  td.cell.ref-hl {
+    box-shadow: inset 0 0 0 2px var(--hl, #0ea5e9);
+    background: rgba(14, 165, 233, 0.10);
+  }
+  td.cell.selected.ref-hl {
+    box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 0 4px rgba(14,165,233,0.35);
+  }
+  .editor-wrap {
+    position: absolute;
+    inset: 0;
+    background: #f8fbff;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 2px var(--accent);
+    z-index: 2;
+    overflow: hidden;
+  }
+  .editor-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0 8px;
+    border: none;
+    background: transparent;
+    color: #111827;
+    font: 13px/27px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    outline: none;
+  }
+  .statusbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 18px;
+    border-top: 1px solid var(--header-border);
+    background: #f8fafc;
+    color: #475569;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .status-left {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    font-weight: 600;
+  }
+  .status-left span {
+    font-weight: 500;
+    color: #334155;
+  }
+  .status-right {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .chip {
+    background: #e2e8f0;
+    color: #334155;
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-weight: 600;
+  }
+  .chip.warn {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+  .hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #64748b;
+  }
+  kbd {
+    font-family: inherit;
+    font-size: 11px;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: #334155;
+  }
+  @media (max-width: 720px) {
+    .top-actions { display: none; }
+    .brand-sub { display: none; }
+    .formula-row { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">G</div>
+      <span>Gridcalc</span>
+      <span class="brand-sub">Spreadsheet engine</span>
+    </div>
+    <div class="top-actions">
+      <span>26 columns × 100 rows</span>
+      <span>F2 / double-click to edit</span>
+    </div>
+  </header>
+
+  <div class="formula-row">
+    <div class="address-label" id="address-label">A1</div>
+    <input id="formula-bar" type="text" autocomplete="off" spellcheck="false" aria-label="Formula bar">
+  </div>
+
+  <div class="sheet-scroll" id="sheet-scroll">
+    <table id="sheet" aria-label="Spreadsheet grid">
+      <colgroup id="colgroup"></colgroup>
+      <thead>
+        <tr id="column-headers"></tr>
+      </thead>
+      <tbody id="sheet-body"></tbody>
+    </table>
+  </div>
+
+  <footer class="statusbar">
+    <div class="status-left">
+      <span id="status-selected">A1</span>
+      <span id="status-value">—</span>
+      <span class="chip" id="status-formulas">0 formulas</span>
+      <span class="chip warn" id="status-errors">0 errors</span>
+    </div>
+    <div class="status-right">
+      <span class="hint"><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> copy & paste</span>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const COLS = 26;
+  const ROWS = 100;
+  const ROW_HEADER_WIDTH = 42;
+  const STORAGE_KEY = "gridcalc.data.v1";
+
+  function colLetter(index) {
+    return String.fromCharCode(65 + index);
+  }
+
+  function colIndexFromLetters(letters) {
+    let n = 0;
+    for (let i = 0; i < letters.length; i++) {
+      n = n * 26 + (letters.charCodeAt(i) - 65);
+    }
+    return n - 1;
+  }
+
+  function addressFromRC(r, c) {
+    return colLetter(c) + String(r + 1);
+  }
+
+  function canonicalAddress(row, col) {
+    return colLetter(col) + String(row + 1);
+  }
+
+  function isValidRC(r, c) {
+    return r >= 0 && r < ROWS && c >= 0 && c < COLS;
+  }
+
+  function isValidAddress(addr) {
+    const m = /^([A-Z]+)([0-9]+)$/.exec(addr);
+    if (!m) return false;
+    const c = colIndexFromLetters(m[1]);
+    const r = Number(m[2]) - 1;
+    return c >= 0 && c < COLS && r >= 0 && r < ROWS;
+  }
+
+  function parseAddressText(text) {
+    const m = /^\$?([A-Za-z]+)\$?([0-9]+)$/.exec(text);
+    if (!m) return null;
+    const col = colIndexFromLetters(m[1].toUpperCase());
+    const row = Number(m[2]) - 1;
+    if (!Number.isInteger(row) || row < 0 || row >= ROWS) {
+      // Keep a canonical outward address so evaluation can return #REF!
+      const letters = m[1].toUpperCase();
+      return { address: letters + String(row + 1), row, col, valid: false };
+    }
+    if (col < 0 || col >= COLS) {
+      const letters = m[1].toUpperCase();
+      return { address: letters + String(row + 1), row, col, valid: false };
+    }
+    return { address: canonicalAddress(row, col), row, col, valid: true };
+  }
+
+  function addressRange(startAddr, endAddr) {
+    const start = parseAddressText(startAddr);
+    const end = parseAddressText(endAddr);
+    if (!start || !end) return [];
+    const r1 = Math.min(start.row, end.row);
+    const r2 = Math.max(start.row, end.row);
+    const c1 = Math.min(start.col, end.col);
+    const c2 = Math.max(start.col, end.col);
+    const out = [];
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        out.push(canonicalAddress(r, c));
+      }
+    }
+    return out;
+  }
+
+  // ---------- Tokenizer ----------
+
+  function tokenize(src) {
+    const tokens = [];
+    let i = 0;
+    while (i < src.length) {
+      const ch = src[i];
+      if (/\s/.test(ch)) { i++; continue; }
+
+      if (ch === '"') {
+        i++;
+        let value = "";
+        let closed = false;
+        while (i < src.length) {
+          const c = src[i];
+          if (c === '"') {
+            i++;
+            closed = true;
+            break;
+          }
+          if (c === "\\" && i + 1 < src.length) {
+            value += src[i + 1];
+            i += 2;
+          } else {
+            value += c;
+            i++;
+          }
+        }
+        if (!closed) throw new Error("Unterminated string");
+        tokens.push({ type: "string", value });
+        continue;
+      }
+
+      if ((ch >= "0" && ch <= "9") || ch === ".") {
+        const start = i;
+        let sawDigit = false;
+        if (ch === ".") {
+          i++;
+          if (i < src.length && src[i] >= "0" && src[i] <= "9") sawDigit = true;
+          else throw new Error("Invalid number");
+        }
+        while (i < src.length && src[i] >= "0" && src[i] <= "9") {
+          sawDigit = true;
+          i++;
+        }
+        if (i < src.length && src[i] === ".") {
+          i++;
+          while (i < src.length && src[i] >= "0" && src[i] <= "9") {
+            sawDigit = true;
+            i++;
+          }
+        }
+        if (!sawDigit) throw new Error("Invalid number");
+        if (i < src.length && (src[i] === "e" || src[i] === "E")) {
+          i++;
+          if (i < src.length && (src[i] === "+" || src[i] === "-")) i++;
+          let expDigits = 0;
+          while (i < src.length && src[i] >= "0" && src[i] <= "9") {
+            expDigits++;
+            i++;
+          }
+          if (expDigits === 0) throw new Error("Invalid exponent");
+        }
+        const text = src.slice(start, i);
+        const num = Number(text);
+        if (Number.isNaN(num)) throw new Error("Invalid number");
+        tokens.push({ type: "number", value: num });
+        continue;
+      }
+
+      if (ch === "<" && src[i + 1] === "=") {
+        tokens.push({ type: "op", value: "<=" });
+        i += 2;
+        continue;
+      }
+      if (ch === ">" && src[i + 1] === "=") {
+        tokens.push({ type: "op", value: ">=" });
+        i += 2;
+        continue;
+      }
+      if (ch === "<" && src[i + 1] === ">") {
+        tokens.push({ type: "op", value: "<>" });
+        i += 2;
+        continue;
+      }
+      if ("+-*/^&=<>(),:".includes(ch)) {
+        tokens.push({ type: "op", value: ch });
+        i++;
+        continue;
+      }
+
+      if (/[A-Za-z]/.test(ch) || ch === "$") {
+        const start = i;
+        while (i < src.length && /[A-Za-z0-9$]/.test(src[i])) i++;
+        tokens.push({ type: "identifier", value: src.slice(start, i) });
+        continue;
+      }
+
+      throw new Error("Unexpected character: " + ch);
+    }
+    return tokens;
+  }
+
+  // ---------- Parser ----------
+
+  function Parser(tokens) {
+    this.tokens = tokens;
+    this.pos = 0;
+  }
+
+  Parser.prototype.peek = function () {
+    return this.tokens[this.pos] || null;
+  };
+
+  Parser.prototype.isOp = function (value) {
+    const t = this.peek();
+    return t && t.type === "op" && t.value === value;
+  };
+
+  Parser.prototype.consumeOp = function (value) {
+    if (!this.isOp(value)) throw new Error("Expected " + value);
+    this.pos++;
+  };
+
+  Parser.prototype.parse = function () {
+    const node = this.parseComparison();
+    if (this.pos !== this.tokens.length) throw new Error("Unexpected token");
+    return node;
+  };
+
+  Parser.prototype.parseComparison = function () {
+    let left = this.parseConcat();
+    const ops = ["=", "<>", "<", ">", "<=", ">="];
+    while (this.peek() && this.peek().type === "op" && ops.includes(this.peek().value)) {
+      const op = this.peek().value;
+      this.pos++;
+      const right = this.parseConcat();
+      left = { type: "binary", op, left, right };
+    }
+    return left;
+  };
+
+  Parser.prototype.parseConcat = function () {
+    let left = this.parseAdditive();
+    while (this.isOp("&")) {
+      this.pos++;
+      const right = this.parseAdditive();
+      left = { type: "binary", op: "&", left, right };
+    }
+    return left;
+  };
+
+  Parser.prototype.parseAdditive = function () {
+    let left = this.parseMultiplicative();
+    while (this.isOp("+") || this.isOp("-")) {
+      const op = this.peek().value;
+      this.pos++;
+      const right = this.parseMultiplicative();
+      left = { type: "binary", op, left, right };
+    }
+    return left;
+  };
+
+  Parser.prototype.parseMultiplicative = function () {
+    let left = this.parseUnary();
+    while (this.isOp("*") || this.isOp("/")) {
+      const op = this.peek().value;
+      this.pos++;
+      const right = this.parseUnary();
+      left = { type: "binary", op, left, right };
+    }
+    return left;
+  };
+
+  Parser.prototype.parseUnary = function () {
+    if (this.isOp("+") || this.isOp("-")) {
+      const op = this.peek().value;
+      this.pos++;
+      const operand = this.parseUnary();
+      return { type: "unary", op, operand };
+    }
+    return this.parsePower();
+  };
+
+  Parser.prototype.parsePower = function () {
+    let left = this.parsePrimary();
+    if (this.isOp("^")) {
+      this.pos++;
+      const right = this.parseUnary();
+      left = { type: "binary", op: "^", left, right };
+    }
+    return left;
+  };
+
+  Parser.prototype.parsePrimary = function () {
+    const token = this.peek();
+    if (!token) throw new Error("Unexpected end of formula");
+
+    if (token.type === "number") {
+      this.pos++;
+      return { type: "number", value: token.value };
+    }
+    if (token.type === "string") {
+      this.pos++;
+      return { type: "string", value: token.value };
+    }
+    if (token.type === "op" && token.value === "(") {
+      this.pos++;
+      const node = this.parseComparison();
+      if (!this.isOp(")")) throw new Error("Expected )");
+      this.pos++;
+      return node;
+    }
+    if (token.type === "identifier") {
+      const next = this.tokens[this.pos + 1];
+      if (next && next.type === "op" && next.value === "(") {
+        const name = token.value.toUpperCase();
+        this.pos++;
+        this.pos++;
+        const args = [];
+        if (this.isOp(")")) {
+          this.pos++;
+          return { type: "call", name, args };
+        }
+        while (true) {
+          args.push(this.parseComparison());
+          if (this.isOp(",")) {
+            this.pos++;
+            continue;
+          }
+          if (this.isOp(")")) {
+            this.pos++;
+            break;
+          }
+          throw new Error("Expected , or )");
+        }
+        return { type: "call", name, args };
+      }
+
+      const upper = token.value.toUpperCase();
+      if (upper === "TRUE" || upper === "FALSE") {
+        this.pos++;
+        return { type: "boolean", value: upper === "TRUE" };
+      }
+
+      const ref = parseAddressText(token.value);
+      if (!ref) throw new Error("Invalid reference");
+      this.pos++;
+
+      if (this.isOp(":")) {
+        this.pos++;
+        const nextToken = this.peek();
+        if (!nextToken || nextToken.type !== "identifier") {
+          throw new Error("Invalid range");
+        }
+        const ref2 = parseAddressText(nextToken.value);
+        if (!ref2) throw new Error("Invalid range reference");
+        this.pos++;
+        return { type: "range", start: ref.address, end: ref2.address };
+      }
+
+      return { type: "ref", address: ref.address };
+    }
+
+    throw new Error("Unexpected token");
+  };
+
+  function parseFormula(source) {
+    const tokens = tokenize(source);
+    return new Parser(tokens).parse();
+  }
+
+  // ---------- Dependency collection ----------
+
+  function collectDependencies(node, set) {
+    if (!node) return;
+    switch (node.type) {
+      case "ref":
+        if (isValidAddress(node.address)) set.add(node.address);
+        break;
+      case "range": {
+        const cells = addressRange(node.start, node.end);
+        for (const a of cells) set.add(a);
+        break;
+      }
+      case "binary":
+        collectDependencies(node.left, set);
+        collectDependencies(node.right, set);
+        break;
+      case "unary":
+        collectDependencies(node.operand, set);
+        break;
+      case "call":
+        for (const arg of node.args) collectDependencies(arg, set);
+        break;
+      default:
+        break;
+    }
+  }
+
+  // ---------- Formatting ----------
+
+  function formatNumber(n) {
+    if (typeof n !== "number" || Number.isNaN(n)) return "NaN";
+    if (!Number.isFinite(n)) return n > 0 ? "Infinity" : "-Infinity";
+    if (n === 0) return "0";
+
+    let s = n.toPrecision(10);
+    if (s.includes("e") || s.includes("E")) {
+      let [mantissa, exponent] = s.split(/[eE]/);
+      if (mantissa.includes(".")) {
+        mantissa = mantissa.replace(/0+$/, "").replace(/\.$/, "");
+      }
+      exponent = exponent.replace(/^\+/, "");
+      exponent = exponent.replace(/^(-?)0+/, "$1");
+      if (exponent === "") exponent = "0";
+      return mantissa + "e" + exponent;
+    }
+
+    if (s.includes(".")) {
+      s = s.replace(/0+$/, "").replace(/\.$/, "");
+    }
+    return s;
+  }
+
+  function displayValue(value) {
+    if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+    if (typeof value === "number") return formatNumber(value);
+    if (typeof value === "string") return value;
+    if (value === null || value === undefined) return "";
+    return String(value);
+  }
+
+  function stringifyValue(value, empty) {
+    if (empty) return "";
+    if (typeof value === "number") return formatNumber(value);
+    if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+    if (typeof value === "string") return value;
+    return String(value);
+  }
+
+  // ---------- Data model ----------
+
+  const cells = new Map();
+  const cellEls = new Map();
+  const rowHeaders = new Map();
+  const colHeaders = new Map();
+  const reverseDeps = new Map();
+
+  let selected = "A1";
+  let editing = null;
+  let clipboard = null;
+  let highlightedCells = new Set();
+  let currentSelectedEl = null;
+
+  // ---------- DOM build ----------
+
+  const colgroup = document.getElementById("colgroup");
+  const columnHeaders = document.getElementById("column-headers");
+  const sheetBody = document.getElementById("sheet-body");
+  const table = document.getElementById("sheet");
+  const formulaBar = document.getElementById("formula-bar");
+  const addressLabel = document.getElementById("address-label");
+  const statusSelected = document.getElementById("status-selected");
+  const statusValue = document.getElementById("status-value");
+  const statusFormulas = document.getElementById("status-formulas");
+  const statusErrors = document.getElementById("status-errors");
+  const sheetScroll = document.getElementById("sheet-scroll");
+
+  const colWidths = new Array(COLS).fill(92);
+
+  function layoutTable() {
+    const headerCol = document.createElement("col");
+    headerCol.style.width = ROW_HEADER_WIDTH + "px";
+    colgroup.innerHTML = "";
+    colgroup.appendChild(headerCol);
+    let total = ROW_HEADER_WIDTH;
+    for (let c = 0; c < COLS; c++) {
+      const col = document.createElement("col");
+      col.style.width = colWidths[c] + "px";
+      total += colWidths[c];
+      colgroup.appendChild(col);
+    }
+    table.style.width = total + "px";
+  }
+
+  function buildGrid() {
+    layoutTable();
+
+    const corner = document.createElement("th");
+    corner.className = "corner";
+    corner.textContent = "";
+    columnHeaders.appendChild(corner);
+
+    for (let c = 0; c < COLS; c++) {
+      const th = document.createElement("th");
+      th.className = "column-header";
+      th.dataset.col = colLetter(c);
+      th.textContent = colLetter(c);
+      columnHeaders.appendChild(th);
+      colHeaders.set(colLetter(c), th);
+    }
+
+    for (let r = 0; r < ROWS; r++) {
+      const tr = document.createElement("tr");
+      tr.dataset.row = String(r + 1);
+
+      const rh = document.createElement("th");
+      rh.className = "row-header";
+      rh.dataset.row = String(r + 1);
+      rh.textContent = String(r + 1);
+      tr.appendChild(rh);
+      rowHeaders.set(String(r + 1), rh);
+
+      for (let c = 0; c < COLS; c++) {
+        const addr = canonicalAddress(r, c);
+        const td = document.createElement("td");
+        td.className = "cell";
+        td.dataset.cell = addr;
+        td.textContent = "";
+        tr.appendChild(td);
+
+        const cell = {
+          address: addr,
+          row: r,
+          col: c,
+          raw: "",
+          value: 0,
+          empty: true,
+          error: null,
+          display: "",
+          ast: null,
+          deps: new Set()
+        };
+        cells.set(addr, cell);
+        cellEls.set(addr, td);
+
+        td.addEventListener("click", function (e) {
+          if (editing && editing.input === e.target) return;
+          if (editing) {
+            if (editing.address === addr) return;
+            commitEditing(null);
+          }
+          selectCell(addr);
+        });
+
+        td.addEventListener("dblclick", function (e) {
+          if (editing && editing.input === e.target) return;
+          if (editing) {
+            if (editing.address === addr) return;
+            commitEditing(null);
+          }
+          selectCell(addr);
+          startEditing(addr, cells.get(addr).raw);
+        });
+      }
+
+      sheetBody.appendChild(tr);
+    }
+  }
+
+  // ---------- Cell state / rendering ----------
+
+  function clearReverseDeps(cell) {
+    for (const dep of cell.deps) {
+      const set = reverseDeps.get(dep);
+      if (set) {
+        set.delete(cell.address);
+        if (set.size === 0) reverseDeps.delete(dep);
+      }
+    }
+  }
+
+  function addReverseDeps(cell) {
+    for (const dep of cell.deps) {
+      if (!reverseDeps.has(dep)) reverseDeps.set(dep, new Set());
+      reverseDeps.get(dep).add(cell.address);
+    }
+  }
+
+  function parseCell(cell) {
+    clearReverseDeps(cell);
+    cell.deps = new Set();
+    cell.ast = null;
+    cell.error = null;
+
+    const raw = cell.raw;
+
+    if (raw === "") {
+      cell.value = 0;
+      cell.empty = true;
+      cell.display = "";
+      return;
+    }
+
+    if (raw.charAt(0) === "=") {
+      try {
+        const ast = parseFormula(raw.slice(1));
+        cell.ast = ast;
+        collectDependencies(ast, cell.deps);
+        cell.empty = false;
+      } catch (e) {
+        cell.ast = null;
+        cell.error = "#ERROR!";
+        cell.value = null;
+        cell.empty = false;
+        cell.display = "#ERROR!";
+        return;
+      }
+      addReverseDeps(cell);
+      return;
+    }
+
+    const numberPattern = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+    if (numberPattern.test(raw)) {
+      const n = Number(raw);
+      cell.value = n;
+      cell.empty = false;
+      cell.error = null;
+      cell.display = displayValue(n);
+    } else {
+      cell.value = raw;
+      cell.empty = false;
+      cell.error = null;
+      cell.display = raw;
+    }
+  }
+
+  function setCellComputed(cell, result) {
+    if (result.error) {
+      cell.error = result.error;
+      cell.value = null;
+      cell.empty = false;
+      cell.display = result.error;
+    } else {
+      cell.error = null;
+      cell.value = result.value;
+      cell.empty = false;
+      cell.display = displayValue(result.value);
+    }
+  }
+
+  function renderCell(cell) {
+    const td = cellEls.get(cell.address);
+    if (!td) return;
+    td.textContent = cell.display;
+    td.classList.remove("num", "text", "bool", "error");
+    if (cell.error) {
+      td.classList.add("error");
+      td.title = errorExplanation(cell.error);
+    } else {
+      td.title = "";
+      if (typeof cell.value === "number") {
+        td.classList.add("num");
+      } else if (typeof cell.value === "boolean") {
+        td.classList.add("bool");
+      } else {
+        td.classList.add("text");
+      }
+    }
+    if (cell.address === selected) {
+      td.classList.add("selected");
+    } else {
+      td.classList.remove("selected");
+    }
+  }
+
+  function errorExplanation(code) {
+    switch (code) {
+      case "#DIV/0!":
+        return "#DIV/0! — division by zero";
+      case "#VALUE!":
+        return "#VALUE! — text used in arithmetic";
+      case "#REF!":
+        return "#REF! — reference outside A1:Z100";
+      case "#ERROR!":
+        return "#ERROR! — formula could not be parsed or function is unknown";
+      case "#CYCLE!":
+        return "#CYCLE! — circular reference";
+      default:
+        return code;
+    }
+  }
+
+  // ---------- Formula evaluation ----------
+
+  function errorResult(code) {
+    return { error: code };
+  }
+
+  function valueResult(value, empty) {
+    return { value, empty: !!empty };
+  }
+
+  function getCellResult(addr) {
+    if (!isValidAddress(addr)) return errorResult("#REF!");
+    const cell = cells.get(addr);
+    if (!cell) return errorResult("#REF!");
+    if (cell.error) return errorResult(cell.error);
+    return valueResult(cell.value, cell.empty);
+  }
+
+  function toNumber(result) {
+    if (result.error) return result;
+    if (typeof result.value === "number") return result;
+    if (typeof result.value === "boolean") {
+      return valueResult(result.value ? 1 : 0, false);
+    }
+    return errorResult("#VALUE!");
+  }
+
+  function compareValues(op, a, b) {
+    if (op === "=") {
+      if (typeof a === "number" && typeof b === "number") return a === b;
+      if (typeof a === "boolean" && typeof b === "boolean") return a === b;
+      if (typeof a === "string" && typeof b === "string") return a === b;
+      return false;
+    }
+    if (op === "<>") {
+      if (typeof a === "number" && typeof b === "number") return a !== b;
+      if (typeof a === "boolean" && typeof b === "boolean") return a !== b;
+      if (typeof a === "string" && typeof b === "string") return a !== b;
+      return true;
+    }
+    if (op === "<") return a < b;
+    if (op === ">") return a > b;
+    if (op === "<=") return a <= b;
+    if (op === ">=") return a >= b;
+    return false;
+  }
+
+  function evaluateNode(node) {
+    if (!node) return errorResult("#ERROR!");
+
+    if (node.type === "number") return valueResult(node.value, false);
+    if (node.type === "string") return valueResult(node.value, false);
+    if (node.type === "boolean") return valueResult(node.value, false);
+
+    if (node.type === "ref") {
+      return getCellResult(node.address);
+    }
+
+    if (node.type === "unary") {
+      const r = evaluateNode(node.operand);
+      if (r.error) return r;
+      const n = toNumber(r);
+      if (n.error) return n;
+      return valueResult(node.op === "-" ? -n.value : n.value, false);
+    }
+
+    if (node.type === "binary") {
+      if (node.op === "&") {
+        const a = evaluateNode(node.left);
+        if (a.error) return a;
+        const b = evaluateNode(node.right);
+        if (b.error) return b;
+        return valueResult(
+          stringifyValue(a.value, a.empty) + stringifyValue(b.value, b.empty),
+          false
+        );
+      }
+
+      if (node.op === "=" || node.op === "<>" || node.op === "<" ||
+          node.op === ">" || node.op === "<=" || node.op === ">=") {
+        const a = evaluateNode(node.left);
+        if (a.error) return a;
+        const b = evaluateNode(node.right);
+        if (b.error) return b;
+        return valueResult(compareValues(node.op, a.value, b.value), false);
+      }
+
+      const a = evaluateNode(node.left);
+      if (a.error) return a;
+      const b = evaluateNode(node.right);
+      if (b.error) return b;
+      const na = toNumber(a);
+      if (na.error) return na;
+      const nb = toNumber(b);
+      if (nb.error) return nb;
+      const x = na.value;
+      const y = nb.value;
+      let z;
+
+      if (node.op === "+") z = x + y;
+      else if (node.op === "-") z = x - y;
+      else if (node.op === "*") z = x * y;
+      else if (node.op === "/") {
+        if (y === 0) return errorResult("#DIV/0!");
+        z = x / y;
+      } else if (node.op === "^") {
+        z = Math.pow(x, y);
+      } else {
+        return errorResult("#ERROR!");
+      }
+
+      if (Number.isNaN(z)) return errorResult("#VALUE!");
+      return valueResult(z, false);
+    }
+
+    if (node.type === "range") {
+      return errorResult("#VALUE!");
+    }
+
+    if (node.type === "call") {
+      return evaluateCall(node);
+    }
+
+    return errorResult("#ERROR!");
+    }
+
+  function evaluateCall(node) {
+    const name = node.name.toUpperCase();
+    const args = node.args;
+
+    if (name === "IF") {
+      if (args.length !== 3) return errorResult("#ERROR!");
+      const cond = evaluateNode(args[0]);
+      if (cond.error) return cond;
+      let truthy;
+      if (typeof cond.value === "boolean") truthy = cond.value;
+      else if (typeof cond.value === "number") truthy = cond.value !== 0;
+      else return errorResult("#VALUE!");
+      return evaluateNode(truthy ? args[1] : args[2]);
+    }
+
+    if (name === "SUM" || name === "AVERAGE" || name === "MIN" ||
+        name === "MAX" || name === "COUNT") {
+      const nums = [];
+      for (const arg of args) {
+        if (arg.type === "range") {
+          const rangeCells = addressRange(arg.start, arg.end);
+          for (const addr of rangeCells) {
+            if (!isValidAddress(addr)) continue;
+            const cell = cells.get(addr);
+            if (!cell) continue;
+            if (cell.error) return errorResult(cell.error);
+            if (cell.raw === "") continue;
+            if (typeof cell.value === "number") nums.push(cell.value);
+            // Text and booleans are ignored in ranges.
+          }
+        } else {
+          const r = evaluateNode(arg);
+          if (r.error) return r;
+          if (typeof r.value === "number") nums.push(r.value);
+          // Text and booleans are ignored by these aggregate functions.
+        }
+      }
+
+      if (name === "SUM") return valueResult(nums.reduce((a, b) => a + b, 0), false);
+      if (name === "COUNT") return valueResult(nums.length, false);
+      if (name === "MIN") return valueResult(nums.length ? Math.min(...nums) : 0, false);
+      if (name === "MAX") return valueResult(nums.length ? Math.max(...nums) : 0, false);
+      if (name === "AVERAGE") {
+        if (nums.length === 0) return errorResult("#DIV/0!");
+        return valueResult(nums.reduce((a, b) => a + b, 0) / nums.length, false);
+      }
+    }
+
+    if (name === "ABS") {
+      if (args.length !== 1) return errorResult("#ERROR!");
+      const r = evaluateNode(args[0]);
+      if (r.error) return r;
+      const n = toNumber(r);
+      if (n.error) return n;
+      return valueResult(Math.abs(n.value), false);
+    }
+
+    if (name === "ROUND") {
+      if (args.length !== 2) return errorResult("#ERROR!");
+      const r1 = evaluateNode(args[0]);
+      if (r1.error) return r1;
+      const r2 = evaluateNode(args[1]);
+      if (r2.error) return r2;
+      const n1 = toNumber(r1);
+      if (n1.error) return n1;
+      const n2 = toNumber(r2);
+      if (n2.error) return n2;
+      const digits = Math.trunc(n2.value);
+      const factor = Math.pow(10, digits);
+      const scaled = n1.value * factor;
+      const rounded = Math.sign(scaled) * Math.round(Math.abs(scaled));
+      return valueResult(rounded / factor, false);
+    }
+
+    return errorResult("#ERROR!");
+  }
+
+  // ---------- Recalculation with SCC / cycle handling ----------
+
+  function collectAffected(startAddr) {
+    const affected = new Set([startAddr]);
+    const queue = [startAddr];
+    while (queue.length) {
+      const a = queue.pop();
+      const dependents = reverseDeps.get(a);
+      if (!dependents) continue;
+      for (const d of dependents) {
+        if (!affected.has(d)) {
+          affected.add(d);
+          queue.push(d);
+        }
+      }
+    }
+    return affected;
+  }
+
+  function recalcSet(affected) {
+    const indices = new Map();
+    const low = new Map();
+    const onStack = new Set();
+    const stack = [];
+    const sccs = [];
+    let index = 0;
+
+    function strongConnect(v) {
+      indices.set(v, index);
+      low.set(v, index);
+      index++;
+      stack.push(v);
+      onStack.add(v);
+
+      const cell = cells.get(v);
+      if (cell && cell.deps) {
+        for (const dep of cell.deps) {
+          if (!affected.has(dep)) continue;
+          if (!indices.has(dep)) {
+            strongConnect(dep);
+            if (low.get(dep) < low.get(v)) low.set(v, low.get(dep));
+          } else if (onStack.has(dep)) {
+            if (indices.get(dep) < low.get(v)) low.set(v, indices.get(dep));
+          }
+        }
+      }
+
+      if (low.get(v) === indices.get(v)) {
+        const comp = [];
+        while (true) {
+          const w = stack.pop();
+          onStack.delete(w);
+          comp.push(w);
+          if (w === v) break;
+        }
+        sccs.push(comp);
+      }
+    }
+
+    for (const v of affected) {
+      if (!indices.has(v)) strongConnect(v);
+    }
+
+    for (const comp of sccs) {
+      let isCycle = comp.length > 1;
+      if (comp.length === 1) {
+        const v = comp[0];
+        const cell = cells.get(v);
+        if (cell && cell.deps.has(v)) isCycle = true;
+      }
+
+      if (isCycle) {
+        for (const v of comp) {
+          const cell = cells.get(v);
+          cell.error = "#CYCLE!";
+          cell.value = null;
+          cell.empty = false;
+          cell.display = "#CYCLE!";
+        }
+      } else {
+        const v = comp[0];
+        const cell = cells.get(v);
+        if (!cell) continue;
+
+        if (cell.ast) {
+          const result = evaluateNode(cell.ast);
+          setCellComputed(cell, result);
+        } else if (cell.raw === "") {
+          cell.error = null;
+          cell.value = 0;
+          cell.empty = true;
+          cell.display = "";
+        } else {
+          // Non-formula raw content.
+          const numberPattern = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+          if (numberPattern.test(cell.raw)) {
+            cell.value = Number(cell.raw);
+            cell.empty = false;
+            cell.error = null;
+            cell.display = displayValue(cell.value);
+          } else {
+            cell.value = cell.raw;
+            cell.empty = false;
+            cell.error = null;
+            cell.display = cell.raw;
+          }
+        }
+      }
+    }
+  }
+
+  function recalcAll() {
+    recalcSet(new Set(cells.keys()));
+  }
+
+  function refreshStats() {
+    let formulas = 0;
+    let errors = 0;
+    for (const cell of cells.values()) {
+      if (cell.raw.startsWith("=")) formulas++;
+      if (cell.error) errors++;
+    }
+    statusFormulas.textContent = formulas + (formulas === 1 ? " formula" : " formulas");
+    statusErrors.textContent = errors + (errors === 1 ? " error" : " errors");
+  }
+
+  function refreshSelectedStatus() {
+    const cell = cells.get(selected);
+    statusSelected.textContent = selected;
+    if (!cell) {
+      statusValue.textContent = "—";
+      return;
+    }
+    if (cell.error) {
+      statusValue.textContent = cell.error;
+    } else if (cell.raw === "") {
+      statusValue.textContent = "empty";
+    } else {
+      statusValue.textContent = cell.display;
+    }
+  }
+
+  function updateSelectionUI() {
+    if (currentSelectedEl) {
+      currentSelectedEl.classList.remove("selected");
+      currentSelectedEl.setAttribute("aria-selected", "false");
+    }
+
+    const td = cellEls.get(selected);
+    currentSelectedEl = td;
+    if (td) {
+      td.classList.add("selected");
+      td.setAttribute("aria-selected", "true");
+    }
+
+    for (const [col, th] of colHeaders) {
+      th.classList.toggle("col-active", col === selected.match(/^[A-Z]+/)[0]);
+    }
+    for (const [row, th] of rowHeaders) {
+      th.classList.toggle("row-active", row === selected.match(/[0-9]+$/)[0]);
+    }
+
+    refreshSelectedStatus();
+  }
+
+  function scrollSelectedIntoView() {
+    const td = cellEls.get(selected);
+    if (!td) return;
+    td.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+
+  function selectCell(addr, doScroll) {
+    if (!cells.has(addr)) return;
+    selected = addr;
+    updateSelectionUI();
+    const cell = cells.get(addr);
+    formulaBar.value = cell.raw;
+    addressLabel.textContent = addr;
+    if (doScroll !== false) scrollSelectedIntoView();
+    refreshSelectedStatus();
+  }
+
+  // ---------- Editing ----------
+
+  function clearHighlights() {
+    for (const el of highlightedCells) {
+      el.classList.remove("ref-hl");
+      el.style.removeProperty("--hl");
+    }
+    highlightedCells.clear();
+  }
+
+  function extractReferenceBlocks(text) {
+    let source = text;
+    if (source.startsWith("=")) source = source.slice(1);
+    let tokens;
+    try {
+      tokens = tokenize(source);
+    } catch (e) {
+      return [];
+    }
+
+    const blocks = [];
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      if (t.type !== "identifier") continue;
+      const ref = parseAddressText(t.value);
+      if (!ref) continue;
+
+      if (tokens[i + 1] && tokens[i + 1].type === "op" && tokens[i + 1].value === ":") {
+        const next = tokens[i + 2];
+        if (next && next.type === "identifier") {
+          const ref2 = parseAddressText(next.value);
+          if (ref2) {
+            blocks.push({ start: ref.address, end: ref2.address, range: true });
+            i += 2;
+            continue;
+          }
+        }
+      }
+      blocks.push({ start: ref.address, end: ref.address, range: false });
+    }
+    return blocks;
+  }
+
+  const highlightPalette = [
+    "#0ea5e9",
+    "#8b5cf6",
+    "#f59e0b",
+    "#10b981",
+    "#ef4444",
+    "#6366f1"
+  ];
+
+  function highlightFormulaReferences(text) {
+    clearHighlights();
+    const blocks = extractReferenceBlocks(text);
+    let colorIndex = 0;
+    for (const block of blocks) {
+      const color = highlightPalette[colorIndex % highlightPalette.length];
+      colorIndex++;
+      const rangeCells = addressRange(block.start, block.end);
+      for (const addr of rangeCells) {
+        if (!isValidAddress(addr)) continue;
+        const td = cellEls.get(addr);
+        if (!td) continue;
+        td.classList.add("ref-hl");
+        td.style.setProperty("--hl", color);
+        highlightedCells.add(td);
+      }
+    }
+  }
+
+  function startEditing(addr, initialText) {
+    const cell = cells.get(addr);
+    if (!cell) return;
+    if (editing) {
+      commitEditing(null);
+    }
+
+    const td = cellEls.get(addr);
+    if (!td) return;
+
+    const wrap = document.createElement("div");
+    wrap.className = "editor-wrap";
+
+    const input = document.createElement("input");
+    input.className = "editor-input";
+    input.type = "text";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.value = initialText;
+
+    wrap.appendChild(input);
+    td.appendChild(wrap);
+
+    editing = {
+      address: addr,
+      input,
+      wrap,
+      originalRaw: cell.raw
+    };
+
+    selected = addr;
+    updateSelectionUI();
+    formulaBar.value = initialText;
+    addressLabel.textContent = addr;
+
+    input.focus();
+    const len = input.value.length;
+    try {
+      input.setSelectionRange(len, len);
+    } catch (e) {}
+
+    input.addEventListener("input", function () {
+      formulaBar.value = input.value;
+      highlightFormulaReferences(input.value);
+    });
+
+    input.addEventListener("click", function (e) {
+      e.stopPropagation();
+    });
+
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const dr = e.shiftKey ? -1 : 1;
+        commitEditing({ dr, dc: 0 });
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        const dc = e.shiftKey ? -1 : 1;
+        commitEditing({ dr: 0, dc });
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancelEditing();
+      }
+    });
+
+    highlightFormulaReferences(initialText);
+  }
+
+  function removeEditor() {
+    if (!editing) return;
+    const input = editing.input;
+    const wrap = editing.wrap;
+    if (input && input.parentNode) input.parentNode.removeChild(input);
+    if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    editing = null;
+    clearHighlights();
+  }
+
+  function commitEditing(moveDirection) {
+    if (!editing) return;
+    const addr = editing.address;
+    const raw = editing.input.value;
+    removeEditor();
+    setRaw(addr, raw);
+
+    if (moveDirection) {
+      const cell = cells.get(addr);
+      let nr = cell.row + moveDirection.dr;
+      let nc = cell.col + moveDirection.dc;
+      if (nr < 0) nr = 0;
+      if (nr >= ROWS) nr = ROWS - 1;
+      if (nc < 0) nc = 0;
+      if (nc >= COLS) nc = COLS - 1;
+      selectCell(canonicalAddress(nr, nc));
+    } else {
+      selectCell(addr);
+    }
+  }
+
+  function cancelEditing() {
+    if (!editing) return;
+    const addr = editing.address;
+    const original = editing.originalRaw;
+    removeEditor();
+    const cell = cells.get(addr);
+    formulaBar.value = original;
+    selectCell(addr);
+    if (cell) formulaBar.value = cell.raw;
+  }
+
+  // ---------- Cell content changes ----------
+
+  function setRaw(addr, raw) {
+    const cell = cells.get(addr);
+    if (!cell) return;
+    if (cell.raw === raw) {
+      selectCell(addr);
+      return;
+    }
+
+    clearReverseDeps(cell);
+    cell.raw = raw;
+    parseCell(cell);
+
+    const affected = collectAffected(addr);
+    recalcSet(affected);
+
+    for (const a of affected) {
+      renderCell(cells.get(a));
+    }
+    renderCell(cells.get(addr));
+    updateSelectionUI();
+    refreshStats();
+    refreshSelectedStatus();
+    saveData();
+  }
+
+  // ---------- Persistence ----------
+
+  function saveData() {
+    const obj = {};
+    for (const cell of cells.values()) {
+      if (cell.raw !== "") obj[cell.address] = cell.raw;
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+    } catch (e) {}
+  }
+
+  function loadData() {
+    let obj = {};
+    try {
+      const text = localStorage.getItem(STORAGE_KEY);
+      if (text) obj = JSON.parse(text);
+    } catch (e) {
+      obj = {};
+    }
+    if (obj && typeof obj === "object") {
+      for (const [addr, raw] of Object.entries(obj)) {
+        if (cells.has(addr) && typeof raw === "string") {
+          cells.get(addr).raw = raw;
+        }
+      }
+    }
+  }
+
+  // ---------- Keyboard / clipboard ----------
+
+  function moveSelection(dr, dc) {
+    const cell = cells.get(selected);
+    if (!cell) return;
+    let nr = cell.row + dr;
+    let nc = cell.col + dc;
+    if (nr < 0) nr = 0;
+    if (nr >= ROWS) nr = ROWS - 1;
+    if (nc < 0) nc = 0;
+    if (nc >= COLS) nc = COLS - 1;
+    selectCell(canonicalAddress(nr, nc));
+  }
+
+  function isPrintableKey(e) {
+    return e.key.length === 1 &&
+      !e.ctrlKey && !e.metaKey && !e.altKey;
+  }
+
+  document.addEventListener("keydown", function (e) {
+    const target = e.target;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
+      return;
+    }
+    if (editing) return;
+
+    if ((e.ctrlKey || e.metaKey) && (e.key === "c" || e.key === "C")) {
+      e.preventDefault();
+      copySelected();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === "v" || e.key === "V")) {
+      e.preventDefault();
+      pasteSelected();
+      return;
+    }
+
+    if (e.key === "ArrowUp" || e.key === "ArrowDown" ||
+        e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      if (e.key === "ArrowUp") moveSelection(-1, 0);
+      else if (e.key === "ArrowDown") moveSelection(1, 0);
+      else if (e.key === "ArrowLeft") moveSelection(0, -1);
+      else moveSelection(0, 1);
+      return;
+    }
+
+    if (e.key === "F2") {
+      e.preventDefault();
+      startEditing(selected, cells.get(selected).raw);
+      return;
+    }
+
+    if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      setRaw(selected, "");
+      return;
+    }
+
+    if (isPrintableKey(e)) {
+      e.preventDefault();
+      startEditing(selected, e.key);
+      const input = editing.input;
+      const len = input.value.length;
+      try {
+        input.setSelectionRange(len, len);
+      } catch (err) {}
+      return;
+    }
+  });
+
+  function copySelected() {
+    const cell = cells.get(selected);
+    if (!cell) return;
+    clipboard = {
+      source: selected,
+      raw: cell.raw
+    };
+  }
+
+  function shiftFormula(raw, dr, dc) {
+    if (!raw.startsWith("=")) return raw;
+    const source = raw.slice(1);
+    const tokens = tokenize(source);
+    const out = [];
+
+    function shiftRef(text) {
+      const m = /^\$?([A-Za-z]+)\$?([0-9]+)$/.exec(text);
+      if (!m) return text;
+
+      let colAbs = text.startsWith("$");
+      let rowAbs = false;
+      const dollarPositions = [];
+      for (let i = 0; i < text.length; i++) {
+        if (text[i] === "$") dollarPositions.push(i);
+      }
+
+      // Determine whether row is absolute: $A$1 or A$1.
+      const rowMatch = /^\$?([A-Za-z]+)\$?([0-9]+)$/.exec(text);
+      if (!rowMatch) return text;
+
+      const letters = rowMatch[1].toUpperCase();
+      const rowNumber = Number(rowMatch[2]);
+      const colAbsFlag = letters.length > 0 && text.charAt(0) === "$";
+      const rowAbsFlag = rowMatch[2] && text.charAt(text.length - rowNumber.toString().length - 1) === "$";
+
+      let c = colIndexFromLetters(letters);
+      let r = rowNumber - 1;
+
+      if (!colAbsFlag) c += dc;
+      if (!rowAbsFlag) r += dr;
+
+      if (c < 0 || c >= COLS || r < 0 || r >= ROWS) {
+        return "#REF!";
+      }
+
+      return (colAbsFlag ? "$" : "") +
+        colLetter(c) +
+        (rowAbsFlag ? "$" : "") +
+        String(r + 1);
+    }
+
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      if (t.type === "identifier") {
+        const ref = parseAddressText(t.value);
+        if (ref) {
+          if (tokens[i + 1] && tokens[i + 1].type === "op" && tokens[i + 1].value === ":") {
+            const next = tokens[i + 2];
+            if (next && next.type === "identifier") {
+              const ref2 = parseAddressText(next.value);
+              if (ref2) {
+                out.push(shiftRef(t.value));
+                out.push(":");
+                out.push(shiftRef(next.value));
+                i += 2;
+                continue;
+              }
+            }
+          }
+          out.push(shiftRef(t.value));
+          continue;
+        }
+      }
+      out.push(t.value);
+    }
+    return "=" + out.join("");
+  }
+
+  function pasteSelected() {
+    if (!clipboard) return;
+    const dest = cells.get(selected);
+    if (!dest) return;
+    const src = cells.get(clipboard.source);
+    if (!src) return;
+
+    const dr = dest.row - src.row;
+    const dc = dest.col - src.col;
+    let raw = clipboard.raw;
+    if (raw.startsWith("=")) {
+      raw = shiftFormula(raw, dr, dc);
+    }
+    setRaw(dest.address, raw);
+  }
+
+  // ---------- Formula bar behavior ----------
+
+  formulaBar.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const raw = formulaBar.value;
+      setRaw(selected, raw);
+      formulaBar.value = cells.get(selected).raw;
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      formulaBar.value = cells.get(selected).raw;
+      formulaBar.blur();
+    }
+  });
+
+  formulaBar.addEventListener("focus", function () {
+    if (editing) commitEditing(null);
+  });
+
+  // ---------- Column resizing (small polish extra) ----------
+
+  let resizeState = null;
+
+  columnHeaders.addEventListener("mousedown", function (e) {
+    const th = e.target.closest("th.column-header");
+    if (!th) return;
+    const rect = th.getBoundingClientRect();
+    if (e.clientX > rect.right - 6) {
+      const col = th.dataset.col;
+      const c = colIndexFromLetters(col);
+      resizeState = {
+        col: c,
+        startX: e.clientX,
+        startWidth: colWidths[c],
+        header: th
+      };
+      e.preventDefault();
+      document.body.style.cursor = "col-resize";
+    }
+  });
+
+  document.addEventListener("mousemove", function (e) {
+    if (!resizeState) return;
+    const delta = e.clientX - resizeState.startX;
+    const newWidth = Math.max(46, resizeState.startWidth + delta);
+    colWidths[resizeState.col] = newWidth;
+    layoutTable();
+    refreshCellWidths();
+  });
+
+  document.addEventListener("mouseup", function () {
+    if (resizeState) {
+      resizeState = null;
+      document.body.style.cursor = "";
+    }
+  });
+
+  function refreshCellWidths() {
+    // Colgroup controls widths; no per-cell changes required.
+  }
+
+  // ---------- Initialization ----------
+
+  buildGrid();
+  loadData();
+
+  for (const cell of cells.values()) {
+    parseCell(cell);
+  }
+  recalcAll();
+  for (const cell of cells.values()) renderCell(cell);
+
+  updateSelectionUI();
+  selectCell("A1", false);
+  formulaBar.value = cells.get("A1").raw;
+  addressLabel.textContent = "A1";
+  refreshStats();
+  refreshSelectedStatus();
+
+  // Clean up any editor if the page is hidden/reloaded mid-edit.
+  window.addEventListener("beforeunload", function () {
+    // Nothing persistent for editor state; ignore.
+  });
+
+})();
+</script>
+</body>
+</html>
+```
